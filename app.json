@@ -1,0 +1,73 @@
+{
+  "expo": {
+    "name": "Glassnik",
+    "slug": "mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon_2.png",
+    "scheme": "glassnik",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#060609"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.glassnik.mobile",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Glassnik uses your camera to record POV videos from your glasses.",
+        "NSMicrophoneUsageDescription": "Glassnik uses your microphone to capture audio with your POV recordings.",
+        "NSPhotoLibraryUsageDescription": "Glassnik needs access to your photo library to upload videos and thumbnails.",
+        "NSPhotoLibraryAddUsageDescription": "Glassnik saves your recorded videos to your photo library.",
+        "NSLocationWhenInUseUsageDescription": "Glassnik uses your location to show you nearby POV content and tag your videos.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Glassnik uses your location to show you nearby POV content and tag your videos."
+      }
+    },
+    "android": {
+      "package": "com.glassnik.mobile",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon_2.png",
+        "backgroundColor": "#060609"
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/images/icon_2.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-web-browser",
+      "expo-video",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Glassnik needs access to your photos to upload videos and thumbnails.",
+          "cameraPermission": "Glassnik uses your camera to record POV videos from your glasses.",
+          "microphonePermission": "Glassnik uses your microphone to capture audio with your POV recordings."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Glassnik uses your location to show you nearby POV content and tag your videos."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
