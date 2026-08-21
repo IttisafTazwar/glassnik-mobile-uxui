@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -9,6 +9,7 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -34,9 +35,51 @@ export default function ProfileScreen() {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const queryClient = useQueryClient();
   const [gridTab, setGridTab] = useState<GridTab>('videos');
+
+  // ── Inline profile editing ──
+  const [isEditing, setIsEditing] = useState(false);
+  const [editDisplayName, setEditDisplayName] = useState('');
+  const [editUsername, setEditUsername] = useState('');
+  const [editAvatarUrl, setEditAvatarUrl] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  useEffect(() => {
+    setEditDisplayName(user?.displayName ?? '');
+    setEditUsername(user?.username ?? '');
+    setEditAvatarUrl(user?.avatarUrl ?? '');
+  }, [user]);
+
+  function handleStartEdit() {
+    setEditDisplayName(user?.displayName ?? '');
+    setEditUsername(user?.username ?? '');
+    setEditAvatarUrl(user?.avatarUrl ?? '');
+    setIsEditing(true);
+  }
+
+  function handleCancelEdit() {
+    setIsEditing(false);
+  }
+
+  async function handleSaveEdit() {
+    if (savingProfile) return;
+    setSavingProfile(true);
+    try {
+      await updateUser({
+        displayName: editDisplayName.trim() || undefined,
+        username: editUsername.trim() || undefined,
+        avatarUrl: editAvatarUrl.trim() || undefined,
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      setIsEditing(false);
+    } catch (err: any) {
+      Alert.alert('Error', err?.message ?? 'Could not save changes.');
+    } finally {
+      setSavingProfile(false);
+    }
+  }
 
   const { data: capabilities } = useQuery({
     queryKey: ['my-capabilities'],
@@ -191,57 +234,121 @@ const videos = allVideos.filter((v) => {
               </View>
             </View>
 
-            <Text style={styles.displayName}>{displayName}</Text>
+            {isEditing ? (
+              <View style={styles.editFields}>
+                <View style={styles.editField}>
+                  <Text style={styles.editFieldLabel}>Display Name</Text>
+                  <TextInput
+                    style={styles.editInput}
+                    value={editDisplayName}
+                    onChangeText={setEditDisplayName}
+                    placeholder="Your display name"
+                    placeholderTextColor="rgba(255,255,255,0.3)"
+                    autoCapitalize="words"
+                  />
+                </View>
+                <View style={styles.editField}>
+                  <Text style={styles.editFieldLabel}>Username</Text>
+                  <TextInput
+                    style={styles.editInput}
+                    value={editUsername}
+                    onChangeText={setEditUsername}
+                    placeholder="username"
+                    placeholderTextColor="rgba(255,255,255,0.3)"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
+                <View style={styles.editField}>
+                  <Text style={styles.editFieldLabel}>Avatar URL</Text>
+                  <TextInput
+                    style={styles.editInput}
+                    value={editAvatarUrl}
+                    onChangeText={setEditAvatarUrl}
+                    placeholder="https://…"
+                    placeholderTextColor="rgba(255,255,255,0.3)"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="url"
+                  />
+                </View>
 
-            {/* Stats */}
-            <View style={styles.statsRow}>
-              <View style={styles.statItem}>
-                <Text style={styles.statNum}>{stats.following}</Text>
-                <Text style={styles.statLabel}>Following</Text>
+                <View style={styles.editActionRow}>
+                  <Pressable
+                    style={[styles.editActionBtn, styles.editCancelBtn]}
+                    onPress={handleCancelEdit}
+                    disabled={savingProfile}
+                  >
+                    <Text style={styles.editCancelText}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.editActionBtn, styles.editSaveBtn]}
+                    onPress={handleSaveEdit}
+                    disabled={savingProfile}
+                  >
+                    {savingProfile ? (
+                      <ActivityIndicator size="small" color="#000" />
+                    ) : (
+                      <Text style={styles.editSaveText}>Save</Text>
+                    )}
+                  </Pressable>
+                </View>
               </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <Text style={styles.statNum}>{stats.followers}</Text>
-                <Text style={styles.statLabel}>Followers</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <Text style={styles.statNum}>{stats.likes}</Text>
-                <Text style={styles.statLabel}>Total Views</Text>
-              </View>
-            </View>
+            ) : (
+              <>
+                <Text style={styles.displayName}>{displayName}</Text>
 
-            {/* Action buttons */}
-            <View style={styles.actionRow}>
-              <Pressable
-                style={styles.editProfileBtn}
-                onPress={() => router.push('/settings' as any)}
-              >
-                <Text style={styles.editProfileText}>Edit profile</Text>
-              </Pressable>
-              <Pressable
-                style={styles.iconBtn}
-                onPress={() => router.push('/my-videos' as any)}
-              >
-                <Feather name="film" size={16} color="#fff" />
-              </Pressable>
-              <Pressable
-                style={styles.iconBtn}
-                onPress={handleLogout}
-              >
-                <Feather name="log-out" size={16} color="rgba(255,255,255,0.7)" />
-              </Pressable>
-            </View>
-
-            {/* Capability badges */}
-            {capabilities && capabilities.length > 0 && (
-              <View style={styles.capRow}>
-                {capabilities.map((cap: any) => (
-                  <View key={cap.id} style={styles.capBadge}>
-                    <Text style={styles.capBadgeText}>{cap.capability?.name ?? 'Videographer'}</Text>
+                {/* Stats */}
+                <View style={styles.statsRow}>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statNum}>{stats.following}</Text>
+                    <Text style={styles.statLabel}>Following</Text>
                   </View>
-                ))}
-              </View>
+                  <View style={styles.statDivider} />
+                  <View style={styles.statItem}>
+                    <Text style={styles.statNum}>{stats.followers}</Text>
+                    <Text style={styles.statLabel}>Followers</Text>
+                  </View>
+                  <View style={styles.statDivider} />
+                  <View style={styles.statItem}>
+                    <Text style={styles.statNum}>{stats.likes}</Text>
+                    <Text style={styles.statLabel}>Total Views</Text>
+                  </View>
+                </View>
+
+                {/* Action buttons */}
+                <View style={styles.actionRow}>
+                  <Pressable
+                    style={styles.editProfileBtn}
+                    onPress={handleStartEdit}
+                  >
+                    <Text style={styles.editProfileText}>Edit profile</Text>
+                  </Pressable>
+                  <Pressable
+                    style={styles.iconBtn}
+                    onPress={() => router.push('/my-videos' as any)}
+                  >
+                    <Feather name="film" size={16} color="#fff" />
+                  </Pressable>
+                  <Pressable
+                    style={styles.iconBtn}
+                    onPress={handleLogout}
+                  >
+                    <Feather name="log-out" size={16} color="rgba(255,255,255,0.7)" />
+                  </Pressable>
+                </View>
+
+                {/* Capability badges */}
+                {capabilities && capabilities.length > 0 && (
+                  <View style={styles.capRow}>
+                    {capabilities.map((cap: any) => (
+                      <View key={cap.id} style={styles.capBadge}>
+                        <Text style={styles.capBadgeText}>{cap.capability?.name ?? 'Videographer'}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </>
             )}
           </View>
         </View>
@@ -503,6 +610,38 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
   },
+
+  // Inline edit mode
+  editFields: { width: '100%', gap: 12, marginTop: 4 },
+  editField: { gap: 6 },
+  editFieldLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontFamily: 'Inter_500Medium', letterSpacing: 0.5 },
+  editInput: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 14,
+    height: 44,
+    color: '#fff',
+    fontSize: 14,
+    fontFamily: 'Inter_400Regular',
+  },
+  editActionRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  editActionBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editCancelBtn: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  editCancelText: { color: 'rgba(255,255,255,0.7)', fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  editSaveBtn: { backgroundColor: '#fff' },
+  editSaveText: { color: '#000', fontSize: 14, fontFamily: 'Inter_700Bold' },
 
   // Capability badges
   capRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
