@@ -32,6 +32,33 @@ const TRENDING = [
   { tag: 'fun', count: '190M' },
 ];
 
+// Full category list per spec. "All" is the default filter, not an upload category itself.
+const CATEGORIES = [
+  'All',
+  'City Walks',
+  'Local Life',
+  'Food & Markets',
+  'Nature & Scenery',
+  'Beaches & Coastlines',
+  'Architecture & Landmarks',
+  'Attractions',
+  'Hidden Gems',
+  'Peaceful Places',
+  'Cafes',
+  'Shopping',
+  'Museums & Galleries',
+  'Parks & Gardens',
+  'Trails & Hiking',
+  'Adventure',
+  'Rides & Transport',
+  'Scenic Drives',
+  'Sports',
+  'Events & Festivals',
+  'Music & Performance',
+  'Sacred Places',
+  'After Dark',
+];
+
 function apiVideoToSample(v: VideoAsset): SampleVideo {
   const colors = ['#FF6B9D', '#FF4500', '#7C3AED', '#0EA5E9', '#F59E0B', '#10B981', '#EF4444', '#6366F1'];
   const name = v.owner?.displayName ?? 'Unknown';
@@ -44,6 +71,10 @@ function apiVideoToSample(v: VideoAsset): SampleVideo {
     hashtags: ['glassnik', 'pov'],
     music: 'Original Sound',
     likes: 0, comments: 0, shares: 0,
+    place: v.place ?? undefined,
+    city: v.city ?? undefined,
+    country: v.country ?? undefined,
+    category: v.category ?? undefined,
   };
 }
 
@@ -51,6 +82,7 @@ export default function ExploreScreen() {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState('All');
 
   const { data: apiVideos, isLoading } = useQuery<VideoAsset[]>({
     queryKey: ['explore'],
@@ -64,15 +96,21 @@ export default function ExploreScreen() {
   }, [apiVideos]);
 
   const filtered = useMemo(() => {
-    if (!query.trim()) return allVideos;
+    let result = allVideos;
+
+    if (activeCategory !== 'All') {
+      result = result.filter((v) => v.category === activeCategory);
+    }
+
+    if (!query.trim()) return result;
     const q = query.toLowerCase();
-    return allVideos.filter(
+    return result.filter(
       (v) =>
         v.description.toLowerCase().includes(q) ||
         v.creator.username.toLowerCase().includes(q) ||
         v.hashtags.some((h) => h.includes(q))
     );
-  }, [allVideos, query]);
+  }, [allVideos, query, activeCategory]);
 
   const COLS = 3;
   const CELL_GAP = 2;
@@ -104,6 +142,28 @@ export default function ExploreScreen() {
             </Pressable>
           )}
         </View>
+
+        {/* Category pills */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoryRow}
+        >
+          {CATEGORIES.map((cat) => {
+            const isActive = activeCategory === cat;
+            return (
+              <Pressable
+                key={cat}
+                onPress={() => setActiveCategory(cat)}
+                style={[styles.categoryPill, isActive && styles.categoryPillActive]}
+              >
+                <Text style={[styles.categoryPillText, isActive && styles.categoryPillTextActive]}>
+                  {cat}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
       </View>
 
       <FlatList
@@ -152,7 +212,7 @@ export default function ExploreScreen() {
           ) : (
             <View style={styles.centered}>
               <Feather name="search" size={40} color="rgba(255,255,255,0.2)" />
-              <Text style={styles.emptyText}>No results for "{query}"</Text>
+              <Text style={styles.emptyText}>No results{query ? ` for "${query}"` : ''}</Text>
             </View>
           )
         }
@@ -173,6 +233,8 @@ function VideoGridCell({
   height: number;
   showPlayCount?: boolean;
 }) {
+  const locationLabel = [video.place, video.city, video.country].filter(Boolean).join(', ');
+
   return (
     <Pressable
       style={({ pressed }) => [
@@ -214,12 +276,22 @@ function VideoGridCell({
         </View>
       )}
 
-      {/* Hashtag */}
+      {/* Category badge (falls back to first hashtag if no category set) */}
       <View style={styles.cellTag}>
         <Text style={styles.cellTagText} numberOfLines={1}>
-          #{video.hashtags[0]}
+          {video.category ? video.category.toUpperCase() : `#${video.hashtags[0]}`}
         </Text>
       </View>
+
+      {/* Location, shown only when present */}
+      {locationLabel ? (
+        <View style={styles.cellLocation}>
+          <Feather name="map-pin" size={9} color="rgba(255,255,255,0.85)" />
+          <Text style={styles.cellLocationText} numberOfLines={1}>
+            {locationLabel}
+          </Text>
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -233,6 +305,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomColor: 'rgba(255,255,255,0.08)',
     borderBottomWidth: 1,
+    gap: 12,
   },
   searchWrap: {
     flexDirection: 'row',
@@ -251,6 +324,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter_400Regular',
     height: '100%',
+  },
+
+  // Category pills
+  categoryRow: { gap: 8, paddingRight: 14 },
+  categoryPill: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  categoryPillActive: {
+    backgroundColor: '#fff',
+    borderColor: '#fff',
+  },
+  categoryPillText: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 13,
+    fontFamily: 'Inter_500Medium',
+  },
+  categoryPillTextActive: {
+    color: '#000',
+    fontFamily: 'Inter_600SemiBold',
   },
 
   // Sections
@@ -318,6 +415,20 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.7)',
     fontSize: 10,
     fontFamily: 'Inter_600SemiBold',
+  },
+  cellLocation: {
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    maxWidth: '55%',
+  },
+  cellLocationText: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 9,
+    fontFamily: 'Inter_500Medium',
   },
 
   // States
