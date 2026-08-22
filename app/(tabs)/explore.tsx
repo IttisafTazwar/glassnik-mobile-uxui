@@ -19,19 +19,6 @@ import { mobileApi } from '@/lib/api';
 import { SAMPLE_VIDEOS, type SampleVideo } from '@/constants/sampleVideos';
 import type { VideoAsset } from '@/types';
 
-const TRENDING = [
-  { tag: 'FYP', count: '8.2B' },
-  { tag: 'viral', count: '4.1B' },
-  { tag: 'trending', count: '2.9B' },
-  { tag: 'explore', count: '1.6B' },
-  { tag: 'travel', count: '938M' },
-  { tag: 'adventure', count: '712M' },
-  { tag: 'art', count: '524M' },
-  { tag: 'film', count: '317M' },
-  { tag: 'cars', count: '248M' },
-  { tag: 'fun', count: '190M' },
-];
-
 // Full category list per spec. "All" is the default filter, not an upload category itself.
 const CATEGORIES = [
   'All',
@@ -95,6 +82,25 @@ export default function ExploreScreen() {
     return [...SAMPLE_VIDEOS, ...api];
   }, [apiVideos]);
 
+  // Trending Destinations — grouped from real city/country data.
+  // Sorted by video count as a proxy for "by views" (SampleVideo has no
+  // real views field). Genuinely empty until videos carry location data.
+  const trendingDestinations = useMemo(() => {
+    const counts = new Map<string, { label: string; count: number }>();
+    for (const v of allVideos) {
+      if (!v.city && !v.country) continue;
+      const label = [v.city, v.country].filter(Boolean).join(', ');
+      const key = label;
+      const existing = counts.get(key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        counts.set(key, { label, count: 1 });
+      }
+    }
+    return Array.from(counts.values()).sort((a, b) => b.count - a.count);
+  }, [allVideos]);
+
   const filtered = useMemo(() => {
     let result = allVideos;
 
@@ -108,7 +114,9 @@ export default function ExploreScreen() {
       (v) =>
         v.description.toLowerCase().includes(q) ||
         v.creator.username.toLowerCase().includes(q) ||
-        v.hashtags.some((h) => h.includes(q))
+        v.hashtags.some((h) => h.includes(q)) ||
+        v.city?.toLowerCase().includes(q) ||
+        v.country?.toLowerCase().includes(q)
     );
   }, [allVideos, query, activeCategory]);
 
@@ -173,24 +181,28 @@ export default function ExploreScreen() {
         ListHeaderComponent={
           !query ? (
             <View>
-              {/* Trending hashtags */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Trending</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tagsRow}>
-                  {TRENDING.map((t) => (
-                    <Pressable
-                      key={t.tag}
-                      style={styles.trendChip}
-                      onPress={() => setQuery(t.tag)}
-                    >
-                      <Text style={styles.trendChipHash}>#</Text>
-                      <Text style={styles.trendChipTag}>{t.tag}</Text>
-                      <Text style={styles.trendChipCount}>{t.count} views</Text>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-              </View>
-              <Text style={[styles.sectionTitle, { paddingHorizontal: 14, marginBottom: 8 }]}>All Experiences</Text>
+              {/* Trending Destinations */}
+              {trendingDestinations.length > 0 && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Trending Destinations</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tagsRow}>
+                    {trendingDestinations.map((d) => (
+                      <Pressable
+                        key={d.label}
+                        style={styles.trendChip}
+                        onPress={() => setQuery(d.label)}
+                      >
+                        <Feather name="map-pin" size={12} color="#FE2C55" />
+                        <Text style={styles.trendChipTag}>{d.label}</Text>
+                        <Text style={styles.trendChipCount}>
+                          {d.count} {d.count === 1 ? 'experience' : 'experiences'}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+              <Text style={[styles.sectionTitle, { paddingHorizontal: 14, marginBottom: 8, marginTop: trendingDestinations.length > 0 ? 0 : 18 }]}>All Experiences</Text>
             </View>
           ) : null
         }
@@ -361,17 +373,19 @@ const styles = StyleSheet.create({
   },
   tagsRow: { paddingHorizontal: 14, gap: 8 },
   trendChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
-    minWidth: 90,
   },
   trendChipHash: { color: '#FE2C55', fontSize: 13, fontFamily: 'Inter_700Bold' },
-  trendChipTag: { color: '#fff', fontSize: 14, fontFamily: 'Inter_700Bold', marginTop: 1 },
-  trendChipCount: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  trendChipTag: { color: '#fff', fontSize: 14, fontFamily: 'Inter_700Bold' },
+  trendChipCount: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontFamily: 'Inter_400Regular', marginLeft: 4 },
 
   // Grid
   columnWrapper: { gap: 2, marginBottom: 2 },
