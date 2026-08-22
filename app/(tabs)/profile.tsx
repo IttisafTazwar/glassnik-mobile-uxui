@@ -31,6 +31,13 @@ function formatCount(n: number): string {
   return String(n);
 }
 
+function formatMemberSince(iso?: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
 export default function ProfileScreen() {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -157,6 +164,16 @@ const videos = allVideos.filter((v) => {
     likes:     profileStats?.likeCount      != null ? formatCount(profileStats.likeCount)      : '—',
   };
 
+  // These fields aren't declared on the `User` type, but /users/me is typed
+  // as `any`, so the real backend response may include them. Rendered only
+  // when present — nothing fabricated if the backend doesn't send them yet.
+  const bio: string | null = (profileStats as any)?.bio ?? null;
+  const location: string | null =
+    (profileStats as any)?.location ??
+    [(profileStats as any)?.city, (profileStats as any)?.country].filter(Boolean).join(', ') ??
+    null;
+  const memberSince = formatMemberSince((profileStats as any)?.createdAt ?? (user as any)?.createdAt);
+
   const CELL_SIZE = (width - 3) / 3;
 
   async function handleDeleteErrorVideo(video: VideoItem) {
@@ -224,15 +241,19 @@ const videos = allVideos.filter((v) => {
             </Pressable>
           </View>
 
-          {/* Avatar */}
+          {/* Avatar — tappable (owner only), opens inline edit mode */}
           <View style={styles.avatarSection}>
-            <View style={styles.avatarWrap}>
+            <Pressable
+              style={styles.avatarWrap}
+              onPress={isEditing ? undefined : handleStartEdit}
+              hitSlop={8}
+            >
               <View style={styles.avatarRing}>
                 <View style={styles.avatar}>
                   <Text style={styles.avatarText}>{initial}</Text>
                 </View>
               </View>
-            </View>
+            </Pressable>
 
             {isEditing ? (
               <View style={styles.editFields}>
@@ -297,6 +318,28 @@ const videos = allVideos.filter((v) => {
             ) : (
               <>
                 <Text style={styles.displayName}>{displayName}</Text>
+                <Text style={styles.roleLabel}>Eye-POV Videographer</Text>
+
+                {/* Location / Member since — only shown when the backend provides them */}
+                {(location || memberSince) && (
+                  <View style={styles.metaRow}>
+                    {location ? (
+                      <View style={styles.metaItem}>
+                        <Feather name="map-pin" size={12} color="rgba(255,255,255,0.5)" />
+                        <Text style={styles.metaText}>{location}</Text>
+                      </View>
+                    ) : null}
+                    {memberSince ? (
+                      <View style={styles.metaItem}>
+                        <Feather name="calendar" size={12} color="rgba(255,255,255,0.5)" />
+                        <Text style={styles.metaText}>Member since {memberSince}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                )}
+
+                {/* Bio — only shown when the backend provides it */}
+                {bio ? <Text style={styles.bioText}>{bio}</Text> : null}
 
                 {/* Stats */}
                 <View style={styles.statsRow}>
@@ -469,8 +512,19 @@ const videos = allVideos.filter((v) => {
             ) : videos.length === 0 ? (
               <View style={styles.gridEmpty}>
                 <Feather name="video-off" size={36} color="rgba(255,255,255,0.15)" />
-                <Text style={styles.gridEmptyText}>No videos yet</Text>
-                <Text style={styles.gridEmptySub}>Upload your first video from the + tab.</Text>
+                {processingVideos.length > 0 ? (
+                  <>
+                    <Text style={styles.gridEmptyText}>Your first Eye-POV experience is being reviewed</Text>
+                    <Text style={styles.gridEmptySub}>
+                      Most videos are reviewed within 1 hour, although reviews may take up to 24 hours during busy periods.
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.gridEmptyText}>No videos yet</Text>
+                    <Text style={styles.gridEmptySub}>Upload your first video from the + tab.</Text>
+                  </>
+                )}
               </View>
             ) : (
               <View style={styles.grid}>
@@ -578,9 +632,24 @@ const styles = StyleSheet.create({
   },
   avatarText: { color: '#fff', fontSize: 36, fontFamily: 'Inter_700Bold' },
   displayName: { color: '#fff', fontSize: 18, fontFamily: 'Inter_700Bold' },
+  roleLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontFamily: 'Inter_500Medium', marginTop: 2 },
+
+  metaRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12, marginTop: 4 },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  metaText: { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontFamily: 'Inter_400Regular' },
+
+  bioText: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 13,
+    fontFamily: 'Inter_400Regular',
+    textAlign: 'center',
+    marginTop: 6,
+    paddingHorizontal: 16,
+    lineHeight: 18,
+  },
 
   // Stats
-  statsRow: { flexDirection: 'row', alignItems: 'center', gap: 0 },
+  statsRow: { flexDirection: 'row', alignItems: 'center', gap: 0, marginTop: 8 },
   statItem: { alignItems: 'center', paddingHorizontal: 24, paddingVertical: 4 },
   statNum: { color: '#fff', fontSize: 18, fontFamily: 'Inter_700Bold' },
   statLabel: { color: 'rgba(255,255,255,0.55)', fontSize: 12, fontFamily: 'Inter_400Regular' },
