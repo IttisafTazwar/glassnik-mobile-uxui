@@ -28,7 +28,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
   ready:     { label: 'Ready',     color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
   live:      { label: 'Live',      color: '#FE2C55', bg: 'rgba(254,44,85,0.12)' },
   processing:{ label: 'Processing',color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
-  pending:   { label: 'Pending',   color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
+  pending:   { label: 'Pending Review', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
   failed:    { label: 'Failed',    color: '#ef4444', bg: 'rgba(239,68,68,0.12)' },
 };
 

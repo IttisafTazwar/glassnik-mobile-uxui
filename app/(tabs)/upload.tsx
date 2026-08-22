@@ -33,6 +33,32 @@ import { useUploadGuard } from '@/context/UploadGuardContext';
 // The backend returns a Google Cloud Storage V4 signed URL. It is a normal
 // signed object upload URL, not a TUS resumable endpoint.
 
+// ─── Category list (matches Explore) ───────────────────────────────────────────
+const UPLOAD_CATEGORIES = [
+  'City Walks',
+  'Local Life',
+  'Food & Markets',
+  'Nature & Scenery',
+  'Beaches & Coastlines',
+  'Architecture & Landmarks',
+  'Attractions',
+  'Hidden Gems',
+  'Peaceful Places',
+  'Cafes',
+  'Shopping',
+  'Museums & Galleries',
+  'Parks & Gardens',
+  'Trails & Hiking',
+  'Adventure',
+  'Rides & Transport',
+  'Scenic Drives',
+  'Sports',
+  'Events & Festivals',
+  'Music & Performance',
+  'Sacred Places',
+  'After Dark',
+];
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 type UploadPhase = 'idle' | 'uploading' | 'processing' | 'done' | 'error';
@@ -49,6 +75,9 @@ export default function UploadScreen() {
   const [pickedSize, setPickedSize] = useState<number>(0);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [location, setLocation] = useState('');
+  const [category, setCategory] = useState<string | null>(null);
+  const [confirmedGuidelines, setConfirmedGuidelines] = useState(false);
   const [phase, setPhase] = useState<UploadPhase>('idle');
   const [uploadProgress, setUploadProgress] = useState(0); // 0–1
   const [statusMsg, setStatusMsg] = useState('');
@@ -250,6 +279,9 @@ export default function UploadScreen() {
         setPickedSize(0);
         setTitle('');
         setDescription('');
+        setLocation('');
+        setCategory(null);
+        setConfirmedGuidelines(false);
         router.push({
           pathname: '/video/[id]' as any,
           params: { id: videoId },
@@ -308,6 +340,9 @@ export default function UploadScreen() {
 
     try {
       // Create the backend video record and obtain a fresh GCS signed URL.
+      // NOTE: mobileApi.requestUpload currently only accepts title/size/description.
+      // location/category are captured in UI state above but not yet sent to the
+      // backend — that requires a backend-side change outside this session's scope.
       const slot = await mobileApi.requestUpload(
         uploadTitle.trim(),
         fileSize,
@@ -414,6 +449,9 @@ setPickedName('');
 setPickedSize(0);
 setTitle('');
 setDescription('');
+setLocation('');
+setCategory(null);
+setConfirmedGuidelines(false);
     } catch (err: any) {
       clearPollTimer();
 
@@ -458,6 +496,14 @@ setDescription('');
     }
     if (!title.trim()) {
       Alert.alert('Title required', 'Please add a title before uploading.');
+      return;
+    }
+    if (!category) {
+      Alert.alert('Category required', 'Please select a category before uploading.');
+      return;
+    }
+    if (!confirmedGuidelines) {
+      Alert.alert('Confirmation required', 'Please confirm this video was recorded using smart glasses and complies with the Glassnik upload guidelines.');
       return;
     }
 
@@ -693,9 +739,19 @@ setDescription('');
         {pickedUri && !isUploading && phase !== 'done' && (
           <View style={styles.fields}>
             <View>
-              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>
-                Title <Text style={{ color: colors.primary }}>*</Text>
-              </Text>
+              <View style={styles.labelRow}>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground, marginBottom: 0 }]}>
+                  Title <Text style={{ color: colors.primary }}>*</Text>
+                </Text>
+                <Pressable
+                  hitSlop={8}
+                  onPress={() =>
+                    Alert.alert('Title', 'Example: "Sunset walk through Shibuya"')
+                  }
+                >
+                  <Feather name="info" size={13} color={colors.mutedForeground} />
+                </Pressable>
+              </View>
               <View style={[styles.inputWrap, { backgroundColor: colors.input, borderColor: colors.border }]}>
                 <TextInput
                   style={[styles.input, { color: colors.foreground }]}
@@ -708,7 +764,17 @@ setDescription('');
             </View>
 
             <View>
-              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Description</Text>
+              <View style={styles.labelRow}>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground, marginBottom: 0 }]}>Description</Text>
+                <Pressable
+                  hitSlop={8}
+                  onPress={() =>
+                    Alert.alert('Description', 'One or two sentences describing what viewers will experience in the video.')
+                  }
+                >
+                  <Feather name="info" size={13} color={colors.mutedForeground} />
+                </Pressable>
+              </View>
               <View
                 style={[
                   styles.inputWrap,
@@ -727,6 +793,65 @@ setDescription('');
                 />
               </View>
             </View>
+
+            <View>
+              <Text style={[styles.fieldLabel, { color: colors.foreground, fontFamily: 'Inter_600SemiBold' }]}>
+                Location
+              </Text>
+              <View style={[styles.inputWrap, { backgroundColor: colors.input, borderColor: colors.primary, borderWidth: 1.5 }]}>
+                <TextInput
+                  style={[styles.input, { color: colors.foreground }]}
+                  placeholder="Where was this filmed?"
+                  placeholderTextColor={colors.mutedForeground}
+                  value={location}
+                  onChangeText={setLocation}
+                />
+              </View>
+            </View>
+
+            <View>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>
+                Category <Text style={{ color: colors.primary }}>*</Text>
+              </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
+                {UPLOAD_CATEGORIES.map((cat) => {
+                  const isActive = category === cat;
+                  return (
+                    <Pressable
+                      key={cat}
+                      onPress={() => setCategory(cat)}
+                      style={[
+                        styles.categoryPill,
+                        { borderColor: colors.border, backgroundColor: colors.input },
+                        isActive && { backgroundColor: colors.primary, borderColor: colors.primary },
+                      ]}
+                    >
+                      <Text style={[styles.categoryPillText, { color: isActive ? '#fff' : colors.mutedForeground }]}>
+                        {cat}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            <Pressable
+              style={styles.checkboxRow}
+              onPress={() => setConfirmedGuidelines((v) => !v)}
+            >
+              <View
+                style={[
+                  styles.checkbox,
+                  { borderColor: colors.border },
+                  confirmedGuidelines && { backgroundColor: colors.primary, borderColor: colors.primary },
+                ]}
+              >
+                {confirmedGuidelines && <Feather name="check" size={13} color="#fff" />}
+              </View>
+              <Text style={[styles.checkboxLabel, { color: colors.mutedForeground }]}>
+                I confirm this video was recorded using smart glasses and complies with the Glassnik upload guidelines.
+              </Text>
+            </Pressable>
           </View>
         )}
 
@@ -867,6 +992,7 @@ const styles = StyleSheet.create({
   },
   changeBtnText: { color: '#fff', fontSize: 12, fontFamily: 'Inter_600SemiBold' },
   fields: { gap: 12 },
+  labelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6, marginLeft: 2 },
   fieldLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', marginBottom: 6, marginLeft: 2 },
   inputWrap: {
     borderRadius: 12,
@@ -878,6 +1004,25 @@ const styles = StyleSheet.create({
   textareaWrap: { height: 'auto', paddingVertical: 12 },
   input: { fontSize: 15, fontFamily: 'Inter_400Regular' },
   textarea: { height: 72, textAlignVertical: 'top' },
+  categoryRow: { gap: 8, paddingRight: 4 },
+  categoryPill: {
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  categoryPillText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  checkboxRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', paddingRight: 8 },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  checkboxLabel: { flex: 1, fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17 },
   uploadBtn: {
     height: 52,
     borderRadius: 12,
