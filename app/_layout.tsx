@@ -17,7 +17,6 @@ import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { MuteProvider } from '@/context/MuteContext';
 import { TopNav } from '@/components/TopNav';
-import { FooterMenu } from '@/components/FooterMenu';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -38,8 +37,8 @@ function AuthGate() {
   const pathname = usePathname();
 
   // The "For You" feed (default tab, full-screen swipeable video) is the one
-  // screen that must stay edge-to-edge — the persistent top nav / footer
-  // would eat into the video otherwise. Every other screen gets both.
+  // screen that must stay edge-to-edge — the persistent top nav would eat
+  // into the video otherwise. Every other screen gets it.
   const isFeedScreen = pathname === '/';
 
   useEffect(() => {
@@ -87,7 +86,6 @@ function AuthGate() {
     <View style={{ flex: 1, backgroundColor: '#000' }}>
       <TopNav />
       <View style={{ flex: 1 }}>{stack}</View>
-      <FooterMenu />
     </View>
   );
 }

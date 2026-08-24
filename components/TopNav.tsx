@@ -3,20 +3,20 @@ import { Pressable, ScrollView, StyleSheet, Text, View, Linking, Platform } from
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useAuth } from '@/context/AuthContext';
 
 const NAV_LINKS = [
-  { label: 'Premium', url: 'https://www.glassnik.com/premium' },
-  { label: 'Why Glassnik', url: 'https://www.glassnik.com/why-glassnik' },
+  { label: 'Premium', url: 'https://www.glassnik.com/glassnik-premium' },
+  { label: 'Why Glassnik', url: 'https://www.glassnik.com/whyglassnik' },
   { label: 'For Videographers', url: 'https://www.glassnik.com/for-videographers' },
-  { label: 'Store', url: 'https://www.glassnik.com/store' },
-  { label: 'Install App', url: 'https://www.glassnik.com/install' },
+  { label: 'Store', url: 'https://www.glassnik.com/smart-glasses-store' },
+  { label: 'Live', url: 'https://www.glassnik.com/live' },
+  { label: 'Immersive', url: 'https://www.glassnik.com/immersive' },
+  { label: 'About Us', url: 'https://www.glassnik.com/about-us' },
 ];
 
 export function TopNav() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user } = useAuth();
   const topPad = Platform.OS === 'web' ? 10 : insets.top + 6;
 
   return (
@@ -30,16 +30,12 @@ export function TopNav() {
         </Pressable>
 
         <View style={styles.rightActions}>
-          {!user && (
-            <>
-              <Pressable style={styles.signupBtn} onPress={() => router.push('/auth/register' as any)}>
-                <Text style={styles.signupText}>Sign up</Text>
-              </Pressable>
-              <Pressable style={styles.loginBtn} onPress={() => router.push('/auth/login' as any)}>
-                <Text style={styles.loginText}>Log in</Text>
-              </Pressable>
-            </>
-          )}
+          <Pressable hitSlop={8} onPress={() => router.push('/(tabs)/explore' as any)}>
+            <Feather name="search" size={18} color="rgba(255,255,255,0.7)" />
+          </Pressable>
+          <Pressable style={styles.loginBtn} onPress={() => router.push('/auth/login' as any)}>
+            <Text style={styles.loginText}>Log In</Text>
+          </Pressable>
         </View>
       </View>
 
@@ -86,15 +82,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logoText: { color: '#fff', fontSize: 16, fontFamily: 'Inter_700Bold' },
-  rightActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  signupBtn: {
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  signupText: { color: '#fff', fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  rightActions: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   loginBtn: {
     backgroundColor: '#fff',
     borderRadius: 16,
