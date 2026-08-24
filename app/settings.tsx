@@ -3,24 +3,80 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
+import { useMute } from '@/context/MuteContext';
+
+// Local preference keys. Autoplay and push-notification toggles persist here
+// but aren't yet consumed by real feed-playback or push-registration logic —
+// flagged clearly rather than presented as fully wired.
+const AUTOPLAY_KEY = 'pref:autoplay';
+const PUSH_NOTIFS_KEY = 'pref:pushNotifications';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
+  const { isMuted, toggleMute } = useMute();
 
   const [loggingOut, setLoggingOut] = useState(false);
+  const [autoplay, setAutoplay] = useState(true);
+  const [pushNotifs, setPushNotifs] = useState(true);
+
+  React.useEffect(() => {
+    AsyncStorage.getItem(AUTOPLAY_KEY).then((v) => {
+      if (v != null) setAutoplay(v === 'true');
+    });
+    AsyncStorage.getItem(PUSH_NOTIFS_KEY).then((v) => {
+      if (v != null) setPushNotifs(v === 'true');
+    });
+  }, []);
+
+  function handleToggleAutoplay(next: boolean) {
+    setAutoplay(next);
+    AsyncStorage.setItem(AUTOPLAY_KEY, String(next)).catch(() => {});
+  }
+
+  function handleTogglePushNotifs(next: boolean) {
+    setPushNotifs(next);
+    AsyncStorage.setItem(PUSH_NOTIFS_KEY, String(next)).catch(() => {});
+  }
+
+  function handleChangePassword() {
+    Alert.alert(
+      'Not yet available',
+      'Password changes aren\'t supported yet. Contact the team if you need to reset your password.',
+    );
+  }
+
+  function handleDeleteAccount() {
+    Alert.alert(
+      'Delete account',
+      'This will permanently delete your account, including your videos, likes, comments, and followers. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert('Not yet available', 'Account deletion isn\'t supported yet. Contact the team if you need your account removed.');
+          },
+        },
+      ],
+    );
+  }
 
   async function handleLogout() {
     Alert.alert(
@@ -101,6 +157,15 @@ export default function SettingsScreen() {
           </View>
 
           <Pressable
+            onPress={handleChangePassword}
+            style={({ pressed }) => [styles.rowBtn, { opacity: pressed ? 0.7 : 1 }]}
+          >
+            <Feather name="lock" size={16} color="rgba(255,255,255,0.7)" />
+            <Text style={styles.rowBtnText}>Change Password</Text>
+            <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.3)" />
+          </Pressable>
+
+          <Pressable
             onPress={handleLogout}
             disabled={loggingOut}
             style={({ pressed }) => [styles.logoutBtn, { opacity: pressed || loggingOut ? 0.7 : 1 }]}
@@ -114,6 +179,58 @@ export default function SettingsScreen() {
               </>
             )}
           </Pressable>
+
+          <Pressable
+            onPress={handleDeleteAccount}
+            style={({ pressed }) => [styles.rowBtn, { opacity: pressed ? 0.7 : 1 }]}
+          >
+            <Feather name="trash-2" size={16} color="#ef4444" />
+            <Text style={[styles.rowBtnText, { color: '#ef4444' }]}>Delete Account</Text>
+          </Pressable>
+        </View>
+
+        {/* Preferences section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>PREFERENCES</Text>
+
+          <View style={styles.switchRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.switchLabel}>Autoplay</Text>
+              <Text style={styles.switchSub}>Automatically play videos in your feed</Text>
+            </View>
+            <Switch
+              value={autoplay}
+              onValueChange={handleToggleAutoplay}
+              trackColor={{ false: 'rgba(255,255,255,0.15)', true: '#FE2C55' }}
+              thumbColor="#fff"
+            />
+          </View>
+
+          <View style={styles.switchRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.switchLabel}>Default mute</Text>
+              <Text style={styles.switchSub}>Start videos muted</Text>
+            </View>
+            <Switch
+              value={isMuted}
+              onValueChange={toggleMute}
+              trackColor={{ false: 'rgba(255,255,255,0.15)', true: '#FE2C55' }}
+              thumbColor="#fff"
+            />
+          </View>
+
+          <View style={styles.switchRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.switchLabel}>Push notifications</Text>
+              <Text style={styles.switchSub}>Likes, comments, and new followers</Text>
+            </View>
+            <Switch
+              value={pushNotifs}
+              onValueChange={handleTogglePushNotifs}
+              trackColor={{ false: 'rgba(255,255,255,0.15)', true: '#FE2C55' }}
+              thumbColor="#fff"
+            />
+          </View>
         </View>
 
         {/* App section */}
@@ -127,6 +244,33 @@ export default function SettingsScreen() {
             <Text style={styles.appInfoLabel}>Platform</Text>
             <Text style={styles.appInfoValue}>{Platform.OS}</Text>
           </View>
+
+          <Pressable
+            onPress={() => Linking.openURL('https://glassnik.com/privacy')}
+            style={({ pressed }) => [styles.rowBtn, { opacity: pressed ? 0.7 : 1, paddingHorizontal: 0 }]}
+          >
+            <Feather name="shield" size={16} color="rgba(255,255,255,0.7)" />
+            <Text style={styles.rowBtnText}>Privacy Policy</Text>
+            <Feather name="external-link" size={13} color="rgba(255,255,255,0.3)" />
+          </Pressable>
+
+          <Pressable
+            onPress={() => Linking.openURL('https://glassnik.com/terms')}
+            style={({ pressed }) => [styles.rowBtn, { opacity: pressed ? 0.7 : 1, paddingHorizontal: 0 }]}
+          >
+            <Feather name="file-text" size={16} color="rgba(255,255,255,0.7)" />
+            <Text style={styles.rowBtnText}>Terms of Service</Text>
+            <Feather name="external-link" size={13} color="rgba(255,255,255,0.3)" />
+          </Pressable>
+
+          <Pressable
+            onPress={() => Linking.openURL('mailto:support@glassnik.com')}
+            style={({ pressed }) => [styles.rowBtn, { opacity: pressed ? 0.7 : 1, paddingHorizontal: 0 }]}
+          >
+            <Feather name="help-circle" size={16} color="rgba(255,255,255,0.7)" />
+            <Text style={styles.rowBtnText}>Contact Support</Text>
+            <Feather name="external-link" size={13} color="rgba(255,255,255,0.3)" />
+          </Pressable>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -193,17 +337,16 @@ const styles = StyleSheet.create({
   },
   editProfileBtnText: { color: '#fff', fontSize: 14, fontFamily: 'Inter_600SemiBold' },
 
-  saveBtn: {
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  saveBtnText: { color: '#000', fontSize: 15, fontFamily: 'Inter_700Bold' },
-
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   infoText: { color: 'rgba(255,255,255,0.5)', fontSize: 14, fontFamily: 'Inter_400Regular' },
+
+  rowBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 4,
+  },
+  rowBtnText: { flex: 1, color: '#fff', fontSize: 14, fontFamily: 'Inter_500Medium' },
 
   logoutBtn: {
     flexDirection: 'row',
@@ -218,6 +361,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logoutText: { color: '#FE2C55', fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+
+  switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  switchLabel: { color: '#fff', fontSize: 14, fontFamily: 'Inter_500Medium' },
+  switchSub: { color: 'rgba(255,255,255,0.4)', fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
 
   appInfoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   appInfoLabel: { color: 'rgba(255,255,255,0.45)', fontSize: 13, fontFamily: 'Inter_400Regular' },

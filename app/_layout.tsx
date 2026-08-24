@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { View } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -11,10 +12,12 @@ import {
   Inter_700Bold,
   useFonts,
 } from '@expo-google-fonts/inter';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments, usePathname } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { MuteProvider } from '@/context/MuteContext';
+import { TopNav } from '@/components/TopNav';
+import { FooterMenu } from '@/components/FooterMenu';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -32,6 +35,12 @@ function AuthGate() {
   const { user, isLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const pathname = usePathname();
+
+  // The "For You" feed (default tab, full-screen swipeable video) is the one
+  // screen that must stay edge-to-edge — the persistent top nav / footer
+  // would eat into the video otherwise. Every other screen gets both.
+  const isFeedScreen = pathname === '/';
 
   useEffect(() => {
     if (isLoading) return;
@@ -45,7 +54,7 @@ function AuthGate() {
     // }
   }, [user, isLoading, segments]);
 
-  return (
+  const stack = (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="auth/login" options={{ headerShown: false }} />
@@ -68,6 +77,18 @@ function AuthGate() {
         options={{ headerShown: false, presentation: 'card' }}
       />
     </Stack>
+  );
+
+  if (isFeedScreen) {
+    return stack;
+  }
+
+  return (
+    <View style={{ flex: 1, backgroundColor: '#000' }}>
+      <TopNav />
+      <View style={{ flex: 1 }}>{stack}</View>
+      <FooterMenu />
+    </View>
   );
 }
 
