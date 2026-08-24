@@ -7,9 +7,11 @@ import {
   Platform,
   Pressable,
   RefreshControl,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,6 +25,32 @@ import type { VideoItem } from '@/types';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.glassnik.com';
 
+// Matches the category list used on Explore and Upload.
+const EDIT_CATEGORIES = [
+  'City Walks',
+  'Local Life',
+  'Food & Markets',
+  'Nature & Scenery',
+  'Beaches & Coastlines',
+  'Architecture & Landmarks',
+  'Attractions',
+  'Hidden Gems',
+  'Peaceful Places',
+  'Cafes',
+  'Shopping',
+  'Museums & Galleries',
+  'Parks & Gardens',
+  'Trails & Hiking',
+  'Adventure',
+  'Rides & Transport',
+  'Scenic Drives',
+  'Sports',
+  'Events & Festivals',
+  'Music & Performance',
+  'Sacred Places',
+  'After Dark',
+];
+
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   published: { label: 'Published', color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
   ready:     { label: 'Ready',     color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
@@ -35,6 +63,10 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
 function getStatusConfig(status?: string | null) {
   if (!status) return { label: 'Unknown', color: 'rgba(255,255,255,0.4)', bg: 'rgba(255,255,255,0.06)' };
   return STATUS_CONFIG[status.toLowerCase()] ?? { label: status, color: 'rgba(255,255,255,0.5)', bg: 'rgba(255,255,255,0.06)' };
+}
+
+function isPendingStatus(status?: string | null): boolean {
+  return (status ?? '').toLowerCase() === 'pending';
 }
 
 function formatCount(n: number | null | undefined): string {
@@ -94,6 +126,14 @@ export default function MyVideosScreen() {
   const queryClient = useQueryClient();
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [uploadingThumbId, setUploadingThumbId] = useState<number | null>(null);
+
+  // ── Edit panel (Title/Description/Location/Category) for pending videos ──
+  const [editingVideo, setEditingVideo] = useState<VideoItem | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editLocation, setEditLocation] = useState('');
+  const [editCategory, setEditCategory] = useState<string | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const { data: rawData, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['my-videos', user?.id],
@@ -183,106 +223,269 @@ export default function MyVideosScreen() {
     }
   }
 
-  function showVideoOptions(video: VideoItem) {
+  function openEditPanel(video: VideoItem) {
+    setEditTitle(video.title ?? '');
+    setEditDescription((video as any).description ?? '');
+    setEditLocation((video as any).place ?? (video as any).location ?? '');
+    setEditCategory((video as any).category ?? null);
+    setEditingVideo(video);
+  }
+
+  function closeEditPanel() {
+    setEditingVideo(null);
+  }
+
+  async function handleSaveEdit() {
+    if (!editingVideo || savingEdit) return;
+    setSavingEdit(true);
+    try {
+      // NOTE: mirrors the existing thumbnail PATCH call above. Not yet
+      // confirmed the backend accepts these specific fields — same caveat
+      // as Location/Category on the Upload form.
+      const patchRes = await fetch(`${API_BASE}/videos/${editingVideo.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          title: editTitle.trim(),
+          description: editDescription.trim(),
+          location: editLocation.trim(),
+          category: editCategory,
+        }),
+      });
+      if (!patchRes.ok) throw new Error('Failed to save changes');
+
+      queryClient.setQueryData(['my-videos', user?.id], (old: any) => {
+        const patch = (v: VideoItem) =>
+          v.id === editingVideo.id
+            ? { ...v, title: editTitle.trim(), description: editDescription.trim() }
+            : v;
+        if (Array.isArray(old)) return old.map(patch);
+        if (old?.data) return { ...old, data: old.data.map(patch) };
+        return old;
+      });
+
+      Alert.alert('Saved', 'Your changes have been saved.');
+      setEditingVideo(null);
+    } catch (e: any) {
+      Alert.alert('Could not save', e?.message ?? 'Please try again.');
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  function showStatusDetail(video: VideoItem) {
+    const sc = getStatusConfig(video.status);
+    const pending = isPendingStatus(video.status);
     Alert.alert(
-      video.title ?? 'Video options',
-      undefined,
-      [
-        {
-          text: 'Change thumbnail',
-          onPress: () => handleChangeThumbnail(video),
-        },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => confirmDelete(video),
-        },
-        { text: 'Cancel', style: 'cancel' },
-      ],
+      sc.label,
+      pending
+        ? `Submitted ${timeAgo(video.createdAt)} ago. Every video is manually reviewed to ensure it meets Glassnik's Eye-POV standards. Most videos are published within 1 hour, although reviews may take up to 24 hours during busy periods.`
+        : `Status: ${sc.label}`,
+      [{ text: 'OK' }],
     );
+  }
+
+  function showVideoOptions(video: VideoItem) {
+    const pending = isPendingStatus(video.status);
+    const options: any[] = [];
+
+    if (pending) {
+      options.push({ text: 'Edit', onPress: () => openEditPanel(video) });
+    }
+    options.push({ text: 'View Status', onPress: () => showStatusDetail(video) });
+    options.push({ text: 'Change thumbnail', onPress: () => handleChangeThumbnail(video) });
+    options.push({ text: 'Delete', style: 'destructive', onPress: () => confirmDelete(video) });
+    options.push({ text: 'Cancel', style: 'cancel' });
+
+    Alert.alert(video.title ?? 'Video options', undefined, options);
   }
 
   const renderItem = useCallback(({ item }: { item: VideoItem }) => {
     const sc = getStatusConfig(item.status);
+    const pending = isPendingStatus(item.status);
     const isDeleting = deletingId === item.id;
     const isUploadingThumb = uploadingThumbId === item.id;
 
     return (
-      <Pressable
-        onPress={() => !isDeleting && router.push({ pathname: '/video/[id]' as any, params: { id: item.id, data: JSON.stringify(item) } })}
-        onLongPress={() => showVideoOptions(item)}
-        style={[styles.row, isDeleting && { opacity: 0.4 }]}
-      >
-        {/* Thumbnail — tap opens picker, not the video */}
+      <View>
         <Pressable
-          onPress={(e) => { e.stopPropagation(); handleChangeThumbnail(item); }}
-          style={styles.thumbWrapper}
+          onPress={() => !isDeleting && router.push({ pathname: '/video/[id]' as any, params: { id: item.id, data: JSON.stringify(item) } })}
+          onLongPress={() => showVideoOptions(item)}
+          style={[styles.row, isDeleting && { opacity: 0.4 }]}
         >
-          {item.thumbnailUrl ? (
-            <Image
-              source={{ uri: item.thumbnailUrl }}
-              style={styles.thumbImage}
-              resizeMode="cover"
-            />
-          ) : (
-            <View style={styles.thumbPlaceholder}>
-              <Text style={styles.thumbInitial}>
-                {(item.title ?? 'V').charAt(0).toUpperCase()}
-              </Text>
-            </View>
-          )}
-          {/* Edit overlay */}
-          <View style={styles.thumbEditOverlay}>
-            {isUploadingThumb ? (
-              <ActivityIndicator size="small" color="#fff" />
+          {/* Thumbnail — tap opens picker, not the video */}
+          <Pressable
+            onPress={(e) => { e.stopPropagation(); handleChangeThumbnail(item); }}
+            style={styles.thumbWrapper}
+          >
+            {item.thumbnailUrl ? (
+              <Image
+                source={{ uri: item.thumbnailUrl }}
+                style={styles.thumbImage}
+                resizeMode="cover"
+              />
             ) : (
-              <Feather name="camera" size={12} color="rgba(255,255,255,0.9)" />
+              <View style={styles.thumbPlaceholder}>
+                <Text style={styles.thumbInitial}>
+                  {(item.title ?? 'V').charAt(0).toUpperCase()}
+                </Text>
+              </View>
+            )}
+
+            {/* Pending Review overlay — shown over either a real thumbnail or the placeholder */}
+            {pending && (
+              <View style={styles.pendingOverlay}>
+                <Feather name="clock" size={12} color="#f59e0b" />
+                <Text style={styles.pendingOverlayText}>Pending Review</Text>
+              </View>
+            )}
+
+            {/* Edit overlay */}
+            <View style={styles.thumbEditOverlay}>
+              {isUploadingThumb ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Feather name="camera" size={12} color="rgba(255,255,255,0.9)" />
+              )}
+            </View>
+          </Pressable>
+
+          {/* Info */}
+          <View style={styles.info}>
+            <Text style={styles.title} numberOfLines={1}>{item.title ?? 'Untitled'}</Text>
+
+            <View style={[styles.statusBadge, { backgroundColor: sc.bg }]}>
+              <Text style={[styles.statusText, { color: sc.color }]}>{sc.label}</Text>
+            </View>
+
+            {pending ? (
+              <Text style={styles.submittedText}>Submitted: {timeAgo(item.createdAt)} ago</Text>
+            ) : (
+              <View style={styles.metaRow}>
+                <View style={styles.metaItem}>
+                  <Feather name="eye" size={12} color="rgba(255,255,255,0.4)" />
+                  <Text style={styles.metaText}>{formatCount(item.viewCount)}</Text>
+                </View>
+                <View style={styles.metaItem}>
+                  <Feather name="heart" size={12} color="rgba(255,255,255,0.4)" />
+                  <Text style={styles.metaText}>{formatCount(item.likeCount)}</Text>
+                </View>
+                <View style={styles.metaItem}>
+                  <Feather name="message-circle" size={12} color="rgba(255,255,255,0.4)" />
+                  <Text style={styles.metaText}>{formatCount(item.commentCount)}</Text>
+                </View>
+                <Text style={styles.timeText}>{timeAgo(item.createdAt)}</Text>
+              </View>
             )}
           </View>
+
+          {/* More options button */}
+          <Pressable
+            onPress={() => !isDeleting && showVideoOptions(item)}
+            hitSlop={8}
+            style={({ pressed }) => [styles.moreBtn, { opacity: pressed ? 0.6 : 1 }]}
+          >
+            {isDeleting ? (
+              <ActivityIndicator size="small" color="rgba(255,255,255,0.4)" />
+            ) : (
+              <Feather name="more-vertical" size={18} color="rgba(255,255,255,0.35)" />
+            )}
+          </Pressable>
         </Pressable>
 
-        {/* Info */}
-        <View style={styles.info}>
-          <Text style={styles.title} numberOfLines={1}>{item.title ?? 'Untitled'}</Text>
-
-          <View style={[styles.statusBadge, { backgroundColor: sc.bg }]}>
-            <Text style={[styles.statusText, { color: sc.color }]}>{sc.label}</Text>
-          </View>
-
-          <View style={styles.metaRow}>
-            <View style={styles.metaItem}>
-              <Feather name="eye" size={12} color="rgba(255,255,255,0.4)" />
-              <Text style={styles.metaText}>{formatCount(item.viewCount)}</Text>
-            </View>
-            <View style={styles.metaItem}>
-              <Feather name="heart" size={12} color="rgba(255,255,255,0.4)" />
-              <Text style={styles.metaText}>{formatCount(item.likeCount)}</Text>
-            </View>
-            <View style={styles.metaItem}>
-              <Feather name="message-circle" size={12} color="rgba(255,255,255,0.4)" />
-              <Text style={styles.metaText}>{formatCount(item.commentCount)}</Text>
-            </View>
-            <Text style={styles.timeText}>{timeAgo(item.createdAt)}</Text>
-          </View>
-        </View>
-
-        {/* More options button */}
-        <Pressable
-          onPress={() => !isDeleting && showVideoOptions(item)}
-          hitSlop={8}
-          style={({ pressed }) => [styles.moreBtn, { opacity: pressed ? 0.6 : 1 }]}
-        >
-          {isDeleting ? (
-            <ActivityIndicator size="small" color="rgba(255,255,255,0.4)" />
-          ) : (
-            <Feather name="more-vertical" size={18} color="rgba(255,255,255,0.35)" />
-          )}
-        </Pressable>
-      </Pressable>
+        {/* Review-time disclaimer — shown once per pending item */}
+        {pending && (
+          <Text style={styles.disclaimerText}>
+            Every video is manually reviewed to ensure it meets Glassnik's Eye-POV standards. Most videos are published within 1 hour, although reviews may take up to 24 hours during busy periods.
+          </Text>
+        )}
+      </View>
     );
   }, [deletingId, uploadingThumbId]);
 
   const topPad = Platform.OS === 'web' ? 8 : insets.top + 12;
+
+  // ── Edit panel screen (replaces the list while active) ──
+  if (editingVideo) {
+    return (
+      <View style={styles.root}>
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <View style={[styles.header, { paddingTop: topPad }]}>
+          <Pressable onPress={closeEditPanel} hitSlop={12} style={styles.backBtn}>
+            <Feather name="x" size={22} color="#fff" />
+          </Pressable>
+          <Text style={styles.headerTitle}>Edit Video</Text>
+          <View style={{ width: 40 }} />
+        </View>
+
+        <ScrollView contentContainerStyle={styles.editScroll} keyboardShouldPersistTaps="handled">
+          <View style={styles.editField}>
+            <Text style={styles.editFieldLabel}>Title</Text>
+            <TextInput
+              style={styles.editInput}
+              value={editTitle}
+              onChangeText={setEditTitle}
+              placeholder="Give your video a title…"
+              placeholderTextColor="rgba(255,255,255,0.3)"
+            />
+          </View>
+
+          <View style={styles.editField}>
+            <Text style={styles.editFieldLabel}>Description</Text>
+            <TextInput
+              style={[styles.editInput, styles.editTextarea]}
+              value={editDescription}
+              onChangeText={setEditDescription}
+              placeholder="Describe what's in this video…"
+              placeholderTextColor="rgba(255,255,255,0.3)"
+              multiline
+              numberOfLines={3}
+            />
+          </View>
+
+          <View style={styles.editField}>
+            <Text style={styles.editFieldLabel}>Location</Text>
+            <TextInput
+              style={styles.editInput}
+              value={editLocation}
+              onChangeText={setEditLocation}
+              placeholder="Where was this filmed?"
+              placeholderTextColor="rgba(255,255,255,0.3)"
+            />
+          </View>
+
+          <View style={styles.editField}>
+            <Text style={styles.editFieldLabel}>Category</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.editCategoryRow}>
+              {EDIT_CATEGORIES.map((cat) => {
+                const isActive = editCategory === cat;
+                return (
+                  <Pressable
+                    key={cat}
+                    onPress={() => setEditCategory(cat)}
+                    style={[styles.editCategoryPill, isActive && styles.editCategoryPillActive]}
+                  >
+                    <Text style={[styles.editCategoryPillText, isActive && styles.editCategoryPillTextActive]}>
+                      {cat}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+
+          <View style={styles.editActionRow}>
+            <Pressable style={[styles.editActionBtn, styles.editCancelBtn]} onPress={closeEditPanel} disabled={savingEdit}>
+              <Text style={styles.editCancelText}>Cancel</Text>
+            </Pressable>
+            <Pressable style={[styles.editActionBtn, styles.editSaveBtn]} onPress={handleSaveEdit} disabled={savingEdit}>
+              {savingEdit ? <ActivityIndicator size="small" color="#000" /> : <Text style={styles.editSaveText}>Save</Text>}
+            </Pressable>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.root}>
@@ -395,6 +598,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  pendingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  pendingOverlayText: {
+    color: '#f59e0b',
+    fontSize: 9,
+    fontFamily: 'Inter_600SemiBold',
+    textAlign: 'center',
+  },
 
   info: { flex: 1, gap: 6 },
   title: { color: '#fff', fontSize: 14, fontFamily: 'Inter_600SemiBold' },
@@ -407,10 +623,61 @@ const styles = StyleSheet.create({
   },
   statusText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
 
+  submittedText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 12,
+    fontFamily: 'Inter_400Regular',
+  },
+
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   metaText: { color: 'rgba(255,255,255,0.4)', fontSize: 12, fontFamily: 'Inter_400Regular' },
   timeText: { color: 'rgba(255,255,255,0.25)', fontSize: 11, fontFamily: 'Inter_400Regular', marginLeft: 'auto' },
 
+  disclaimerText: {
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 11,
+    fontFamily: 'Inter_400Regular',
+    lineHeight: 15,
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    paddingLeft: 86,
+  },
+
   moreBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+
+  // Edit panel
+  editScroll: { padding: 20, gap: 16 },
+  editField: { gap: 6, marginBottom: 4 },
+  editFieldLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontFamily: 'Inter_500Medium', letterSpacing: 0.5 },
+  editInput: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 14,
+    height: 46,
+    color: '#fff',
+    fontSize: 14,
+    fontFamily: 'Inter_400Regular',
+  },
+  editTextarea: { height: 84, paddingTop: 12, textAlignVertical: 'top' },
+  editCategoryRow: { gap: 8, paddingRight: 4 },
+  editCategoryPill: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  editCategoryPillActive: { backgroundColor: '#FE2C55', borderColor: '#FE2C55' },
+  editCategoryPillText: { color: 'rgba(255,255,255,0.7)', fontSize: 13, fontFamily: 'Inter_500Medium' },
+  editCategoryPillTextActive: { color: '#fff' },
+  editActionRow: { flexDirection: 'row', gap: 10, marginTop: 8 },
+  editActionBtn: { flex: 1, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  editCancelBtn: { backgroundColor: 'transparent', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+  editCancelText: { color: 'rgba(255,255,255,0.7)', fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  editSaveBtn: { backgroundColor: '#fff' },
+  editSaveText: { color: '#000', fontSize: 14, fontFamily: 'Inter_700Bold' },
 });
