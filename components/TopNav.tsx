@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, Linking, Platform } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View, Linking, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -21,36 +21,33 @@ export function TopNav() {
 
   return (
     <View style={[styles.wrap, { paddingTop: topPad }]}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.row}
-      >
+      <View style={styles.row}>
         <Pressable style={styles.logoRow} onPress={() => router.push('/(tabs)/explore' as any)}>
-          <View style={styles.logoIcon}>
-            <Feather name="aperture" size={16} color="#5eead4" />
-          </View>
+          <Image
+            source={require('@/assets/images/logo.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
           <Text style={styles.logoText}>Glassnik</Text>
         </Pressable>
 
-        {NAV_LINKS.map((link) => (
-          <Pressable
-            key={link.label}
-            style={styles.linkBtn}
-            onPress={() => Linking.openURL(link.url)}
-          >
-            <Text style={styles.linkText}>{link.label}</Text>
+        <View style={styles.linksRow}>
+          {NAV_LINKS.map((link) => (
+            <Pressable key={link.label} onPress={() => Linking.openURL(link.url)}>
+              <Text style={styles.linkText}>{link.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <View style={styles.rightActions}>
+          <Pressable hitSlop={8}>
+            <Feather name="search" size={18} color="rgba(255,255,255,0.85)" />
           </Pressable>
-        ))}
-
-        <Pressable hitSlop={8} style={styles.iconBtn}>
-          <Feather name="search" size={18} color="rgba(255,255,255,0.85)" />
-        </Pressable>
-
-        <Pressable style={styles.loginBtn} onPress={() => router.push('/auth/login' as any)}>
-          <Text style={styles.loginText}>Log In</Text>
-        </Pressable>
-      </ScrollView>
+          <Pressable style={styles.loginBtn} onPress={() => router.push('/auth/login' as any)}>
+            <Text style={styles.loginText}>Log In</Text>
+          </Pressable>
+        </View>
+      </View>
     </View>
   );
 }
@@ -65,22 +62,29 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    gap: 32,
+    paddingHorizontal: 20,
   },
-  logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 8 },
-  logoIcon: {
-    width: 26,
-    height: 26,
-    borderRadius: 7,
-    backgroundColor: '#0f766e',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
+  logoImage: {
+  width: 40,
+  height: 40,
+  borderRadius: 9,
+},
   logoText: { color: '#fff', fontSize: 17, fontFamily: 'Inter_700Bold' },
-  linkBtn: { paddingVertical: 4 },
+
+  // This is the piece that makes the spread work: flex:1 makes the links
+  // group take up all remaining space between the logo and the right
+  // actions, and space-evenly distributes the links across that space.
+  linksRow: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
+    alignItems: 'center',
+    marginHorizontal: 20,
+  },
   linkText: { color: 'rgba(255,255,255,0.85)', fontSize: 15, fontFamily: 'Inter_500Medium' },
-  iconBtn: { paddingHorizontal: 4 },
+
+  rightActions: { flexDirection: 'row', alignItems: 'center', gap: 18, flexShrink: 0 },
   loginBtn: {
     backgroundColor: '#fff',
     borderRadius: 18,

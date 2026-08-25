@@ -1,5 +1,4 @@
 import React, { useEffect } from 'react';
-import { View } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -12,11 +11,10 @@ import {
   Inter_700Bold,
   useFonts,
 } from '@expo-google-fonts/inter';
-import { Stack, useRouter, useSegments, usePathname } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { MuteProvider } from '@/context/MuteContext';
-import { TopNav } from '@/components/TopNav';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -24,8 +22,8 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
-      staleTime: 5 * 60 * 1000,   // 5 min — stops constant re-fetches on tab switch
-      refetchOnWindowFocus: false, // don't re-fetch just because the user switched apps
+      staleTime: 5 * 60 * 1000,
+      refetchOnWindowFocus: false,
     },
   },
 });
@@ -34,12 +32,6 @@ function AuthGate() {
   const { user, isLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
-  const pathname = usePathname();
-
-  // The "For You" feed (default tab, full-screen swipeable video) is the one
-  // screen that must stay edge-to-edge — the persistent top nav would eat
-  // into the video otherwise. Every other screen gets it.
-  const isFeedScreen = pathname === '/';
 
   useEffect(() => {
     if (isLoading) return;
@@ -53,40 +45,16 @@ function AuthGate() {
     // }
   }, [user, isLoading, segments]);
 
-  const stack = (
+  return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="auth/login" options={{ headerShown: false }} />
       <Stack.Screen name="auth/register" options={{ headerShown: false }} />
-      <Stack.Screen
-        name="video/[id]"
-        options={{ headerShown: false, presentation: 'card' }}
-      />
-      {/* user/[id] must be outside tabs so the Profile tab doesn't stay highlighted */}
-      <Stack.Screen
-        name="user/[id]"
-        options={{ headerShown: false, presentation: 'card' }}
-      />
-      <Stack.Screen
-        name="settings"
-        options={{ headerShown: false, presentation: 'card' }}
-      />
-      <Stack.Screen
-        name="my-videos"
-        options={{ headerShown: false, presentation: 'card' }}
-      />
+      <Stack.Screen name="video/[id]" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="user/[id]" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="settings" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="my-videos" options={{ headerShown: false, presentation: 'card' }} />
     </Stack>
-  );
-
-  if (isFeedScreen) {
-    return stack;
-  }
-
-  return (
-    <View style={{ flex: 1, backgroundColor: '#000' }}>
-      <TopNav />
-      <View style={{ flex: 1 }}>{stack}</View>
-    </View>
   );
 }
 

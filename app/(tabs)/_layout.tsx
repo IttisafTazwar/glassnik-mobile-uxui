@@ -18,11 +18,6 @@ import { useAuth } from '@/context/AuthContext';
 import { notificationsApi } from '@/lib/api';
 import { UploadGuardProvider, useUploadGuard } from '@/context/UploadGuardContext';
 
-/**
- * Wraps any tab bar button with an upload guard. When an upload is in progress,
- * pressing this button shows a confirmation dialog instead of navigating away.
- * Only used for non-upload tabs in ClassicTabLayout.
- */
 function GuardedTabButton({ onPress, ...rest }: any) {
   const { isGuardActive, cancelUploadRef, intentionalLeaveRef } = useUploadGuard();
 
@@ -52,7 +47,6 @@ function GuardedTabButton({ onPress, ...rest }: any) {
   return <Pressable {...rest} onPress={handlePress} />;
 }
 
-// TikTok-style + button for the Upload tab
 function UploadTabButton({ onPress }: { onPress?: () => void }) {
   return (
     <Pressable
@@ -60,7 +54,6 @@ function UploadTabButton({ onPress }: { onPress?: () => void }) {
       style={({ pressed }) => [styles.uploadBtn, { opacity: pressed ? 0.8 : 1 }]}
       hitSlop={8}
     >
-      {/* TikTok dual-color pill effect */}
       <View style={styles.uploadPillShadowLeft} />
       <View style={styles.uploadPillShadowRight} />
       <View style={styles.uploadPillCenter}>
@@ -70,7 +63,6 @@ function UploadTabButton({ onPress }: { onPress?: () => void }) {
   );
 }
 
-/** Bell icon that shows an unread count badge (polls every 30 s). */
 function NotificationTabIcon({ color }: { color: string }) {
   const { user } = useAuth();
   const { data } = useQuery({
@@ -126,7 +118,6 @@ function ClassicTabLayout() {
   const safeAreaInsets = useSafeAreaInsets();
   const isWeb = Platform.OS === 'web';
   const isIOS = Platform.OS === 'ios';
-  const tabBarHeight = isWeb ? 62 : 56 + safeAreaInsets.bottom;
 
   return (
     <Tabs
@@ -135,15 +126,11 @@ function ClassicTabLayout() {
         tabBarActiveTintColor: '#fff',
         tabBarInactiveTintColor: 'rgba(255,255,255,0.5)',
         tabBarLabelStyle: styles.tabLabel,
+        // Hidden entirely — the Sidebar (built into Explore and other
+        // screens) now handles all primary navigation, matching the
+        // reference site's structure. See components/Sidebar.tsx.
         tabBarStyle: {
-          position: 'absolute',
-          backgroundColor: isIOS ? 'transparent' : 'rgba(0,0,0,0.92)',
-          borderTopColor: 'rgba(255,255,255,0.12)',
-          borderTopWidth: 0.5,
-          elevation: 0,
-          height: tabBarHeight,
-          paddingBottom: isWeb ? 8 : safeAreaInsets.bottom,
-          paddingTop: 6,
+          display: 'none',
         },
         tabBarBackground: () =>
           isIOS ? (
@@ -214,8 +201,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_500Medium',
     marginTop: 2,
   },
-
-  // Upload (center) button
   uploadBtn: {
     flex: 1,
     alignItems: 'center',
@@ -248,8 +233,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 1,
   },
-
-  // Notification badge
   notifBadge: {
     position: 'absolute',
     top: -4,
