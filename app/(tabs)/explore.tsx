@@ -131,6 +131,17 @@ export default function ExploreScreen() {
     <View style={styles.root}>
       {/* ── Header ── */}
       <View style={[styles.header, { paddingTop: topPad }]}>
+        {/* Hero text — matches the reference screenshot's banner copy */}
+        <View style={styles.hero}>
+          <Text style={styles.heroTitle}>
+            Don't scroll through the world.{'\n'}
+            <Text style={styles.heroTitleAccent}>Experience</Text> it.
+          </Text>
+          <Text style={styles.heroSubtitle}>
+            Glassnik turns real-world smart-glasses Eye-POV videos into immersive experiences.
+          </Text>
+        </View>
+
         <View style={styles.searchWrap}>
           <Feather name="search" size={16} color="rgba(255,255,255,0.5)" />
           <TextInput
@@ -319,6 +330,23 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     gap: 12,
   },
+
+  // Hero
+  hero: { paddingTop: 4, gap: 8 },
+  heroTitle: {
+    color: '#fff',
+    fontSize: 24,
+    fontFamily: 'Inter_700Bold',
+    lineHeight: 30,
+  },
+  heroTitleAccent: { color: '#5eead4' },
+  heroSubtitle: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 14,
+    fontFamily: 'Inter_400Regular',
+    lineHeight: 19,
+  },
+
   searchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
