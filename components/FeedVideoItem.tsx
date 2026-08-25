@@ -158,6 +158,26 @@ export function FeedVideoItem({ video, isActive, onCommentPress }: Props) {
     lastTap.current = now;
   }
 
+  function handleReport() {
+    Alert.alert(
+      'Report video',
+      'Why are you reporting this video?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Submit report',
+          style: 'destructive',
+          onPress: () => {
+            // NOTE: no report endpoint confirmed in lib/api.ts — this is a
+            // local acknowledgement only, not a real backend submission.
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+            Alert.alert('Thanks', 'Your report has been noted.');
+          },
+        },
+      ],
+    );
+  }
+
   async function handleFollow() {
     if (!user) {
       Alert.alert(
@@ -238,8 +258,8 @@ export function FeedVideoItem({ video, isActive, onCommentPress }: Props) {
         <Feather name="heart" size={90} color="#fff" />
       </Animated.View>
 
-      {/* ── Right sidebar ── */}
-      <View style={[styles.sidebar, { bottom: Platform.OS === 'web' ? 100 : 100 + 34 }]}>
+      {/* ── Right sidebar — avatar/follow, Save, Music disc only ── */}
+      <View style={[styles.sidebar, { bottom: Platform.OS === 'web' ? 170 : 170 + 34 }]}>
         {/* Creator avatar + follow badge — hidden on own videos */}
         {!isOwnVideo && (
         <Pressable style={styles.sideItem} onPress={video.creatorId ? handleFollow : undefined} disabled={followLoading}>
@@ -268,36 +288,7 @@ export function FeedVideoItem({ video, isActive, onCommentPress }: Props) {
         </Pressable>
         )}
 
-        {/* Like */}
-        <Pressable style={styles.sideItem} onPress={handleLike}>
-          <Feather
-            name="heart"
-            size={32}
-            color={liked ? '#FE2C55' : '#fff'}
-            style={liked ? styles.likedHeart : undefined}
-          />
-          <Text style={styles.sideLabel}>{formatCount(likeCount)}</Text>
-        </Pressable>
-
-        {/* Comment — opens CommentsSheet */}
-        <Pressable
-          style={styles.sideItem}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-            onCommentPress?.(video.id);
-          }}
-        >
-          <Feather name="message-circle" size={32} color="#fff" />
-          <Text style={styles.sideLabel}>{formatCount(video.comments)}</Text>
-        </Pressable>
-
-        {/* Share */}
-        <Pressable style={styles.sideItem}>
-          <Feather name="share-2" size={30} color="#fff" />
-          <Text style={styles.sideLabel}>{formatCount(video.shares)}</Text>
-        </Pressable>
-
-        {/* Bookmark */}
+        {/* Save */}
         <Pressable style={styles.sideItem}>
           <Feather name="bookmark" size={30} color="#fff" />
           <Text style={styles.sideLabel}>Save</Text>
@@ -313,8 +304,41 @@ export function FeedVideoItem({ video, isActive, onCommentPress }: Props) {
         </Pressable>
       </View>
 
+      {/* ── Bottom action bar — Love / Comment / Share / Report ── */}
+      <View style={[styles.actionBar, { bottom: Platform.OS === 'web' ? 96 : 96 + 34 }]}>
+        <Pressable style={styles.actionItem} onPress={handleLike}>
+          <Feather
+            name="heart"
+            size={24}
+            color={liked ? '#FE2C55' : '#fff'}
+          />
+          <Text style={styles.actionLabel}>{formatCount(likeCount)}</Text>
+        </Pressable>
+
+        <Pressable
+          style={styles.actionItem}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            onCommentPress?.(video.id);
+          }}
+        >
+          <Feather name="message-circle" size={24} color="#fff" />
+          <Text style={styles.actionLabel}>{formatCount(video.comments)}</Text>
+        </Pressable>
+
+        <Pressable style={styles.actionItem}>
+          <Feather name="share-2" size={22} color="#fff" />
+          <Text style={styles.actionLabel}>{formatCount(video.shares)}</Text>
+        </Pressable>
+
+        <Pressable style={styles.actionItem} onPress={handleReport}>
+          <Feather name="flag" size={22} color="#fff" />
+          <Text style={styles.actionLabel}>Report</Text>
+        </Pressable>
+      </View>
+
       {/* ── Bottom info ── */}
-      <View style={[styles.bottomInfo, { paddingBottom: Platform.OS === 'web' ? 80 : 114 }]}>
+      <View style={[styles.bottomInfo, { paddingBottom: Platform.OS === 'web' ? 140 : 174 }]}>
        {/* Creator + follow — hidden on own videos */}
         {!isOwnVideo && <View style={styles.creatorRow}>
           <Text style={styles.creatorName}>@{video.creator.username}</Text>
@@ -471,7 +495,6 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
-  likedHeart: {},
 
   // Music disc
   disc: {
@@ -498,12 +521,35 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
+  // Bottom action bar (Love / Comment / Share / Report)
+  actionBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  actionItem: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  actionLabel: {
+    color: '#fff',
+    fontSize: 12,
+    fontFamily: 'Inter_600SemiBold',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+
   // Bottom info
   bottomInfo: {
     position: 'absolute',
     bottom: 0,
     left: 0,
-    right: 76,
+    right: 0,
     paddingHorizontal: 16,
     gap: 6,
   },
