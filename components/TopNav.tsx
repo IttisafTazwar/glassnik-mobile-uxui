@@ -21,7 +21,11 @@ export function TopNav() {
 
   return (
     <View style={[styles.wrap, { paddingTop: topPad }]}>
-      <View style={styles.row}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.row}
+      >
         <Pressable style={styles.logoRow} onPress={() => router.push('/(tabs)/explore' as any)}>
           <View style={styles.logoIcon}>
             <Feather name="aperture" size={16} color="#5eead4" />
@@ -29,21 +33,6 @@ export function TopNav() {
           <Text style={styles.logoText}>Glassnik</Text>
         </Pressable>
 
-        <View style={styles.rightActions}>
-          <Pressable hitSlop={8} onPress={() => router.push('/(tabs)/explore' as any)}>
-            <Feather name="search" size={18} color="rgba(255,255,255,0.7)" />
-          </Pressable>
-          <Pressable style={styles.loginBtn} onPress={() => router.push('/auth/login' as any)}>
-            <Text style={styles.loginText}>Log In</Text>
-          </Pressable>
-        </View>
-      </View>
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.linksRow}
-      >
         {NAV_LINKS.map((link) => (
           <Pressable
             key={link.label}
@@ -53,6 +42,14 @@ export function TopNav() {
             <Text style={styles.linkText}>{link.label}</Text>
           </Pressable>
         ))}
+
+        <Pressable hitSlop={8} style={styles.iconBtn}>
+          <Feather name="search" size={18} color="rgba(255,255,255,0.85)" />
+        </Pressable>
+
+        <Pressable style={styles.loginBtn} onPress={() => router.push('/auth/login' as any)}>
+          <Text style={styles.loginText}>Log In</Text>
+        </Pressable>
       </ScrollView>
     </View>
   );
@@ -63,16 +60,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.08)',
-    paddingBottom: 10,
+    paddingBottom: 14,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingBottom: 10,
+    gap: 32,
   },
-  logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 8 },
   logoIcon: {
     width: 26,
     height: 26,
@@ -81,16 +77,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logoText: { color: '#fff', fontSize: 16, fontFamily: 'Inter_700Bold' },
-  rightActions: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  logoText: { color: '#fff', fontSize: 17, fontFamily: 'Inter_700Bold' },
+  linkBtn: { paddingVertical: 4 },
+  linkText: { color: 'rgba(255,255,255,0.85)', fontSize: 15, fontFamily: 'Inter_500Medium' },
+  iconBtn: { paddingHorizontal: 4 },
   loginBtn: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
-  loginText: { color: '#000', fontSize: 12, fontFamily: 'Inter_700Bold' },
-  linksRow: { paddingHorizontal: 16, gap: 18 },
-  linkBtn: { paddingVertical: 2 },
-  linkText: { color: 'rgba(255,255,255,0.7)', fontSize: 13, fontFamily: 'Inter_500Medium' },
+  loginText: { color: '#000', fontSize: 14, fontFamily: 'Inter_700Bold' },
 });
