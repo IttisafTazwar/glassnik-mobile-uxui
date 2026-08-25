@@ -123,7 +123,7 @@ export default function ExploreScreen() {
   const COLS = 3;
   const CELL_GAP = 2;
   const cellWidth = (width - CELL_GAP * (COLS - 1)) / COLS;
-  const cellHeight = cellWidth * 1.5; // 2:3 portrait ratio
+  const cellHeight = cellWidth * (16 / 9); // 9:16 — matches the viewer's actual video aspect ratio
 
   const topPad = Platform.OS === 'web' ? 8 : insets.top + 8;
 
