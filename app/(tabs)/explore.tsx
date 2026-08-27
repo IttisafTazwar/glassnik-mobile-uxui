@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  ImageBackground,
   Linking,
   Platform,
   Pressable,
@@ -206,13 +205,20 @@ export default function ExploreScreen() {
           contentContainerStyle={{ paddingBottom: insets.bottom }}
           showsVerticalScrollIndicator={false}
         >
-          {/* Banner — heading near top, search bar at the bottom of the banner */}
-          <ImageBackground
-            source={require('@/assets/images/explore-banner.png')}
-            style={styles.banner}
-            imageStyle={{ opacity: 0.75 }}
-            resizeMode="contain"
-          >
+          {/* Banner — narrow, fixed-height panoramic banner; heading pinned near
+              the top, search bar pinned near the bottom, so the rest of the
+              page (categories + video grid) sits above the fold.
+              Uses expo-image (not ImageBackground) so we can anchor the crop
+              to the right edge via contentPosition — the person in the photo
+              sits near the right side of the source image, and a centered
+              "cover" crop was cutting him out entirely. */}
+          <View style={styles.banner}>
+            <Image
+              source={require('@/assets/images/home-banner.png')}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              contentPosition="right"
+            />
             <LinearGradient
               colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.75)']}
               style={StyleSheet.absoluteFill}
@@ -251,7 +257,7 @@ export default function ExploreScreen() {
                 )}
               </View>
             </View>
-          </ImageBackground>
+          </View>
 
           {/* Discovery tabs + categories — sit in the black area below the banner */}
           <View style={styles.header}>
@@ -470,18 +476,20 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000' },
 
   banner: {
+    height: 220,
     paddingHorizontal: 20,
-    paddingTop: 28,
-    paddingBottom: 28,
+    paddingTop: 20,
+    paddingBottom: 16,
     backgroundColor: '#0a0f14',
     overflow: 'hidden',
+    justifyContent: 'space-between',
   },
-  bannerContent: { gap: 10, maxWidth: '60%' },
-  bannerSearchRow: { marginTop: 24, alignItems: 'flex-end', paddingRight: '5%' },
-  hero: { gap: 10 },
-  heroTitle: { color: '#fff', fontSize: 44, fontFamily: 'Inter_700Bold', lineHeight: 50 },
+  bannerContent: { gap: 6, maxWidth: '60%' },
+  bannerSearchRow: { alignItems: 'flex-end', paddingRight: '5%' },
+  hero: { gap: 6 },
+  heroTitle: { color: '#fff', fontSize: 30, fontFamily: 'Inter_700Bold', lineHeight: 34 },
   heroTitleAccent: { color: '#5eead4' },
-  heroSubtitle: { color: 'rgba(255,255,255,0.75)', fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 20 },
+  heroSubtitle: { color: 'rgba(255,255,255,0.75)', fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 16 },
 
   header: {
     backgroundColor: '#000',

@@ -55,7 +55,7 @@ export function Sidebar() {
         <View style={styles.joinBox}>
           <View style={styles.joinIconRow}>
             <Feather name="star" size={14} color="#5eead4" />
-            <Text style={styles.joinTitle}>Join Glassnik</Text>
+            <Text style={styles.joinTitle}>Become a Glassnik videographer</Text>
           </View>
           <Text style={styles.joinBody}>
             Start exploring real Eye-POV experiences from around the world.
