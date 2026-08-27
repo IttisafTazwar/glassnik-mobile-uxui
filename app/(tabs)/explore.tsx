@@ -205,13 +205,9 @@ export default function ExploreScreen() {
           contentContainerStyle={{ paddingBottom: insets.bottom }}
           showsVerticalScrollIndicator={false}
         >
-          {/* Banner — narrow, fixed-height panoramic banner; heading pinned near
-              the top, search bar pinned near the bottom, so the rest of the
-              page (categories + video grid) sits above the fold.
-              Uses expo-image (not ImageBackground) so we can anchor the crop
-              to the right edge via contentPosition — the person in the photo
-              sits near the right side of the source image, and a centered
-              "cover" crop was cutting him out entirely. */}
+          {/* Banner — hero text and search bar now sit side-by-side in one
+              row instead of stacked, so the banner can be shorter and the
+              video grid gets more room below. */}
           <View style={styles.banner}>
             <Image
               source={require('@/assets/images/home-banner.png')}
@@ -224,7 +220,7 @@ export default function ExploreScreen() {
               style={StyleSheet.absoluteFill}
             />
 
-            <View style={styles.bannerContent}>
+            <View style={styles.bannerRow}>
               <View style={styles.hero}>
                 <Text style={styles.heroTitle}>
                   Don't scroll through the world.{'\n'}
@@ -234,9 +230,7 @@ export default function ExploreScreen() {
                   Glassnik turns real-world smart-glasses Eye-POV videos into immersive experiences.
                 </Text>
               </View>
-            </View>
 
-            <View style={styles.bannerSearchRow}>
               <View style={styles.searchWrap}>
                 <Feather name="search" size={16} color="rgba(255,255,255,0.5)" />
                 <TextInput
@@ -475,21 +469,25 @@ const styles = StyleSheet.create({
   screenRoot: { flex: 1, backgroundColor: '#000' },
   root: { flex: 1, backgroundColor: '#000' },
 
+  // Shorter banner now that hero text + search bar sit in a single row
+  // instead of stacked (top/bottom).
   banner: {
-    height: 220,
+    height: 140,
     paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
     backgroundColor: '#0a0f14',
     overflow: 'hidden',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
   },
-  bannerContent: { gap: 6, maxWidth: '60%' },
-  bannerSearchRow: { alignItems: 'flex-end', paddingRight: '5%' },
-  hero: { gap: 6 },
-  heroTitle: { color: '#fff', fontSize: 30, fontFamily: 'Inter_700Bold', lineHeight: 34 },
+  bannerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 24,
+  },
+  hero: { gap: 6, flexShrink: 1, maxWidth: '55%' },
+  heroTitle: { color: '#fff', fontSize: 24, fontFamily: 'Inter_700Bold', lineHeight: 28 },
   heroTitleAccent: { color: '#5eead4' },
-  heroSubtitle: { color: 'rgba(255,255,255,0.75)', fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 16 },
+  heroSubtitle: { color: 'rgba(255,255,255,0.75)', fontSize: 11, fontFamily: 'Inter_400Regular', lineHeight: 15 },
 
   header: {
     backgroundColor: '#000',
@@ -511,7 +509,8 @@ const styles = StyleSheet.create({
     height: 44,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.15)',
-    width: '50%',
+    width: '38%',
+    minWidth: 220,
   },
   searchInput: { flex: 1, color: '#fff', fontSize: 14, fontFamily: 'Inter_400Regular', height: '100%' },
 
