@@ -205,9 +205,10 @@ export default function ExploreScreen() {
           contentContainerStyle={{ paddingBottom: insets.bottom }}
           showsVerticalScrollIndicator={false}
         >
-          {/* Banner — hero text and search bar now sit side-by-side in one
-              row instead of stacked, so the banner can be shorter and the
-              video grid gets more room below. */}
+          {/* Banner — hero text and a thinner search bar sit side-by-side.
+              The search bar has its own marginTop so it drops down to
+              shoulder level in the photo, independent of the hero text's
+              own vertical position. */}
           <View style={styles.banner}>
             <Image
               source={require('@/assets/images/home-banner.png')}
@@ -232,7 +233,7 @@ export default function ExploreScreen() {
               </View>
 
               <View style={styles.searchWrap}>
-                <Feather name="search" size={16} color="rgba(255,255,255,0.5)" />
+                <Feather name="search" size={14} color="rgba(255,255,255,0.5)" />
                 <TextInput
                   style={styles.searchInput}
                   placeholder="Search places, attractions or Eye-POV experiences…"
@@ -246,7 +247,7 @@ export default function ExploreScreen() {
                 />
                 {query.length > 0 && (
                   <Pressable onPress={() => setQuery('')} hitSlop={8}>
-                    <Feather name="x" size={15} color="rgba(255,255,255,0.6)" />
+                    <Feather name="x" size={13} color="rgba(255,255,255,0.6)" />
                   </Pressable>
                 )}
               </View>
@@ -469,8 +470,6 @@ const styles = StyleSheet.create({
   screenRoot: { flex: 1, backgroundColor: '#000' },
   root: { flex: 1, backgroundColor: '#000' },
 
-  // Shorter banner now that hero text + search bar sit in a single row
-  // instead of stacked (top/bottom).
   banner: {
     height: 140,
     paddingHorizontal: 20,
@@ -480,9 +479,10 @@ const styles = StyleSheet.create({
   },
   bannerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 24,
+    marginTop: 12,
   },
   hero: { gap: 6, flexShrink: 1, maxWidth: '55%' },
   heroTitle: { color: '#fff', fontSize: 24, fontFamily: 'Inter_700Bold', lineHeight: 28 },
@@ -502,15 +502,16 @@ const styles = StyleSheet.create({
   searchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
     backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    height: 44,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    height: 34,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.15)',
-    width: '38%',
-    minWidth: 220,
+    width: '34%',
+    minWidth: 200,
+    marginTop: 56,
   },
   searchInput: { flex: 1, color: '#fff', fontSize: 14, fontFamily: 'Inter_400Regular', height: '100%' },
 
