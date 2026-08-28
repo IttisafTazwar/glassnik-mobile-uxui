@@ -43,6 +43,9 @@ export function FeedVideoItem({ video, isActive, onCommentPress }: Props) {
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(video.likes);
   const [paused, setPaused] = useState(false);
+  // Instagram-style tap-to-hide, combined with the existing single-tap
+  // pause toggle (no separate gesture was specified).
+  const [controlsVisible, setControlsVisible] = useState(true);
   const [progress, setProgress] = useState(0);
   const [following, setFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
@@ -154,6 +157,7 @@ export function FeedVideoItem({ video, isActive, onCommentPress }: Props) {
       triggerHeartAnim();
     } else {
       setPaused((p) => !p);
+      setControlsVisible((v) => !v);
     }
     lastTap.current = now;
   }
@@ -214,6 +218,11 @@ export function FeedVideoItem({ video, isActive, onCommentPress }: Props) {
 
   const ITEM_HEIGHT = height;
 
+  // Place/Tour/Transport • Location — single line, per the mockup.
+  const placeTourTransport = video.description || null;
+  const locationText = [video.place, video.city, video.country].filter(Boolean).join(', ') || null;
+  const metaLine = [placeTourTransport, locationText].filter(Boolean).join(' • ');
+
   return (
     <View style={[styles.container, { width, height: ITEM_HEIGHT }]}>
       {/* ── Video / thumbnail ── */}
@@ -258,134 +267,134 @@ export function FeedVideoItem({ video, isActive, onCommentPress }: Props) {
         <Feather name="heart" size={90} color="#fff" />
       </Animated.View>
 
-      {/* ── Right sidebar — avatar/follow, Save, Music disc only ── */}
-      <View style={[styles.sidebar, { bottom: Platform.OS === 'web' ? 170 : 170 + 34 }]}>
-        {/* Creator avatar + follow badge — hidden on own videos */}
-        {!isOwnVideo && (
-        <Pressable style={styles.sideItem} onPress={video.creatorId ? handleFollow : undefined} disabled={followLoading}>
-          <View style={[styles.avatar, { backgroundColor: video.creator.color }]}>
-            {video.creator.avatarUrl ? (
-              <Image
-                source={{ uri: video.creator.avatarUrl }}
-                style={styles.avatarImage}
-                contentFit="cover"
-                transition={200}
-              />
-            ) : (
-              <Text style={styles.avatarText}>{video.creator.initial}</Text>
-            )}
-          </View>
-          {video.creatorId && !following && (
-            <View style={styles.followBtn}>
-              <Text style={styles.followPlus}>+</Text>
-            </View>
-          )}
-          {video.creatorId && following && (
-            <View style={[styles.followBtn, styles.followBtnActive]}>
-              <Feather name="check" size={11} color="#fff" />
-            </View>
-          )}
-        </Pressable>
-        )}
-
-        {/* Save */}
-        <Pressable style={styles.sideItem}>
-          <Feather name="bookmark" size={30} color="#fff" />
-          <Text style={styles.sideLabel}>Save</Text>
-        </Pressable>
-
-        {/* Spinning music disc */}
-        <Pressable style={styles.sideItem} onPress={onMuteToggle}>
-          <Animated.View style={[styles.disc, spinStyle]}>
-            <View style={[styles.discInner, { backgroundColor: video.creator.color }]}>
-              <Text style={styles.discNote}>♪</Text>
-            </View>
-          </Animated.View>
-        </Pressable>
-      </View>
-
-      {/* ── Bottom action bar — Love / Comment / Share / Report ── */}
-      <View style={[styles.actionBar, { bottom: Platform.OS === 'web' ? 96 : 96 + 34 }]}>
-        <Pressable style={styles.actionItem} onPress={handleLike}>
-          <Feather
-            name="heart"
-            size={24}
-            color={liked ? '#FE2C55' : '#fff'}
-          />
-          <Text style={styles.actionLabel}>{formatCount(likeCount)}</Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.actionItem}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-            onCommentPress?.(video.id);
-          }}
-        >
-          <Feather name="message-circle" size={24} color="#fff" />
-          <Text style={styles.actionLabel}>{formatCount(video.comments)}</Text>
-        </Pressable>
-
-        <Pressable style={styles.actionItem}>
-          <Feather name="share-2" size={22} color="#fff" />
-          <Text style={styles.actionLabel}>{formatCount(video.shares)}</Text>
-        </Pressable>
-
-        <Pressable style={styles.actionItem} onPress={handleReport}>
-          <Feather name="flag" size={22} color="#fff" />
-          <Text style={styles.actionLabel}>Report</Text>
-        </Pressable>
-      </View>
-
-      {/* ── Bottom info ── */}
-      <View style={[styles.bottomInfo, { paddingBottom: Platform.OS === 'web' ? 140 : 174 }]}>
-       {/* Creator + follow — hidden on own videos */}
-        {!isOwnVideo && <View style={styles.creatorRow}>
-          <Text style={styles.creatorName}>@{video.creator.username}</Text>
-          {video.creatorId && (
-            <Pressable
-              style={[styles.followTextBtn, following && styles.followTextBtnActive]}
-              onPress={handleFollow}
-              disabled={followLoading}
-            >
-              {following ? (
-                <View style={styles.followingRow}>
-                  <Feather name="check" size={11} color="#fff" />
-                  <Text style={styles.followTextBtnLabel}>Following</Text>
+      {/* ── Right sidebar — avatar/follow, Music disc. Save removed per
+          spec; the floating pink "+" follow badge removed per spec
+          (Steve flagged it as an unidentified button interfering with
+          immersion) — the avatar itself and follow interaction are kept,
+          just moved to a plain outline badge instead of a filled pink one. */}
+      {controlsVisible && (
+        <View style={[styles.sidebar, { bottom: Platform.OS === 'web' ? 170 : 170 + 34 }]}>
+          {!isOwnVideo && (
+            <Pressable style={styles.sideItem} onPress={video.creatorId ? handleFollow : undefined} disabled={followLoading}>
+              <View style={[styles.avatar, { backgroundColor: video.creator.color }]}>
+                {video.creator.avatarUrl ? (
+                  <Image
+                    source={{ uri: video.creator.avatarUrl }}
+                    style={styles.avatarImage}
+                    contentFit="cover"
+                    transition={200}
+                  />
+                ) : (
+                  <Text style={styles.avatarText}>{video.creator.initial}</Text>
+                )}
+              </View>
+              {video.creatorId && !following && (
+                <View style={styles.followBtn}>
+                  <Feather name="plus" size={12} color="#fff" />
                 </View>
-              ) : (
-                <Text style={styles.followTextBtnLabel}>Follow</Text>
+              )}
+              {video.creatorId && following && (
+                <View style={[styles.followBtn, styles.followBtnActive]}>
+                  <Feather name="check" size={11} color="#fff" />
+                </View>
               )}
             </Pressable>
           )}
+
+          {/* Spinning music disc */}
+          <Pressable style={styles.sideItem} onPress={onMuteToggle}>
+            <Animated.View style={[styles.disc, spinStyle]}>
+              <View style={[styles.discInner, { backgroundColor: video.creator.color }]}>
+                <Text style={styles.discNote}>♪</Text>
+              </View>
+            </Animated.View>
+          </Pressable>
+        </View>
+      )}
+
+      {/* ── Bottom info/control box — overlays the video, flush to the
+          bottom and both side edges, compact and semi-transparent.
+          Progress bar sits immediately above it. Both hidden together on
+          tap per the spec. Save button removed; action icons are Like/
+          Comment/Share/Report only, smaller and soft grey. */}
+      {controlsVisible && (
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+        </View>
+      )}
+
+      {controlsVisible && (
+        <View style={styles.bottomBox}>
+          {!isOwnVideo && (
+            <View style={styles.creatorRow}>
+              <Text style={styles.creatorName}>@{video.creator.username}</Text>
+              {video.creatorId && (
+                <Pressable
+                  style={[styles.followTextBtn, following && styles.followTextBtnActive]}
+                  onPress={handleFollow}
+                  disabled={followLoading}
+                >
+                  {following ? (
+                    <View style={styles.followingRow}>
+                      <Feather name="check" size={11} color="#fff" />
+                      <Text style={styles.followTextBtnLabel}>Following</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.followTextBtnLabel}>Follow</Text>
+                  )}
+                </Pressable>
+              )}
             </View>
-        }
-        
+          )}
 
-        {/* Location + category on one line — tappable, navigates to Explore */}
-        {(video.place || video.city || video.country || video.category) ? (
-          <View style={styles.metaRow}>
-            {(video.place || video.city || video.country) ? (
-              <Pressable style={styles.locationWrap} onPress={() => router.push('/(tabs)/explore')}>
-                <Feather name="map-pin" size={11} color="rgba(255,255,255,0.85)" />
-                <Text style={styles.locationText}>
-                  {[video.place, video.city, video.country].filter(Boolean).join(' · ')}
-                </Text>
-              </Pressable>
-            ) : null}
-            {video.category ? (
-              <Pressable style={styles.categoryPill} onPress={() => router.push('/(tabs)/explore')}>
-                <Text style={styles.categoryText}>{video.category.toUpperCase()}</Text>
-              </Pressable>
-            ) : null}
+          {metaLine ? (
+            <View style={styles.metaRow}>
+              <Text style={styles.metaText} numberOfLines={1}>
+                {metaLine}
+              </Text>
+              {video.category ? (
+                <View style={styles.categoryPill}>
+                  <Text style={styles.categoryText}>{video.category.toUpperCase()}</Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+
+          <View style={styles.divider} />
+
+          <View style={styles.actionRow}>
+            <Pressable style={styles.actionItem} onPress={handleLike}>
+              <Feather
+                name="heart"
+                size={18}
+                color={liked ? '#FE2C55' : 'rgba(255,255,255,0.7)'}
+              />
+              <Text style={styles.actionLabel}>{formatCount(likeCount)}</Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.actionItem}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                onCommentPress?.(video.id);
+              }}
+            >
+              <Feather name="message-circle" size={18} color="rgba(255,255,255,0.7)" />
+              <Text style={styles.actionLabel}>{formatCount(video.comments)}</Text>
+            </Pressable>
+
+            <Pressable style={styles.actionItem}>
+              <Feather name="share-2" size={17} color="rgba(255,255,255,0.7)" />
+              <Text style={styles.actionLabel}>{formatCount(video.shares)}</Text>
+            </Pressable>
+
+            <Pressable style={styles.actionItem} onPress={handleReport}>
+              <Feather name="flag" size={17} color="rgba(255,255,255,0.7)" />
+              <Text style={styles.actionLabel}>Report</Text>
+            </Pressable>
           </View>
-        ) : null}
-      </View>
-
-      {/* ── Progress bar ── */}
-      <View style={[styles.progressTrack, { bottom: Platform.OS === 'web' ? 62 : 84 }]}>
-        <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
-      </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -411,8 +420,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 340,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    height: 200,
+    backgroundColor: 'rgba(0,0,0,0.35)',
   },
 
   // Pause
@@ -467,33 +476,23 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 24,
   },
+  // Follow badge — plain dark outline instead of the filled pink circle
+  // Steve flagged as an unidentified button interfering with immersion.
   followBtn: {
     position: 'absolute',
     bottom: -12,
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#FE2C55',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderWidth: 1.5,
+    borderColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
   },
   followBtnActive: {
     backgroundColor: '#555',
-  },
-  followPlus: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '900',
-    lineHeight: 20,
-    textAlign: 'center',
-  },
-  sideLabel: {
-    color: '#fff',
-    fontSize: 12,
-    fontFamily: 'Inter_600SemiBold',
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    borderColor: '#555',
   },
 
   // Music disc
@@ -521,37 +520,32 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  // Bottom action bar (Love / Comment / Share / Report)
-  actionBar: {
+  // Progress bar — flush above the bottom box
+  progressTrack: {
     position: 'absolute',
     left: 0,
     right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-evenly',
-    alignItems: 'center',
-    paddingHorizontal: 24,
+    bottom: 84,
+    height: 2,
+    backgroundColor: 'rgba(255,255,255,0.25)',
   },
-  actionItem: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  actionLabel: {
-    color: '#fff',
-    fontSize: 12,
-    fontFamily: 'Inter_600SemiBold',
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#fff',
+    minWidth: 2,
   },
 
-  // Bottom info
-  bottomInfo: {
+  // Bottom info/control box
+  bottomBox: {
     position: 'absolute',
-    bottom: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: 16,
-    gap: 6,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 14,
+    gap: 8,
   },
   creatorRow: {
     flexDirection: 'row',
@@ -560,7 +554,7 @@ const styles = StyleSheet.create({
   },
   creatorName: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: 'Inter_700Bold',
     textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowOffset: { width: 0, height: 1 },
@@ -590,50 +584,46 @@ const styles = StyleSheet.create({
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 8,
-    flexWrap: 'nowrap',
   },
-  locationWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    flexShrink: 1,
-  },
-  locationText: {
-    color: 'rgba(255,255,255,0.85)',
+  metaText: {
+    flex: 1,
+    color: 'rgba(255,255,255,0.9)',
     fontSize: 13,
     fontFamily: 'Inter_400Regular',
-    flexShrink: 1,
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
   },
   categoryPill: {
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'rgba(255,255,255,0.15)',
     borderRadius: 4,
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: 'rgba(255,255,255,0.25)',
+    flexShrink: 0,
   },
   categoryText: {
-    color: '#fff',
-    fontSize: 11,
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 10,
     fontFamily: 'Inter_700Bold',
     letterSpacing: 0.5,
   },
-
-  // Progress bar
-  progressTrack: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 2,
-    backgroundColor: 'rgba(255,255,255,0.3)',
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.15)',
   },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#fff',
-    minWidth: 2,
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
+    alignItems: 'center',
+  },
+  actionItem: {
+    alignItems: 'center',
+    gap: 3,
+  },
+  actionLabel: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 11,
+    fontFamily: 'Inter_500Medium',
   },
 });

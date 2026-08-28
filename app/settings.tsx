@@ -64,7 +64,7 @@ export default function SettingsScreen() {
   function handleDeleteAccount() {
     Alert.alert(
       'Delete account',
-      'This will permanently delete your account, including your videos, likes, comments, and followers. This cannot be undone.',
+      'This will permanently delete your account, including your Experiences, likes, comments, and followers. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -259,7 +259,7 @@ export default function SettingsScreen() {
             style={({ pressed }) => [styles.rowBtn, { opacity: pressed ? 0.7 : 1, paddingHorizontal: 0 }]}
           >
             <Feather name="file-text" size={16} color="rgba(255,255,255,0.7)" />
-            <Text style={styles.rowBtnText}>Terms of Service</Text>
+            <Text style={styles.rowBtnText}>Terms and Policies</Text>
             <Feather name="external-link" size={13} color="rgba(255,255,255,0.3)" />
           </Pressable>
 

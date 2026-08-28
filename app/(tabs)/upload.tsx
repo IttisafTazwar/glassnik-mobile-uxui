@@ -19,35 +19,27 @@ import * as ImagePicker from 'expo-image-picker';
 import * as LegacyFS from 'expo-file-system/legacy';
 import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { useNavigation, useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
 import { mobileApi, userApi, videoApi } from '@/lib/api';
 import { useUploadGuard } from '@/context/UploadGuardContext';
 
-// ─── Notification handler (must be set before any schedule call) ──────────────
-
-
-// ─── Upload transport ─────────────────────────────────────────────────────────
-// The backend returns a Google Cloud Storage V4 signed URL. It is a normal
-// signed object upload URL, not a TUS resumable endpoint.
-
-// ─── Category list (matches Explore) ───────────────────────────────────────────
+// ─── Category list (matches Explore) — reordered to match the MVP spec ────────
 const UPLOAD_CATEGORIES = [
+  'Attractions',
   'City Walks',
   'Local Life',
-  'Food & Markets',
-  'Nature & Scenery',
-  'Beaches & Coastlines',
-  'Architecture & Landmarks',
-  'Attractions',
   'Hidden Gems',
   'Peaceful Places',
+  'Food & Markets',
   'Cafes',
   'Shopping',
+  'Architecture & Landmarks',
   'Museums & Galleries',
   'Parks & Gardens',
+  'Beaches & Coastlines',
+  'Nature & Scenery',
   'Trails & Hiking',
   'Adventure',
   'Rides & Transport',
@@ -73,10 +65,11 @@ export default function UploadScreen() {
   const [pickedUri, setPickedUri] = useState<string | null>(null);
   const [pickedName, setPickedName] = useState<string>('');
   const [pickedSize, setPickedSize] = useState<number>(0);
+  // "title" now holds the Place / Tour / Transport value (field relabeled per MVP spec)
   const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
   const [category, setCategory] = useState<string | null>(null);
+  const [categoryOpen, setCategoryOpen] = useState(false);
   const [confirmedGuidelines, setConfirmedGuidelines] = useState(false);
   const [phase, setPhase] = useState<UploadPhase>('idle');
   const [uploadProgress, setUploadProgress] = useState(0); // 0–1
@@ -278,7 +271,6 @@ export default function UploadScreen() {
         setPickedName('');
         setPickedSize(0);
         setTitle('');
-        setDescription('');
         setLocation('');
         setCategory(null);
         setConfirmedGuidelines(false);
@@ -311,12 +303,6 @@ export default function UploadScreen() {
   }
 
   /**
-   * Tell the backend that the direct GCS upload has finished.
-   * We use the same API base URL/auth handling as mobileApi by exposing this
-   * through mobileApi.completeUpload in lib/api.ts.
-   */
-
-  /**
    * Upload using the Google Cloud Storage V4 signed URL returned by the backend.
    * This is a normal signed PUT upload, not a TUS HEAD/PATCH session.
    */
@@ -324,13 +310,11 @@ export default function UploadScreen() {
     fileUri: string;
     fileSize: number;
     title: string;
-    description: string;
   }) {
     const {
       fileUri,
       fileSize,
       title: uploadTitle,
-      description: uploadDesc,
     } = opts;
 
     clearPollTimer();
@@ -343,10 +327,11 @@ export default function UploadScreen() {
       // NOTE: mobileApi.requestUpload currently only accepts title/size/description.
       // location/category are captured in UI state above but not yet sent to the
       // backend — that requires a backend-side change outside this session's scope.
+      // Description has been removed from the MVP form, so we pass undefined here.
       const slot = await mobileApi.requestUpload(
         uploadTitle.trim(),
         fileSize,
-        uploadDesc.trim() || undefined,
+        undefined,
       );
 
       const uploadUrl = slot.uploadUrl;
@@ -359,6 +344,9 @@ export default function UploadScreen() {
       if (Platform.OS === 'web') {
         // expo-file-system UploadTask is native-only. On web, read the
         // ImagePicker URI as a Blob and PUT it directly to the signed GCS URL.
+        // NOTE: fetch() gives no upload-progress events on web, so uploadProgress
+        // stays at 0 for the whole PUT and only flips to 1 once it resolves — the
+        // UI below deliberately shows a plain spinner (no %) on web for this reason.
         setStatusMsg('Uploading video…');
 
         const fileResponse = await fetch(fileUri);
@@ -389,7 +377,7 @@ export default function UploadScreen() {
 
         setUploadProgress(1);
       } else {
-        // Native Android/iOS can use Expo FileSystem for upload progress.
+        // Native Android/iOS can use Expo FileSystem for real upload progress.
         const task = LegacyFS.createUploadTask(
           uploadUrl,
           fileUri,
@@ -425,33 +413,31 @@ export default function UploadScreen() {
       // The bytes are now in GCS. Tell the backend the upload is complete,
       // then poll until processing/moderation reaches a terminal state.
       setPhase('processing');
-setStatusMsg('Finalising video…');
+      setStatusMsg('Finalising video…');
 
-console.log('GCS upload complete. Completing video:', videoId);
+      console.log('GCS upload complete. Completing video:', videoId);
 
-await mobileApi.completeUpload(videoId);
+      await mobileApi.completeUpload(videoId);
 
-console.log('Video completed successfully:', videoId);
+      console.log('Video completed successfully:', videoId);
 
-queryClient.invalidateQueries({ queryKey: ['feed'] });
-queryClient.invalidateQueries({ queryKey: ['explore'] });
-queryClient.invalidateQueries({ queryKey: ['my-videos'] });
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      queryClient.invalidateQueries({ queryKey: ['explore'] });
+      queryClient.invalidateQueries({ queryKey: ['my-videos'] });
 
-Haptics.notificationAsync(
-  Haptics.NotificationFeedbackType.Success,
-);
+      Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Success,
+      );
 
-setPhase('done');
-setStatusMsg('Video uploaded successfully!');
+      setPhase('done');
 
-setPickedUri(null);
-setPickedName('');
-setPickedSize(0);
-setTitle('');
-setDescription('');
-setLocation('');
-setCategory(null);
-setConfirmedGuidelines(false);
+      setPickedUri(null);
+      setPickedName('');
+      setPickedSize(0);
+      setTitle('');
+      setLocation('');
+      setCategory(null);
+      setConfirmedGuidelines(false);
     } catch (err: any) {
       clearPollTimer();
 
@@ -495,7 +481,11 @@ setConfirmedGuidelines(false);
       return;
     }
     if (!title.trim()) {
-      Alert.alert('Title required', 'Please add a title before uploading.');
+      Alert.alert('Details required', 'Please add Place / Tour / Transport details before uploading.');
+      return;
+    }
+    if (!location.trim()) {
+      Alert.alert('Location required', 'Please add a location before uploading.');
       return;
     }
     if (!category) {
@@ -517,7 +507,7 @@ setConfirmedGuidelines(false);
       return;
     }
 
-    await runUpload({ fileUri: pickedUri, fileSize, title, description });
+    await runUpload({ fileUri: pickedUri, fileSize, title });
   }
 
 
@@ -572,11 +562,7 @@ setConfirmedGuidelines(false);
           </View>
           <Text style={[styles.lockTitle, { color: colors.foreground }]}>Videographer Access Required</Text>
           <Text style={[styles.lockSubtitle, { color: colors.mutedForeground }]}>
-            You need the{' '}
-            <Text style={{ color: colors.primary, fontFamily: 'Inter_600SemiBold' }}>
-              mobile.creator
-            </Text>{' '}
-            capability to upload videos.
+            You need videographer access to upload Experiences.
           </Text>
           <Text style={[styles.lockHint, { color: colors.mutedForeground }]}>
             Apply in your profile or contact the team to get access.
@@ -692,36 +678,37 @@ setConfirmedGuidelines(false);
           </View>
         )}
 
-        {/* Video picker */}
-        <Pressable
-          style={({ pressed }) => [
-            styles.picker,
-            {
-              backgroundColor: colors.card,
-              borderColor: pickedUri ? colors.primary : colors.border,
-              opacity: pressed ? 0.85 : 1,
-            },
-          ]}
-          onPress={isUploading ? undefined : pickVideo}
-          disabled={isUploading}
-        >
-          {pickedUri ? (
-            <View style={styles.pickedPreview}>
-              <Image source={{ uri: pickedUri }} style={styles.previewImg} contentFit="cover" />
-              <View style={[styles.pickedBadge, { backgroundColor: colors.primary }]}>
+        {/* Video picker — compact confirmation once a video is selected, per MVP
+            spec: no large preview box, just a checkmark row + filename + "Change
+            video" link. */}
+        {pickedUri ? (
+          <View style={[styles.pickedCard, { backgroundColor: colors.card, borderColor: colors.primary }]}>
+            <View style={styles.pickedCardRow}>
+              <View style={[styles.pickedCheckCircle, { backgroundColor: colors.primary }]}>
                 <Feather name="check" size={14} color="#fff" />
               </View>
-              {!isUploading && (
-                <Pressable
-                  onPress={pickVideo}
-                  style={[styles.changeBtn, { backgroundColor: 'rgba(0,0,0,0.55)' }]}
-                >
-                  <Feather name="refresh-cw" size={13} color="#fff" />
-                  <Text style={styles.changeBtnText}>Change</Text>
-                </Pressable>
-              )}
+              <Text style={[styles.pickedCardText, { color: colors.foreground }]} numberOfLines={1}>
+                Video selected — {pickedName}
+              </Text>
             </View>
-          ) : (
+            {!isUploading && (
+              <Pressable onPress={pickVideo} hitSlop={8}>
+                <Text style={[styles.changeVideoLink, { color: colors.primary }]}>Change video</Text>
+              </Pressable>
+            )}
+          </View>
+        ) : (
+          <Pressable
+            style={({ pressed }) => [
+              styles.picker,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+                opacity: pressed ? 0.85 : 1,
+              },
+            ]}
+            onPress={pickVideo}
+          >
             <View style={styles.pickerContent}>
               <View style={[styles.pickerIcon, { backgroundColor: colors.secondary }]}>
                 <Feather name="video" size={28} color={colors.primary} />
@@ -730,109 +717,115 @@ setConfirmedGuidelines(false);
                 Tap to select a video
               </Text>
               <Text style={[styles.pickerHint, { color: colors.mutedForeground }]}>
-                MP4, MOV · from your photo library
+                MP4 or MOV
               </Text>
             </View>
-          )}
-        </Pressable>
+          </Pressable>
+        )}
 
         {pickedUri && !isUploading && phase !== 'done' && (
           <View style={styles.fields}>
+            <View style={styles.sectionHeadingBlock}>
+              <Text style={[styles.sectionHeading, { color: colors.foreground }]}>
+                Where is your experience?
+              </Text>
+              <Text style={[styles.sectionSubtext, { color: colors.mutedForeground }]}>
+                Help viewers know exactly where your video was recorded.
+              </Text>
+            </View>
+
             <View>
-              <View style={styles.labelRow}>
-                <Text style={[styles.fieldLabel, { color: colors.mutedForeground, marginBottom: 0 }]}>
-                  Title <Text style={{ color: colors.primary }}>*</Text>
-                </Text>
-                <Pressable
-                  hitSlop={8}
-                  onPress={() =>
-                    Alert.alert('Title', 'Example: "Sunset walk through Shibuya"')
-                  }
-                >
-                  <Feather name="info" size={13} color={colors.mutedForeground} />
-                </Pressable>
-              </View>
+              <Text style={[styles.fieldLabel, { color: colors.foreground, fontFamily: 'Inter_600SemiBold', marginBottom: 2 }]}>
+                Place / Tour / Transport (from [location name] to [location name]){' '}
+                <Text style={{ color: colors.primary }}>*</Text>
+              </Text>
+              <Text style={[styles.fieldHelper, { color: colors.mutedForeground }]}>
+                e.g. Rundle Mall, Kuala Lumpur City Bus Tour, Train from London to Manchester
+              </Text>
               <View style={[styles.inputWrap, { backgroundColor: colors.input, borderColor: colors.border }]}>
                 <TextInput
                   style={[styles.input, { color: colors.foreground }]}
-                  placeholder="Give your video a title…"
+                  placeholder="Enter place, tour or transport details"
                   placeholderTextColor={colors.mutedForeground}
                   value={title}
                   onChangeText={setTitle}
+                  maxLength={120}
                 />
               </View>
+              <Text style={[styles.charCount, { color: colors.mutedForeground }]}>{title.length}/120</Text>
             </View>
 
             <View>
-              <View style={styles.labelRow}>
-                <Text style={[styles.fieldLabel, { color: colors.mutedForeground, marginBottom: 0 }]}>Description</Text>
-                <Pressable
-                  hitSlop={8}
-                  onPress={() =>
-                    Alert.alert('Description', 'One or two sentences describing what viewers will experience in the video.')
-                  }
-                >
-                  <Feather name="info" size={13} color={colors.mutedForeground} />
-                </Pressable>
-              </View>
-              <View
-                style={[
-                  styles.inputWrap,
-                  styles.textareaWrap,
-                  { backgroundColor: colors.input, borderColor: colors.border },
-                ]}
-              >
-                <TextInput
-                  style={[styles.input, styles.textarea, { color: colors.foreground }]}
-                  placeholder="Describe what's in this video…"
-                  placeholderTextColor={colors.mutedForeground}
-                  value={description}
-                  onChangeText={setDescription}
-                  multiline
-                  numberOfLines={3}
-                />
-              </View>
-            </View>
-
-            <View>
-              <Text style={[styles.fieldLabel, { color: colors.foreground, fontFamily: 'Inter_600SemiBold' }]}>
-                Location
+              <Text style={[styles.fieldLabel, { color: colors.foreground, fontFamily: 'Inter_600SemiBold', marginBottom: 2 }]}>
+                Location <Text style={{ color: colors.primary }}>*</Text>
               </Text>
-              <View style={[styles.inputWrap, { backgroundColor: colors.input, borderColor: colors.primary, borderWidth: 1.5 }]}>
+              <Text style={[styles.fieldHelper, { color: colors.mutedForeground }]}>
+                City / State / Region, Country
+              </Text>
+              <View style={[styles.inputWrap, { backgroundColor: colors.input, borderColor: colors.border }]}>
                 <TextInput
                   style={[styles.input, { color: colors.foreground }]}
-                  placeholder="Where was this filmed?"
+                  placeholder="Enter city, state/region and country"
                   placeholderTextColor={colors.mutedForeground}
                   value={location}
                   onChangeText={setLocation}
+                  maxLength={100}
                 />
               </View>
+              <Text style={[styles.charCount, { color: colors.mutedForeground }]}>{location.length}/100</Text>
             </View>
 
             <View>
               <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>
                 Category <Text style={{ color: colors.primary }}>*</Text>
               </Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
-                {UPLOAD_CATEGORIES.map((cat) => {
-                  const isActive = category === cat;
-                  return (
-                    <Pressable
-                      key={cat}
-                      onPress={() => setCategory(cat)}
-                      style={[
-                        styles.categoryPill,
-                        { borderColor: colors.border, backgroundColor: colors.input },
-                        isActive && { backgroundColor: colors.primary, borderColor: colors.primary },
-                      ]}
-                    >
-                      <Text style={[styles.categoryPillText, { color: isActive ? '#fff' : colors.mutedForeground }]}>
-                        {cat}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
+              <Pressable
+                onPress={() => setCategoryOpen((v) => !v)}
+                style={[styles.dropdownTrigger, { backgroundColor: colors.input, borderColor: colors.border }]}
+              >
+                <Text
+                  style={[
+                    styles.dropdownTriggerText,
+                    { color: category ? colors.foreground : colors.mutedForeground },
+                  ]}
+                >
+                  {category ?? 'Select a category'}
+                </Text>
+                <Feather
+                  name={categoryOpen ? 'chevron-up' : 'chevron-down'}
+                  size={16}
+                  color={colors.mutedForeground}
+                />
+              </Pressable>
+              {categoryOpen && (
+                <View style={[styles.dropdownList, { backgroundColor: colors.input, borderColor: colors.border }]}>
+                  <ScrollView style={styles.dropdownScroll} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                    {UPLOAD_CATEGORIES.map((cat) => {
+                      const isActive = category === cat;
+                      return (
+                        <Pressable
+                          key={cat}
+                          onPress={() => {
+                            setCategory(cat);
+                            setCategoryOpen(false);
+                          }}
+                          style={[styles.dropdownItem, isActive && { backgroundColor: colors.secondary }]}
+                        >
+                          <Text
+                            style={[
+                              styles.dropdownItemText,
+                              { color: isActive ? colors.primary : colors.foreground },
+                            ]}
+                          >
+                            {cat}
+                          </Text>
+                          {isActive && <Feather name="check" size={14} color={colors.primary} />}
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              )}
             </View>
 
             <Pressable
@@ -855,23 +848,29 @@ setConfirmedGuidelines(false);
           </View>
         )}
 
-        {/* Upload progress */}
+        {/* Upload progress — on web, fetch() gives no incremental progress events,
+            so a percentage would be fake; show a plain spinner there instead.
+            Native uses expo-file-system's real byte-tracked progress. */}
         {phase === 'uploading' && (
           <View style={[styles.progressCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.progressHeader}>
               <ActivityIndicator size="small" color={colors.primary} />
               <Text style={[styles.progressLabel, { color: colors.foreground }]}>
-                Uploading… {Math.round(uploadProgress * 100)}%
+                {Platform.OS === 'web'
+                  ? 'Uploading video…'
+                  : `Uploading… ${Math.round(uploadProgress * 100)}%`}
               </Text>
             </View>
-            <View style={[styles.progressTrack, { backgroundColor: colors.muted }]}>
-              <View
-                style={[
-                  styles.progressFill,
-                  { backgroundColor: colors.primary, width: `${Math.round(uploadProgress * 100)}%` },
-                ]}
-              />
-            </View>
+            {Platform.OS !== 'web' && (
+              <View style={[styles.progressTrack, { backgroundColor: colors.muted }]}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    { backgroundColor: colors.primary, width: `${Math.round(uploadProgress * 100)}%` },
+                  ]}
+                />
+              </View>
+            )}
             <Text style={[styles.progressHint, { color: colors.mutedForeground }]}>
               Keep the app open until the upload finishes.
             </Text>
@@ -924,19 +923,34 @@ setConfirmedGuidelines(false);
           </Pressable>
         )}
 
+        {/* Success screen — updated copy + "Upload another video" so a
+            videographer can immediately start the next one. */}
         {phase === 'done' && (
           <View style={[styles.doneCard, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-            <Feather name="check-circle" size={18} color={colors.primary} />
-            <Text style={[styles.doneText, { color: colors.foreground }]}>Video uploaded successfully!</Text>
+            <Feather name="check-circle" size={22} color={colors.primary} />
+            <Text style={[styles.doneTitle, { color: colors.foreground }]}>
+              Video submitted successfully!
+            </Text>
+            <Text style={[styles.doneSubtext, { color: colors.mutedForeground }]}>
+              Your Experience has been sent for review. You'll be notified when it's published.
+            </Text>
+            <Pressable
+              style={({ pressed }) => [
+                styles.uploadAnotherBtn,
+                { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 },
+              ]}
+              onPress={() => setPhase('idle')}
+            >
+              <Feather name="plus" size={16} color="#fff" />
+              <Text style={styles.uploadAnotherBtnText}>Upload another video</Text>
+            </Pressable>
           </View>
         )}
 
         <View style={[styles.note, { backgroundColor: colors.muted, borderColor: colors.border }]}>
           <Feather name="info" size={14} color={colors.mutedForeground} />
           <Text style={[styles.noteText, { color: colors.mutedForeground }]}>
-            Videos are uploaded to Google Cloud Storage and then shared to the Glassnik mobile feed. Only
-            accounts with the{' '}
-            <Text style={{ fontFamily: 'Inter_600SemiBold' }}>mobile.creator</Text> capability can upload.
+            Upload a smart-glasses Eye-POV video to create a new Glassnik Experience.
           </Text>
         </View>
       </ScrollView>
@@ -967,33 +981,34 @@ const styles = StyleSheet.create({
   pickerIcon: { width: 60, height: 60, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   pickerLabel: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   pickerHint: { fontSize: 13, fontFamily: 'Inter_400Regular' },
-  pickedPreview: { width: '100%', aspectRatio: 16 / 9 },
-  previewImg: { width: '100%', height: '100%' },
-  pickedBadge: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  changeBtn: {
-    position: 'absolute',
-    bottom: 10,
-    left: 10,
+  pickedCard: {
+    borderRadius: 12,
+    borderWidth: 1.5,
+    padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
+    justifyContent: 'space-between',
+    gap: 10,
   },
-  changeBtnText: { color: '#fff', fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  pickedCardRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  pickedCheckCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  pickedCardText: { flex: 1, fontSize: 14, fontFamily: 'Inter_500Medium' },
+  changeVideoLink: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   fields: { gap: 12 },
+  sectionHeadingBlock: { gap: 4, marginBottom: 4 },
+  sectionHeading: { fontSize: 17, fontFamily: 'Inter_700Bold' },
+  sectionSubtext: { fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 18 },
   labelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6, marginLeft: 2 },
   fieldLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', marginBottom: 6, marginLeft: 2 },
+  fieldHelper: { fontSize: 12, fontFamily: 'Inter_400Regular', marginBottom: 8, marginLeft: 2 },
+  charCount: { fontSize: 11, fontFamily: 'Inter_400Regular', textAlign: 'right', marginTop: 4, marginRight: 2 },
   inputWrap: {
     borderRadius: 12,
     borderWidth: 1,
@@ -1001,17 +1016,32 @@ const styles = StyleSheet.create({
     height: 48,
     justifyContent: 'center',
   },
-  textareaWrap: { height: 'auto', paddingVertical: 12 },
   input: { fontSize: 15, fontFamily: 'Inter_400Regular' },
-  textarea: { height: 72, textAlignVertical: 'top' },
-  categoryRow: { gap: 8, paddingRight: 4 },
-  categoryPill: {
-    borderRadius: 18,
+  dropdownTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: 12,
     borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 16,
+    height: 48,
   },
-  categoryPillText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  dropdownTriggerText: { fontSize: 15, fontFamily: 'Inter_400Regular' },
+  dropdownList: {
+    marginTop: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  dropdownScroll: { maxHeight: 240 },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  dropdownItemText: { fontSize: 14, fontFamily: 'Inter_500Medium' },
   checkboxRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', paddingRight: 8 },
   checkbox: {
     width: 20,
@@ -1058,12 +1088,22 @@ const styles = StyleSheet.create({
   doneCard: {
     borderRadius: 12,
     borderWidth: 1,
-    padding: 16,
+    padding: 20,
+    alignItems: 'center',
+    gap: 8,
+  },
+  doneTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', textAlign: 'center' },
+  doneSubtext: { fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 18, marginBottom: 4 },
+  uploadAnotherBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginTop: 4,
   },
-  doneText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  uploadAnotherBtnText: { color: '#fff', fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   note: {
     flexDirection: 'row',
     gap: 10,
@@ -1073,7 +1113,6 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   noteText: { flex: 1, fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 18 },
-  // Processing section
   processingSection: {
     borderRadius: 12,
     borderWidth: 1,

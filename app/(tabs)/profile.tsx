@@ -209,11 +209,6 @@ const videos = allVideos.filter((v) => {
     );
   }
 
-  async function handleLogout() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    await logout();
-  }
-
   function navigateToVideo(video: VideoItem) {
     router.push({ pathname: '/video/[id]' as any, params: { id: video.id, data: JSON.stringify(video) } });
   }
@@ -359,7 +354,8 @@ const videos = allVideos.filter((v) => {
                   </View>
                 </View>
 
-                {/* Action buttons */}
+                {/* Action buttons — logout icon removed from here per spec;
+                    it now lives in the hamburger menu (TopNav.tsx) instead. */}
                 <View style={styles.actionRow}>
                   <Pressable
                     style={styles.editProfileBtn}
@@ -373,20 +369,16 @@ const videos = allVideos.filter((v) => {
                   >
                     <Feather name="film" size={16} color="#fff" />
                   </Pressable>
-                  <Pressable
-                    style={styles.iconBtn}
-                    onPress={handleLogout}
-                  >
-                    <Feather name="log-out" size={16} color="rgba(255,255,255,0.7)" />
-                  </Pressable>
                 </View>
 
-                {/* Capability badges */}
+                {/* Capability badges — always shows "Videographer" rather than
+                    the raw internal capability name (e.g. "mobile.creator"),
+                    which should never be exposed to users. */}
                 {capabilities && capabilities.length > 0 && (
                   <View style={styles.capRow}>
                     {capabilities.map((cap: any) => (
                       <View key={cap.id} style={styles.capBadge}>
-                        <Text style={styles.capBadgeText}>{cap.capability?.name ?? 'Videographer'}</Text>
+                        <Text style={styles.capBadgeText}>Videographer</Text>
                       </View>
                     ))}
                   </View>
@@ -516,13 +508,13 @@ const videos = allVideos.filter((v) => {
                   <>
                     <Text style={styles.gridEmptyText}>Your first Eye-POV experience is being reviewed</Text>
                     <Text style={styles.gridEmptySub}>
-                      Most videos are reviewed within 1 hour, although reviews may take up to 24 hours during busy periods.
+                      Most Experiences are reviewed within 1 hour, although reviews may take up to 24 hours during busy periods.
                     </Text>
                   </>
                 ) : (
                   <>
-                    <Text style={styles.gridEmptyText}>No videos yet</Text>
-                    <Text style={styles.gridEmptySub}>Upload your first video from the + tab.</Text>
+                    <Text style={styles.gridEmptyText}>No Experiences yet</Text>
+                    <Text style={styles.gridEmptySub}>Upload your first Experience from the + tab.</Text>
                   </>
                 )}
               </View>
@@ -580,8 +572,8 @@ const videos = allVideos.filter((v) => {
         {gridTab === 'liked' && (
           <View style={styles.gridEmpty}>
             <Feather name="heart" size={36} color="rgba(255,255,255,0.15)" />
-            <Text style={styles.gridEmptyText}>Liked videos</Text>
-            <Text style={styles.gridEmptySub}>Videos you've liked will appear here.</Text>
+            <Text style={styles.gridEmptyText}>Liked Experiences</Text>
+            <Text style={styles.gridEmptySub}>Experiences you've liked will appear here.</Text>
           </View>
         )}
       </ScrollView>

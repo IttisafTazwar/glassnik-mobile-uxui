@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -55,16 +56,14 @@ export default function LoginScreen() {
         >
           {/* ── Logo ── */}
           <View style={styles.header}>
-            {/* TikTok-style logo: two offset squares */}
-            <View style={styles.logoWrap}>
-              <View style={[styles.logoSquare, styles.logoSquareBlue]} />
-              <View style={[styles.logoSquare, styles.logoSquareRed]} />
-              <View style={styles.logoSquareCenter}>
-                <Feather name="aperture" size={26} color="#fff" />
-              </View>
-            </View>
+            <Image
+              source={require('@/assets/images/logo.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
             <Text style={styles.brand}>Glassnik</Text>
-            <Text style={styles.tagline}>The world through every eye</Text>
+            <Text style={styles.tagline}>Welcome back</Text>
+            <Text style={styles.tagline}>Sign in to Glassnik</Text>
           </View>
 
           {/* ── Form ── */}
@@ -127,7 +126,9 @@ export default function LoginScreen() {
               <View style={styles.divider} />
             </View>
 
-            {/* Sign up with phone (decorative — matches TikTok pattern) */}
+            {/* TODO — pending confirmation from Steve: keep (relabel to
+                "Sign in with username") or remove entirely. Left exactly
+                as-is (label + no onPress) until that's decided. */}
             <Pressable style={styles.altBtn}>
               <Feather name="user" size={16} color="#fff" />
               <Text style={styles.altBtnText}>Continue with username</Text>
@@ -136,10 +137,10 @@ export default function LoginScreen() {
 
           {/* ── Footer ── */}
           <View style={styles.footer}>
-            <Text style={styles.footerText}>Don't have an account? </Text>
+            <Text style={styles.footerText}>Want to become a Glassnik Videographer? </Text>
             <Link href="/auth/register" asChild>
               <Pressable>
-                <Text style={styles.footerLink}>Create one</Text>
+                <Text style={styles.footerLink}>Sign up</Text>
               </Pressable>
             </Link>
           </View>
@@ -159,30 +160,12 @@ const styles = StyleSheet.create({
   },
 
   // Logo
-  header: { alignItems: 'center', gap: 14 },
-  logoWrap: { width: 72, height: 72, alignItems: 'center', justifyContent: 'center' },
-  logoSquare: {
-    position: 'absolute',
-    width: 52,
-    height: 52,
-    borderRadius: 14,
-  },
-  logoSquareBlue: {
-    backgroundColor: '#69C9D0',
-    transform: [{ translateX: -4 }],
-  },
-  logoSquareRed: {
-    backgroundColor: TIKTOK_RED,
-    transform: [{ translateX: 4 }],
-  },
-  logoSquareCenter: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
-    backgroundColor: '#000',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1,
+  header: { alignItems: 'center', gap: 8 },
+  logoImage: {
+    width: 72,
+    height: 72,
+    borderRadius: 16,
+    marginBottom: 6,
   },
   brand: {
     color: '#fff',

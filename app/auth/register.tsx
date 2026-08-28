@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -69,12 +70,14 @@ export default function RegisterScreen() {
         >
           {/* Header */}
           <View style={styles.header}>
-            <View style={[styles.logoIcon, { backgroundColor: colors.accent }]}>
-              <Feather name="user-plus" size={26} color="#fff" />
-            </View>
-            <Text style={[styles.title, { color: colors.foreground }]}>Create Account</Text>
+            <Image
+              source={require('@/assets/images/logo.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
+            <Text style={[styles.title, { color: colors.foreground }]}>Join Glassnik</Text>
             <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-              Join the Glassnik community
+              Sign up for free and start publishing your own Eye-POV videos.
             </Text>
           </View>
 
@@ -196,16 +199,14 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   scroll: { flexGrow: 1 },
   header: { alignItems: 'center', gap: 10, paddingHorizontal: 28, marginBottom: 32 },
-  logoIcon: {
+  logoImage: {
     width: 60,
     height: 60,
     borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: 4,
   },
   title: { fontSize: 28, fontFamily: 'Inter_700Bold', letterSpacing: -0.5 },
-  subtitle: { fontSize: 14, fontFamily: 'Inter_400Regular' },
+  subtitle: { fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center' },
   form: { gap: 13 },
   inputWrap: {
     flexDirection: 'row',

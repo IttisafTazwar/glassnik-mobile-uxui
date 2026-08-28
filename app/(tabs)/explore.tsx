@@ -22,6 +22,14 @@ import { SAMPLE_VIDEOS, type SampleVideo } from '@/constants/sampleVideos';
 import type { VideoAsset } from '@/types';
 import { TopNav } from '@/components/TopNav';
 import { Sidebar, SIDEBAR_WIDTH } from '@/components/Sidebar';
+import { TrendingSection } from '@/components/TrendingSection';
+import { NearbySection } from '@/components/NearbySection';
+import { GlobalSection } from '@/components/GlobalSection';
+
+// Same breakpoint as TopNav.tsx — keep these in sync. Below this width,
+// Sidebar is not rendered at all (per the mobile nav spec: no separate
+// side drawer on mobile, the TopNav hamburger menu covers all nav there).
+const MOBILE_BREAKPOINT = 768;
 
 const CATEGORIES = [
   'All',
@@ -59,6 +67,7 @@ function apiVideoToSample(v: VideoAsset): SampleVideo {
     id: String(v.id),
     uri: v.publicUrl ?? '',
     thumbnailUrl: v.thumbnailUrl ?? undefined,
+    creatorId: v.owner?.id,
     creator: { name, username: name.toLowerCase().replace(/\s+/g, ''), initial: name.charAt(0).toUpperCase(), color: colors[v.id % colors.length] ?? '#7C3AED', avatarUrl: v.owner?.avatarUrl ?? undefined },
     description: v.description ?? v.title ?? '',
     hashtags: ['glassnik', 'pov'],
@@ -68,12 +77,14 @@ function apiVideoToSample(v: VideoAsset): SampleVideo {
     city: v.city ?? undefined,
     country: v.country ?? undefined,
     category: v.category ?? undefined,
+    createdAt: v.createdAt,
   };
 }
 
 export default function ExploreScreen() {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const isMobile = width < MOBILE_BREAKPOINT;
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [activeDiscoveryTab, setActiveDiscoveryTab] = useState<DiscoveryTab>('Explore');
@@ -86,7 +97,16 @@ export default function ExploreScreen() {
 
   const allVideos = useMemo(() => {
     const api = (apiVideos ?? []).filter((v) => !!v.publicUrl).map(apiVideoToSample);
-    return [...SAMPLE_VIDEOS, ...api];
+    // Newest-first: videos with a real createdAt (all API videos) are sorted
+    // newest → oldest and placed first. Static sample/placeholder videos have
+    // no createdAt at all (nothing to rank them by), so they're kept as a
+    // trailing fallback after all dated videos, in their existing order.
+    const sortedApi = [...api].sort((a, b) => {
+      const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return tb - ta;
+    });
+    return [...sortedApi, ...SAMPLE_VIDEOS];
   }, [apiVideos]);
 
   const trendingDestinations = useMemo(() => {
@@ -124,9 +144,13 @@ export default function ExploreScreen() {
     );
   }, [allVideos, query, activeCategory]);
 
-  const contentWidth = width - SIDEBAR_WIDTH;
+  // contentWidth no longer subtracts SIDEBAR_WIDTH on mobile, since Sidebar
+  // isn't rendered there at all — without this, cells would be calculated
+  // as if 260px of (nonexistent) sidebar was still eating into the width.
+  const contentWidth = isMobile ? width : width - SIDEBAR_WIDTH;
 
-  const COLS = 4;
+  // 4 columns is too cramped on a phone-width screen — dropped to 2 on mobile.
+  const COLS = isMobile ? 2 : 4;
   const CELL_GAP = 6;
   const GRID_PADDING = 14;
   const cellWidth = (contentWidth - GRID_PADDING * 2 - CELL_GAP * (COLS - 1)) / COLS;
@@ -134,62 +158,100 @@ export default function ExploreScreen() {
 
   const topPad = Platform.OS === 'web' ? 0 : insets.top;
 
-  const listContent = activeDiscoveryTab !== 'Explore' ? (
-    <View style={styles.centered}>
-      <Feather name="clock" size={36} color="rgba(255,255,255,0.2)" />
-      <Text style={styles.emptyText}>{activeDiscoveryTab} is coming soon</Text>
-    </View>
-  ) : (
-    <FlatList
-      data={filtered}
-      keyExtractor={(item) => item.id}
-      numColumns={COLS}
-      scrollEnabled={false}
-      ListHeaderComponent={
-        !query ? (
-          <View>
-            {trendingDestinations.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Trending Destinations</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tagsRow}>
-                  {trendingDestinations.map((d) => (
-                    <Pressable key={d.label} style={styles.trendChip} onPress={() => setQuery(d.label)}>
-                      <Feather name="map-pin" size={12} color="#FE2C55" />
-                      <Text style={styles.trendChipTag}>{d.label}</Text>
-                      <Text style={styles.trendChipCount}>
-                        {d.count} {d.count === 1 ? 'experience' : 'experiences'}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </ScrollView>
+  // Shared handler: Trending/Nearby/Global destination cards use this to
+  // jump back to the Explore tab with a search query set to that
+  // destination — reusing the same filter mechanism the existing Explore
+  // "Trending Destinations" chip row already uses.
+  function handleDestinationPress(label: string) {
+    setActiveDiscoveryTab('Explore');
+    setQuery(label);
+  }
+
+  let discoveryContent: React.ReactNode;
+
+  if (activeDiscoveryTab === 'Trending') {
+    discoveryContent = (
+      <TrendingSection
+        videos={allVideos}
+        isMobile={isMobile}
+        contentWidth={contentWidth}
+        cellWidth={cellWidth}
+        cellHeight={cellHeight}
+        renderVideoCard={(v) => <VideoGridCell video={v} width={cellWidth} height={cellHeight} />}
+        onDestinationPress={handleDestinationPress}
+      />
+    );
+  } else if (activeDiscoveryTab === 'Nearby') {
+    discoveryContent = (
+      <NearbySection
+        videos={allVideos}
+        isMobile={isMobile}
+        contentWidth={contentWidth}
+        onDestinationPress={handleDestinationPress}
+      />
+    );
+  } else if (activeDiscoveryTab === 'Global') {
+    discoveryContent = (
+      <GlobalSection
+        videos={allVideos}
+        isMobile={isMobile}
+        contentWidth={contentWidth}
+        onDestinationPress={handleDestinationPress}
+      />
+    );
+  } else {
+    discoveryContent = (
+      <FlatList
+        data={filtered}
+        keyExtractor={(item) => item.id}
+        numColumns={COLS}
+        scrollEnabled={false}
+        ListHeaderComponent={
+          !query ? (
+            <View>
+              {trendingDestinations.length > 0 && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Trending Destinations</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tagsRow}>
+                    {trendingDestinations.map((d) => (
+                      <Pressable key={d.label} style={styles.trendChip} onPress={() => setQuery(d.label)}>
+                        <Feather name="map-pin" size={12} color="#FE2C55" />
+                        <Text style={styles.trendChipTag}>{d.label}</Text>
+                        <Text style={styles.trendChipCount}>
+                          {d.count} {d.count === 1 ? 'experience' : 'experiences'}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionTitle}>Discover New Experiences</Text>
+                <Text style={styles.sectionCount}>{filtered.length} experiences</Text>
               </View>
-            )}
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>Discover New Experiences</Text>
-              <Text style={styles.sectionCount}>{filtered.length} experiences</Text>
             </View>
-          </View>
-        ) : null
-      }
-      columnWrapperStyle={styles.columnWrapper}
-      contentContainerStyle={{ paddingHorizontal: GRID_PADDING }}
-      renderItem={({ item }) => (
-        <VideoGridCell video={item} width={cellWidth} height={cellHeight} />
-      )}
-      ListEmptyComponent={
-        isLoading ? (
-          <View style={styles.centered}>
-            <ActivityIndicator size="large" color="#FE2C55" />
-          </View>
-        ) : (
-          <View style={styles.centered}>
-            <Feather name="search" size={40} color="rgba(255,255,255,0.2)" />
-            <Text style={styles.emptyText}>No results{query ? ` for "${query}"` : ''}</Text>
-          </View>
-        )
-      }
-    />
-  );
+          ) : null
+        }
+        columnWrapperStyle={styles.columnWrapper}
+        contentContainerStyle={{ paddingHorizontal: GRID_PADDING }}
+        renderItem={({ item }) => (
+          <VideoGridCell video={item} width={cellWidth} height={cellHeight} />
+        )}
+        ListEmptyComponent={
+          isLoading ? (
+            <View style={styles.centered}>
+              <ActivityIndicator size="large" color="#FE2C55" />
+            </View>
+          ) : (
+            <View style={styles.centered}>
+              <Feather name="search" size={40} color="rgba(255,255,255,0.2)" />
+              <Text style={styles.emptyText}>No results{query ? ` for "${query}"` : ''}</Text>
+            </View>
+          )
+        }
+      />
+    );
+  }
 
   return (
     <View style={styles.screenRoot}>
@@ -198,41 +260,44 @@ export default function ExploreScreen() {
       </View>
 
       <View style={{ flex: 1, flexDirection: 'row' }}>
-        <Sidebar />
+        {/* Sidebar only renders on desktop width — on mobile, TopNav's
+            hamburger menu is the sole navigation surface (no side drawer). */}
+        {!isMobile && <Sidebar />}
 
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingBottom: insets.bottom }}
           showsVerticalScrollIndicator={false}
         >
-          {/* Banner — hero text and a thinner search bar sit side-by-side.
-              The search bar has its own marginTop so it drops down to
-              shoulder level in the photo, independent of the hero text's
-              own vertical position. */}
-          <View style={styles.banner}>
-            <Image
-              source={require('@/assets/images/home-banner.png')}
-              style={StyleSheet.absoluteFill}
-              contentFit="cover"
-              contentPosition="right"
-            />
-            <LinearGradient
-              colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.75)']}
-              style={StyleSheet.absoluteFill}
-            />
+          {/* Banner — desktop keeps hero text + search bar side-by-side.
+              Mobile switches to a stacked layout with a content-based
+              height instead of a fixed one, since the fixed height was
+              cutting off/wrapping the hero text and pushing the search bar
+              off-screen at phone widths. */}
+          {isMobile ? (
+            <View style={styles.bannerMobile}>
+              <Image
+                source={require('@/assets/images/home-banner.png')}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+                contentPosition="right"
+              />
+              <LinearGradient
+                colors={['rgba(0,0,0,0.2)', 'rgba(0,0,0,0.8)']}
+                style={StyleSheet.absoluteFill}
+              />
 
-            <View style={styles.bannerRow}>
-              <View style={styles.hero}>
-                <Text style={styles.heroTitle}>
+              <View style={styles.heroMobile}>
+                <Text style={styles.heroTitleMobile}>
                   Don't scroll through the world.{'\n'}
                   <Text style={styles.heroTitleAccent}>Experience</Text> it.
                 </Text>
-                <Text style={styles.heroSubtitle}>
+                <Text style={styles.heroSubtitleMobile}>
                   Glassnik turns real-world smart-glasses Eye-POV videos into immersive experiences.
                 </Text>
               </View>
 
-              <View style={styles.searchWrap}>
+              <View style={styles.searchWrapMobile}>
                 <Feather name="search" size={14} color="rgba(255,255,255,0.5)" />
                 <TextInput
                   style={styles.searchInput}
@@ -252,7 +317,52 @@ export default function ExploreScreen() {
                 )}
               </View>
             </View>
-          </View>
+          ) : (
+            <View style={styles.banner}>
+              <Image
+                source={require('@/assets/images/home-banner.png')}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+                contentPosition="right"
+              />
+              <LinearGradient
+                colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.75)']}
+                style={StyleSheet.absoluteFill}
+              />
+
+              <View style={styles.bannerRow}>
+                <View style={styles.hero}>
+                  <Text style={styles.heroTitle}>
+                    Don't scroll through the world.{'\n'}
+                    <Text style={styles.heroTitleAccent}>Experience</Text> it.
+                  </Text>
+                  <Text style={styles.heroSubtitle}>
+                    Glassnik turns real-world smart-glasses Eye-POV videos into immersive experiences.
+                  </Text>
+                </View>
+
+                <View style={styles.searchWrap}>
+                  <Feather name="search" size={14} color="rgba(255,255,255,0.5)" />
+                  <TextInput
+                    style={styles.searchInput}
+                    placeholder="Search places, attractions or Eye-POV experiences…"
+                    placeholderTextColor="rgba(255,255,255,0.4)"
+                    value={query}
+                    onChangeText={setQuery}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    clearButtonMode="while-editing"
+                    selectionColor="#FE2C55"
+                  />
+                  {query.length > 0 && (
+                    <Pressable onPress={() => setQuery('')} hitSlop={8}>
+                      <Feather name="x" size={13} color="rgba(255,255,255,0.6)" />
+                    </Pressable>
+                  )}
+                </View>
+              </View>
+            </View>
+          )}
 
           {/* Discovery tabs + categories — sit in the black area below the banner */}
           <View style={styles.header}>
@@ -279,7 +389,7 @@ export default function ExploreScreen() {
             </ScrollView>
           </View>
 
-          {listContent}
+          {discoveryContent}
 
           {/* Footer */}
           <View style={styles.footer}>
@@ -393,7 +503,12 @@ function DiscoveryTabs({
   );
 }
 
-function VideoGridCell({
+// ── Video grid cell — redesigned to match the Viewer's info layout:
+// Place/Tour/Transport • Location on one line, Category pill on the right,
+// and Like/Comment/Share/Report icons with counts underneath, scaled down
+// to fit a small grid tile. Exported so Trending/Nearby/Global sections
+// can reuse the exact same card. ──
+export function VideoGridCell({
   video,
   width,
   height,
@@ -402,7 +517,15 @@ function VideoGridCell({
   width: number;
   height: number;
 }) {
-  const locationLabel = [video.place, video.city, video.country].filter(Boolean).join(', ');
+  const locationText = [video.place, video.city, video.country].filter(Boolean).join(', ');
+  const placeTourTransport = video.description || null;
+  const metaLine = [placeTourTransport, locationText].filter(Boolean).join(' • ');
+
+  function formatCount(n: number): string {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+    return String(n);
+  }
 
   return (
     <View style={{ width, marginBottom: 14 }}>
@@ -434,33 +557,43 @@ function VideoGridCell({
 
         <View style={styles.cellTopRow}>
           <Text style={styles.cellUsername} numberOfLines={1}>@{video.creator.username}</Text>
-          <View style={styles.cellMiniTabs}>
-            <Text style={styles.cellMiniTabActive}>For You</Text>
-            <Text style={styles.cellMiniTab}>Following</Text>
-          </View>
         </View>
 
-        <View style={styles.cellTag}>
-          <Text style={styles.cellTagText} numberOfLines={1}>
-            {video.category ? video.category.toUpperCase() : `#${video.hashtags[0]}`}
-          </Text>
+        {/* Bottom info block — mirrors the Viewer's bottomBox layout */}
+        <View style={styles.cellBottomBox}>
+          {metaLine ? (
+            <View style={styles.cellMetaRow}>
+              <Text style={styles.cellMetaText} numberOfLines={1}>
+                {metaLine}
+              </Text>
+              {video.category ? (
+                <View style={styles.cellCategoryPill}>
+                  <Text style={styles.cellCategoryText} numberOfLines={1}>
+                    {video.category.toUpperCase()}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
         </View>
-
-        {locationLabel ? (
-          <View style={styles.cellLocation}>
-            <Feather name="map-pin" size={8} color="rgba(255,255,255,0.85)" />
-            <Text style={styles.cellLocationText} numberOfLines={1}>
-              {locationLabel}
-            </Text>
-          </View>
-        ) : null}
       </Pressable>
 
       <View style={styles.cellActions}>
-        <Feather name="heart" size={13} color="rgba(255,255,255,0.7)" />
-        <Feather name="message-circle" size={13} color="rgba(255,255,255,0.7)" />
-        <Feather name="send" size={12} color="rgba(255,255,255,0.7)" />
-        <Feather name="flag" size={12} color="rgba(255,255,255,0.7)" />
+        <View style={styles.cellActionItem}>
+          <Feather name="heart" size={12} color="rgba(255,255,255,0.7)" />
+          <Text style={styles.cellActionLabel}>{formatCount(video.likes)}</Text>
+        </View>
+        <View style={styles.cellActionItem}>
+          <Feather name="message-circle" size={12} color="rgba(255,255,255,0.7)" />
+          <Text style={styles.cellActionLabel}>{formatCount(video.comments)}</Text>
+        </View>
+        <View style={styles.cellActionItem}>
+          <Feather name="send" size={11} color="rgba(255,255,255,0.7)" />
+          <Text style={styles.cellActionLabel}>{formatCount(video.shares)}</Text>
+        </View>
+        <View style={styles.cellActionItem}>
+          <Feather name="flag" size={11} color="rgba(255,255,255,0.7)" />
+        </View>
       </View>
     </View>
   );
@@ -470,6 +603,7 @@ const styles = StyleSheet.create({
   screenRoot: { flex: 1, backgroundColor: '#000' },
   root: { flex: 1, backgroundColor: '#000' },
 
+  // ── Desktop banner (unchanged) ──
   banner: {
     height: 140,
     paddingHorizontal: 20,
@@ -489,16 +623,6 @@ const styles = StyleSheet.create({
   heroTitleAccent: { color: '#5eead4' },
   heroSubtitle: { color: 'rgba(255,255,255,0.75)', fontSize: 11, fontFamily: 'Inter_400Regular', lineHeight: 15 },
 
-  header: {
-    backgroundColor: '#000',
-    paddingHorizontal: 14,
-    paddingTop: 12,
-    paddingBottom: 12,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
-    borderBottomWidth: 1,
-    gap: 12,
-  },
-
   searchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -513,7 +637,44 @@ const styles = StyleSheet.create({
     minWidth: 200,
     marginTop: 56,
   },
+
+  // ── Mobile banner — stacked layout, content-based height instead of a
+  // fixed one, so the hero text never gets cut off and the search bar
+  // always stays visible below it. ──
+  bannerMobile: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 16,
+    backgroundColor: '#0a0f14',
+    overflow: 'hidden',
+    gap: 12,
+  },
+  heroMobile: { gap: 6 },
+  heroTitleMobile: { color: '#fff', fontSize: 20, fontFamily: 'Inter_700Bold', lineHeight: 24 },
+  heroSubtitleMobile: { color: 'rgba(255,255,255,0.75)', fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 16 },
+  searchWrapMobile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    height: 40,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    width: '100%',
+  },
   searchInput: { flex: 1, color: '#fff', fontSize: 14, fontFamily: 'Inter_400Regular', height: '100%' },
+
+  header: {
+    backgroundColor: '#000',
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 12,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+    borderBottomWidth: 1,
+    gap: 12,
+  },
 
   discoveryRow: { flexDirection: 'row', gap: 20 },
   discoveryTab: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingBottom: 8, position: 'relative' },
@@ -549,38 +710,69 @@ const styles = StyleSheet.create({
   trendChipCount: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontFamily: 'Inter_400Regular', marginLeft: 4 },
 
   columnWrapper: { gap: 6 },
+
+  // ── Grid cell (redesigned) ──
   cell: { overflow: 'hidden', borderRadius: 8, backgroundColor: '#111', alignItems: 'center', justifyContent: 'center' },
   cellThumb: {
     width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center', justifyContent: 'center',
   },
   cellInitial: { fontSize: 14, fontFamily: 'Inter_700Bold' },
-  cellScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.25)' },
+  cellScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.2)' },
   cellTopRow: {
     position: 'absolute',
     top: 6,
     left: 6,
     right: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
   },
   cellUsername: {
     color: '#fff', fontSize: 10, fontFamily: 'Inter_700Bold',
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
-  cellMiniTabs: { flexDirection: 'row', gap: 6 },
-  cellMiniTabActive: { color: '#fff', fontSize: 9, fontFamily: 'Inter_700Bold', textDecorationLine: 'underline' },
-  cellMiniTab: { color: 'rgba(255,255,255,0.55)', fontSize: 9, fontFamily: 'Inter_500Medium' },
-  cellTag: { position: 'absolute', bottom: 20, left: 6 },
-  cellTagText: {
-    backgroundColor: 'rgba(0,0,0,0.5)', color: '#fff', fontSize: 7, fontFamily: 'Inter_600SemiBold',
-    paddingHorizontal: 4, paddingVertical: 2, borderRadius: 3, overflow: 'hidden',
+  // Bottom box — mirrors FeedVideoItem's bottomBox: overlay, flush to
+  // bottom+sides, compact and semi-transparent.
+  cellBottomBox: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    paddingHorizontal: 6,
+    paddingVertical: 5,
   },
-  cellLocation: { position: 'absolute', bottom: 5, left: 6, right: 6, flexDirection: 'row', alignItems: 'center', gap: 2 },
-  cellLocationText: { color: 'rgba(255,255,255,0.85)', fontSize: 7, fontFamily: 'Inter_500Medium', flexShrink: 1 },
+  cellMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  cellMetaText: {
+    flex: 1,
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 7,
+    fontFamily: 'Inter_500Medium',
+  },
+  cellCategoryPill: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 3,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    flexShrink: 0,
+    maxWidth: '45%',
+  },
+  cellCategoryText: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 6,
+    fontFamily: 'Inter_700Bold',
+    letterSpacing: 0.3,
+  },
 
+  // Action row below the card — matches the Viewer's Like/Comment/Share/
+  // Report set (Report has no visible count, same as the full-screen version).
   cellActions: { flexDirection: 'row', justifyContent: 'space-around', paddingTop: 6 },
+  cellActionItem: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  cellActionLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 9, fontFamily: 'Inter_500Medium' },
 
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 40, minHeight: 200 },
   emptyText: { color: 'rgba(255,255,255,0.4)', fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center' },
