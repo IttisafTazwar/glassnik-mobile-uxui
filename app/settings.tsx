@@ -22,6 +22,10 @@ import { useMute } from '@/context/MuteContext';
 // Local preference keys. Autoplay and push-notification toggles persist here
 // but aren't yet consumed by real feed-playback or push-registration logic —
 // flagged clearly rather than presented as fully wired.
+//
+// The Preferences UI section itself has been hidden from videographers per
+// spec, but this state/persistence logic is left in place underneath in
+// case it needs to be re-surfaced later.
 const AUTOPLAY_KEY = 'pref:autoplay';
 const PUSH_NOTIFS_KEY = 'pref:pushNotifications';
 
@@ -122,20 +126,14 @@ export default function SettingsScreen() {
         contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Profile section */}
+        {/* Profile section — avatar removed per spec; @username is the
+            sole identifier used throughout the viewer experience. */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>PROFILE</Text>
 
-          <View style={styles.avatarRow}>
-            <View style={styles.avatarCircle}>
-              <Text style={styles.avatarInitial}>
-                {(user?.displayName ?? user?.email ?? 'U').charAt(0).toUpperCase()}
-              </Text>
-            </View>
-            <View>
-              <Text style={styles.avatarName}>{user?.displayName ?? user?.email ?? ''}</Text>
-              <Text style={styles.avatarSub}>@{user?.username ?? ''}</Text>
-            </View>
+          <View>
+            <Text style={styles.avatarName}>{user?.displayName ?? user?.email ?? ''}</Text>
+            <Text style={styles.avatarSub}>@{user?.username ?? ''}</Text>
           </View>
 
           <Pressable
@@ -189,61 +187,14 @@ export default function SettingsScreen() {
           </Pressable>
         </View>
 
-        {/* Preferences section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>PREFERENCES</Text>
+        {/* Preferences section — hidden from videographers per spec.
+            State/persistence logic above (autoplay, pushNotifs) is left
+            in place, just not rendered here. */}
 
-          <View style={styles.switchRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.switchLabel}>Autoplay</Text>
-              <Text style={styles.switchSub}>Automatically play videos in your feed</Text>
-            </View>
-            <Switch
-              value={autoplay}
-              onValueChange={handleToggleAutoplay}
-              trackColor={{ false: 'rgba(255,255,255,0.15)', true: '#FE2C55' }}
-              thumbColor="#fff"
-            />
-          </View>
-
-          <View style={styles.switchRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.switchLabel}>Default mute</Text>
-              <Text style={styles.switchSub}>Start videos muted</Text>
-            </View>
-            <Switch
-              value={isMuted}
-              onValueChange={toggleMute}
-              trackColor={{ false: 'rgba(255,255,255,0.15)', true: '#FE2C55' }}
-              thumbColor="#fff"
-            />
-          </View>
-
-          <View style={styles.switchRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.switchLabel}>Push notifications</Text>
-              <Text style={styles.switchSub}>Likes, comments, and new followers</Text>
-            </View>
-            <Switch
-              value={pushNotifs}
-              onValueChange={handleTogglePushNotifs}
-              trackColor={{ false: 'rgba(255,255,255,0.15)', true: '#FE2C55' }}
-              thumbColor="#fff"
-            />
-          </View>
-        </View>
-
-        {/* App section */}
+        {/* App section — Version/Platform rows removed per spec; this
+            technical info shouldn't be shown to videographers. */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>APP</Text>
-          <View style={styles.appInfoRow}>
-            <Text style={styles.appInfoLabel}>Version</Text>
-            <Text style={styles.appInfoValue}>1.0.0</Text>
-          </View>
-          <View style={styles.appInfoRow}>
-            <Text style={styles.appInfoLabel}>Platform</Text>
-            <Text style={styles.appInfoValue}>{Platform.OS}</Text>
-          </View>
 
           <Pressable
             onPress={() => Linking.openURL('https://glassnik.com/privacy')}
@@ -311,16 +262,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
   },
 
-  avatarRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  avatarCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#FE2C55',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarInitial: { color: '#fff', fontSize: 24, fontFamily: 'Inter_700Bold' },
   avatarName: { color: '#fff', fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   avatarSub: { color: 'rgba(255,255,255,0.4)', fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 2 },
 

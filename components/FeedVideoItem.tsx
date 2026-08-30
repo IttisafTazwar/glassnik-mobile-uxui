@@ -244,14 +244,28 @@ export function FeedVideoItem({ video, isActive, onCommentPress }: Props) {
         <View style={[StyleSheet.absoluteFill, styles.videoPlaceholder]} />
       )}
 
-      {/* ── Tap handler ── */}
-      <Pressable style={StyleSheet.absoluteFill} onPress={handleTap} />
+      {/* ── Tap handler ──
+          touchAction: 'pan-y' on web tells the browser this element should
+          still allow native vertical scroll/swipe gestures to pass through,
+          instead of the touch being fully claimed by RN-Web's Pressable
+          responder system. Without this, a full-screen Pressable sitting on
+          top of the scrollable feed blocks mobile-browser scroll entirely —
+          this is the fix for the "scroll not working over the videos on
+          mobile" report. */}
+      <Pressable
+        style={[
+          StyleSheet.absoluteFill,
+          Platform.OS === 'web' ? ({ touchAction: 'pan-y' } as any) : null,
+        ]}
+        onPress={handleTap}
+      />
 
-      {/* ── Bottom gradient layers (simulate linear gradient) ── */}
-      <View style={[styles.gradientTop, { pointerEvents: 'none' }]} />
+      {/* ── Bottom gradient layer (kept subtle since the info box now
+          carries its own background) ── */}
       <View style={[styles.gradientBottom, { pointerEvents: 'none' }]} />
 
-      {/* ── Pause indicator ── */}
+      {/* ── Pause indicator — independent of controlsVisible; this is
+          playback-state feedback, not a "control" to hide ── */}
       {paused && isActive && (
         <View style={[styles.pauseOverlay, { pointerEvents: 'none' }]}>
           <View style={styles.pauseIcon}>

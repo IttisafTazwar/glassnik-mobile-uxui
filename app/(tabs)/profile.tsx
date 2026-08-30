@@ -50,19 +50,16 @@ export default function ProfileScreen() {
   const [isEditing, setIsEditing] = useState(false);
   const [editDisplayName, setEditDisplayName] = useState('');
   const [editUsername, setEditUsername] = useState('');
-  const [editAvatarUrl, setEditAvatarUrl] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
 
   useEffect(() => {
     setEditDisplayName(user?.displayName ?? '');
     setEditUsername(user?.username ?? '');
-    setEditAvatarUrl(user?.avatarUrl ?? '');
   }, [user]);
 
   function handleStartEdit() {
     setEditDisplayName(user?.displayName ?? '');
     setEditUsername(user?.username ?? '');
-    setEditAvatarUrl(user?.avatarUrl ?? '');
     setIsEditing(true);
   }
 
@@ -77,7 +74,6 @@ export default function ProfileScreen() {
       await updateUser({
         displayName: editDisplayName.trim() || undefined,
         username: editUsername.trim() || undefined,
-        avatarUrl: editAvatarUrl.trim() || undefined,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       setIsEditing(false);
@@ -156,7 +152,6 @@ const videos = allVideos.filter((v) => {
   const topPad = Platform.OS === 'web' ? 8 : insets.top + 12;
   const displayName = user?.displayName ?? user?.username ?? user?.email ?? 'User';
   const username = user?.username ?? (user?.email?.split('@')[0]) ?? 'user';
-  const initial = displayName.charAt(0).toUpperCase();
 
   const stats = {
     following: profileStats?.followingCount != null ? formatCount(profileStats.followingCount) : '—',
@@ -236,20 +231,10 @@ const videos = allVideos.filter((v) => {
             </Pressable>
           </View>
 
-          {/* Avatar — tappable (owner only), opens inline edit mode */}
+          {/* Avatar removed per spec — @username is the sole identifier
+              used throughout the viewer experience. Edit Profile button
+              below still opens the same inline edit mode. */}
           <View style={styles.avatarSection}>
-            <Pressable
-              style={styles.avatarWrap}
-              onPress={isEditing ? undefined : handleStartEdit}
-              hitSlop={8}
-            >
-              <View style={styles.avatarRing}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{initial}</Text>
-                </View>
-              </View>
-            </Pressable>
-
             {isEditing ? (
               <View style={styles.editFields}>
                 <View style={styles.editField}>
@@ -273,19 +258,6 @@ const videos = allVideos.filter((v) => {
                     placeholderTextColor="rgba(255,255,255,0.3)"
                     autoCapitalize="none"
                     autoCorrect={false}
-                  />
-                </View>
-                <View style={styles.editField}>
-                  <Text style={styles.editFieldLabel}>Avatar URL</Text>
-                  <TextInput
-                    style={styles.editInput}
-                    value={editAvatarUrl}
-                    onChangeText={setEditAvatarUrl}
-                    placeholder="https://…"
-                    placeholderTextColor="rgba(255,255,255,0.3)"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    keyboardType="url"
                   />
                 </View>
 
@@ -355,7 +327,9 @@ const videos = allVideos.filter((v) => {
                 </View>
 
                 {/* Action buttons — logout icon removed from here per spec;
-                    it now lives in the hamburger menu (TopNav.tsx) instead. */}
+                    it now lives in the hamburger menu (TopNav.tsx) instead.
+                    My Videos button now shows a visible "Videos" label next
+                    to the icon, since the icon alone wasn't identifiable. */}
                 <View style={styles.actionRow}>
                   <Pressable
                     style={styles.editProfileBtn}
@@ -364,10 +338,11 @@ const videos = allVideos.filter((v) => {
                     <Text style={styles.editProfileText}>Edit profile</Text>
                   </Pressable>
                   <Pressable
-                    style={styles.iconBtn}
+                    style={styles.myVideosBtn}
                     onPress={() => router.push('/my-videos' as any)}
                   >
                     <Feather name="film" size={16} color="#fff" />
+                    <Text style={styles.myVideosBtnText}>Videos</Text>
                   </Pressable>
                 </View>
 
@@ -602,28 +577,10 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_700Bold',
   },
 
-  // Avatar
+  // Avatar section retained as a wrapper (no avatar itself), holding the
+  // display name / role / meta / stats / actions.
   avatarSection: { alignItems: 'center', paddingHorizontal: 20, gap: 10 },
-  avatarWrap: {},
-  avatarRing: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    borderWidth: 2.5,
-    borderColor: 'rgba(255,255,255,0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatar: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    backgroundColor: '#FE2C55',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: { color: '#fff', fontSize: 36, fontFamily: 'Inter_700Bold' },
-  displayName: { color: '#fff', fontSize: 18, fontFamily: 'Inter_700Bold' },
+  displayName: { color: '#fff', fontSize: 18, fontFamily: 'Inter_700Bold', marginTop: 8 },
   roleLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontFamily: 'Inter_500Medium', marginTop: 2 },
 
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12, marginTop: 4 },
@@ -661,16 +618,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   editProfileText: { color: '#fff', fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  iconBtn: {
-    width: 36,
+  // My Videos button — now shows icon + "Videos" label so its purpose is
+  // clear, instead of an unlabeled icon-only button.
+  myVideosBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     height: 36,
+    paddingHorizontal: 12,
     backgroundColor: 'rgba(255,255,255,0.12)',
     borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
   },
+  myVideosBtnText: { color: '#fff', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
 
   // Inline edit mode
   editFields: { width: '100%', gap: 12, marginTop: 4 },

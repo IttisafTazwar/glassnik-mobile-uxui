@@ -28,12 +28,14 @@ export function TrendingSection({
     [videos]
   );
 
-  // Most Watched — same proxy-by-likes caveat as above, showing the next
-  // tier down from Top Picks.
-  const mostWatched = useMemo(
-    () => [...videos].sort((a, b) => b.likes - a.likes).slice(8, 20),
-    [videos]
-  );
+  // Most Watched — same proxy-by-likes caveat as above. Previously sliced
+  // (8, 20), which returned an empty array whenever there were 8 or fewer
+  // videos total (i.e. always, with the current sample/demo data set) —
+  // fixed to show whatever's left after Top Picks, regardless of count.
+  const mostWatched = useMemo(() => {
+    const sorted = [...videos].sort((a, b) => b.likes - a.likes);
+    return sorted.slice(topPicks.length, topPicks.length + 12);
+  }, [videos, topPicks.length]);
 
   // Trending Destinations — top 10 by number of videos at that destination.
   // Real ranking should be by view count per the spec; this uses video
@@ -76,10 +78,12 @@ export function TrendingSection({
         </View>
       )}
 
-      {/* Trending Destinations */}
-      {destinations.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Trending Destinations</Text>
+      {/* Trending Destinations — now shows an explicit empty state instead
+          of silently disappearing when no video has city/country data yet
+          (matches the same empty-state pattern used on Nearby/Global). */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Trending Destinations</Text>
+        {destinations.length > 0 ? (
           <View style={[styles.destGrid, { paddingHorizontal: DEST_PADDING, gap: DEST_GAP }]}>
             {destinations.map((d) => (
               <DestinationCard
@@ -92,8 +96,10 @@ export function TrendingSection({
               />
             ))}
           </View>
-        </View>
-      )}
+        ) : (
+          <Text style={styles.emptyText}>No destinations available yet.</Text>
+        )}
+      </View>
 
       {/* Glassnik Community — PLACEHOLDER stats. Spec calls for real,
           dynamically-pulled figures; no backend endpoint exists for this
@@ -124,16 +130,18 @@ export function TrendingSection({
       </View>
 
       {/* Most Watched */}
-      {mostWatched.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Most Watched</Text>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Most Watched</Text>
+        {mostWatched.length > 0 ? (
           <View style={[styles.videoGrid, { paddingHorizontal: DEST_PADDING }]}>
             {mostWatched.map((v) => (
               <View key={v.id}>{renderVideoCard(v)}</View>
             ))}
           </View>
-        </View>
-      )}
+        ) : (
+          <Text style={styles.emptyText}>No more Experiences to show yet.</Text>
+        )}
+      </View>
     </View>
   );
 }
@@ -144,6 +152,7 @@ const styles = StyleSheet.create({
   horizontalRow: { paddingHorizontal: 14, gap: 8 },
   destGrid: { flexDirection: 'row', flexWrap: 'wrap' },
   videoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  emptyText: { color: 'rgba(255,255,255,0.35)', fontSize: 13, fontFamily: 'Inter_400Regular', paddingHorizontal: 14 },
   communityRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 14 },
   communityCard: {
     flex: 1,

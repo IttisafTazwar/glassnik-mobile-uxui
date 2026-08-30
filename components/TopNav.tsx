@@ -14,7 +14,9 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, usePathname } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
+import { userApi } from '@/lib/api';
 
 const MOBILE_BREAKPOINT = 768;
 
@@ -31,10 +33,22 @@ const MARKETING_LINKS = [
 // App nav — same items as Sidebar.tsx, kept in sync manually since the
 // hamburger menu replaces the sidebar entirely on mobile (no separate
 // drawer/bottom bar there per the mobile nav spec).
-const APP_NAV_ITEMS: { label: string; icon: React.ComponentProps<typeof Feather>['name']; route: string; loggedInOnly?: boolean }[] = [
+//
+// "Upload" is gated by requiresCreatorCap (not just loggedInOnly) — showing
+// it to any logged-in user was misleading, since the Upload screen itself
+// is gated behind the mobile.creator capability and would immediately show
+// a "Videographer Access Required" lock screen for anyone without it.
+// "Activity" (notifications) stays available to any logged-in user.
+const APP_NAV_ITEMS: {
+  label: string;
+  icon: React.ComponentProps<typeof Feather>['name'];
+  route: string;
+  loggedInOnly?: boolean;
+  requiresCreatorCap?: boolean;
+}[] = [
   { label: 'Explore', icon: 'compass', route: '/(tabs)/explore' },
   { label: 'For You', icon: 'home', route: '/' },
-  { label: 'Upload', icon: 'plus-square', route: '/(tabs)/upload', loggedInOnly: true },
+  { label: 'Upload', icon: 'plus-square', route: '/(tabs)/upload', loggedInOnly: true, requiresCreatorCap: true },
   { label: 'Activity', icon: 'bell', route: '/(tabs)/notifications', loggedInOnly: true },
   { label: 'Profile', icon: 'user', route: '/(tabs)/profile' },
 ];
@@ -54,11 +68,24 @@ export function TopNav() {
   const isMobile = width < MOBILE_BREAKPOINT;
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // Same capability check used by upload.tsx, so the nav and the screen it
+  // links to always agree on whether the user can actually upload.
+  const { data: capabilities } = useQuery({
+    queryKey: ['my-capabilities'],
+    queryFn: userApi.getMyCapabilities,
+    enabled: !!user,
+  });
+  const hasCreatorCap = capabilities?.some(
+    (c: any) => c.capability?.name === 'mobile.creator' && c.status === 'ACTIVE',
+  );
+
   const topPad = Platform.OS === 'web' ? 10 : insets.top + 6;
 
-  const navItems = [
-    ...APP_NAV_ITEMS.filter((item) => !item.loggedInOnly || user),
-  ];
+  const navItems = APP_NAV_ITEMS.filter((item) => {
+    if (item.requiresCreatorCap && !hasCreatorCap) return false;
+    if (item.loggedInOnly && !user) return false;
+    return true;
+  });
 
   function go(route: string) {
     setMenuOpen(false);

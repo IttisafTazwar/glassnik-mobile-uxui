@@ -65,7 +65,7 @@ export default function UploadScreen() {
   const [pickedUri, setPickedUri] = useState<string | null>(null);
   const [pickedName, setPickedName] = useState<string>('');
   const [pickedSize, setPickedSize] = useState<number>(0);
-  // "title" now holds the Place / Tour / Transport value (field relabeled per MVP spec)
+  // "title" now holds the Place / Tour / Transport / Walk value (field relabeled per MVP spec)
   const [title, setTitle] = useState('');
   const [location, setLocation] = useState('');
   const [category, setCategory] = useState<string | null>(null);
@@ -481,7 +481,7 @@ export default function UploadScreen() {
       return;
     }
     if (!title.trim()) {
-      Alert.alert('Details required', 'Please add Place / Tour / Transport details before uploading.');
+      Alert.alert('Details required', 'Please add Place / Tour / Transport / Walk details before uploading.');
       return;
     }
     if (!location.trim()) {
@@ -736,11 +736,11 @@ export default function UploadScreen() {
 
             <View>
               <Text style={[styles.fieldLabel, { color: colors.foreground, fontFamily: 'Inter_600SemiBold', marginBottom: 2 }]}>
-                Place / Tour / Transport (from [location name] to [location name]){' '}
+                Place / Tour / Transport / Walk (from [location name] to [location name]){' '}
                 <Text style={{ color: colors.primary }}>*</Text>
               </Text>
               <Text style={[styles.fieldHelper, { color: colors.mutedForeground }]}>
-                e.g. Rundle Mall, Kuala Lumpur City Bus Tour, Train from London to Manchester
+                e.g. Rundle Mall, Kuala Lumpur City Bus Tour, Train from London to Manchester, Bangkok Streets
               </Text>
               <View style={[styles.inputWrap, { backgroundColor: colors.input, borderColor: colors.border }]}>
                 <TextInput

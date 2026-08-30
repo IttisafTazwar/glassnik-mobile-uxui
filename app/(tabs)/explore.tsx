@@ -234,8 +234,13 @@ export default function ExploreScreen() {
         }
         columnWrapperStyle={styles.columnWrapper}
         contentContainerStyle={{ paddingHorizontal: GRID_PADDING }}
-        renderItem={({ item }) => (
-          <VideoGridCell video={item} width={cellWidth} height={cellHeight} />
+        renderItem={({ item, index }) => (
+          <VideoGridCell
+            video={item}
+            width={cellWidth}
+            height={cellHeight}
+            isFirst={index === 0}
+          />
         )}
         ListEmptyComponent={
           isLoading ? (
@@ -503,19 +508,90 @@ function DiscoveryTabs({
   );
 }
 
+// Web-only video thumbnail. Uses a ref to imperatively set `.muted = true`
+// on the real DOM node before calling play()/seeking — setting `muted` as
+// a JSX prop on a raw <video> element is unreliable in React and often
+// fails silently, which is why an earlier attempt rendered nothing.
+function WebVideoThumb({ uri, isFirst }: { uri: string; isFirst: boolean }) {
+  const videoRef = React.useRef<HTMLVideoElement | null>(null);
+
+  React.useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+
+    // Must be set imperatively, not via JSX props, or autoplay/frame
+    // rendering gets silently blocked by the browser.
+    el.muted = true;
+    el.defaultMuted = true;
+
+    if (isFirst) {
+      const playPromise = el.play();
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch(() => {
+          // Autoplay blocked for some other reason (e.g. data-saver mode) —
+          // fail silently rather than throwing; card just shows the poster
+          // frame once metadata loads instead.
+        });
+      }
+    } else {
+      const showFrame = () => {
+        try {
+          el.currentTime = 0.1;
+        } catch {}
+      };
+      if (el.readyState >= 1) {
+        showFrame();
+      } else {
+        el.addEventListener('loadedmetadata', showFrame, { once: true });
+      }
+    }
+  }, [uri, isFirst]);
+
+  return React.createElement('video', {
+    ref: videoRef,
+    src: uri,
+    playsInline: true,
+    preload: 'metadata',
+    loop: isFirst,
+    style: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      width: '100%',
+      height: '100%',
+      objectFit: 'cover',
+    },
+  });
+}
+
 // ── Video grid cell — redesigned to match the Viewer's info layout:
 // Place/Tour/Transport • Location on one line, Category pill on the right,
 // and Like/Comment/Share/Report icons with counts underneath, scaled down
 // to fit a small grid tile. Exported so Trending/Nearby/Global sections
-// can reuse the exact same card. ──
+// can reuse the exact same card.
+//
+// Thumbnail behavior:
+// - If the API returned a real thumbnailUrl, always use it (all platforms).
+// - Otherwise on WEB, render an actual <video> element via WebVideoThumb
+//   instead of a flat color block — muted (set imperatively via ref, since
+//   JSX props alone were unreliable), preload="metadata", so the browser
+//   shows a real frame from the video. The first card in the grid (isFirst)
+//   also autoplays (muted, looped) per spec.
+// - On NATIVE, there's no cheap client-side way to grab a video frame
+//   without either playing the file or having the backend generate a real
+//   thumbnail image — so native still falls back to the color block. This
+//   is a real platform limitation, not a bug: closing this gap properly
+//   needs Tenzin to wire up backend thumbnail generation. ──
 export function VideoGridCell({
   video,
   width,
   height,
+  isFirst = false,
 }: {
   video: SampleVideo;
   width: number;
   height: number;
+  isFirst?: boolean;
 }) {
   const locationText = [video.place, video.city, video.country].filter(Boolean).join(', ');
   const placeTourTransport = video.description || null;
@@ -526,6 +602,8 @@ export function VideoGridCell({
     if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
     return String(n);
   }
+
+  const canUseWebVideoFallback = Platform.OS === 'web' && !video.thumbnailUrl && !!video.uri;
 
   return (
     <View style={{ width, marginBottom: 14 }}>
@@ -542,6 +620,8 @@ export function VideoGridCell({
             contentFit="cover"
             transition={200}
           />
+        ) : canUseWebVideoFallback ? (
+          <WebVideoThumb uri={video.uri} isFirst={isFirst} />
         ) : (
           <>
             <View style={[StyleSheet.absoluteFill, { backgroundColor: video.creator.color, opacity: 0.25 }]} />
