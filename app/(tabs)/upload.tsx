@@ -310,11 +310,15 @@ export default function UploadScreen() {
     fileUri: string;
     fileSize: number;
     title: string;
+    locationName?: string;
+    categoryId?: number;
   }) {
     const {
       fileUri,
       fileSize,
       title: uploadTitle,
+      locationName,
+      categoryId,
     } = opts;
 
     clearPollTimer();
@@ -323,15 +327,14 @@ export default function UploadScreen() {
     setStatusMsg('');
 
     try {
-      // Create the backend video record and obtain a fresh GCS signed URL.
-      // NOTE: mobileApi.requestUpload currently only accepts title/size/description.
-      // location/category are captured in UI state above but not yet sent to the
-      // backend — that requires a backend-side change outside this session's scope.
-      // Description has been removed from the MVP form, so we pass undefined here.
+      // Create the backend video record and obtain a fresh GCS signed URL,
+      // including the Experience metadata selected on the upload form.
       const slot = await mobileApi.requestUpload(
         uploadTitle.trim(),
         fileSize,
         undefined,
+        locationName?.trim() || undefined,
+        categoryId,
       );
 
       const uploadUrl = slot.uploadUrl;
@@ -507,7 +510,20 @@ export default function UploadScreen() {
       return;
     }
 
-    await runUpload({ fileUri: pickedUri, fileSize, title });
+    const selectedCategoryId = UPLOAD_CATEGORIES.indexOf(category) + 1;
+
+    if (selectedCategoryId <= 0) {
+      Alert.alert('Category error', 'Could not resolve the selected category.');
+      return;
+    }
+
+    await runUpload({
+      fileUri: pickedUri,
+      fileSize,
+      title,
+      locationName: location,
+      categoryId: selectedCategoryId,
+    });
   }
 
 

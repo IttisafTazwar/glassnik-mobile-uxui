@@ -123,8 +123,13 @@ export function TopNav() {
             <Pressable hitSlop={8}>
               <Feather name="search" size={18} color="rgba(255,255,255,0.85)" />
             </Pressable>
-            <Pressable style={styles.loginBtn} onPress={() => router.push('/auth/login' as any)}>
-              <Text style={styles.loginText}>Log In</Text>
+            <Pressable
+              style={styles.loginBtn}
+              onPress={() =>
+                router.push(user ? '/(tabs)/profile' as any : '/auth/login' as any)
+              }
+            >
+              <Text style={styles.loginText}>{user ? 'Profile' : 'Log In'}</Text>
             </Pressable>
           </View>
         </View>
@@ -147,8 +152,13 @@ export function TopNav() {
         </Pressable>
 
         <View style={styles.mobileRightActions}>
-          <Pressable style={styles.mobileLoginBtn} onPress={() => router.push('/auth/login' as any)}>
-            <Text style={styles.loginText}>Log In</Text>
+          <Pressable
+            style={styles.mobileLoginBtn}
+            onPress={() =>
+              router.push(user ? '/(tabs)/profile' as any : '/auth/login' as any)
+            }
+          >
+            <Text style={styles.loginText}>{user ? 'Profile' : 'Log In'}</Text>
           </Pressable>
           <Pressable hitSlop={8}>
             <Feather name="search" size={20} color="rgba(255,255,255,0.85)" />

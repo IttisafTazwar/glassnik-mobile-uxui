@@ -1,12 +1,13 @@
 /**
- * Standalone production server for Expo static builds.
+ * Glassnik production server.
  *
- * Serves the output of build.js (static-build/) with two special routes:
- * - GET / or /manifest with expo-platform header → platform manifest JSON
- * - GET / without expo-platform → landing page HTML
- * Everything else falls through to static file serving from ./static-build/.
+ * Native Expo:
+ *   GET / or /manifest + expo-platform header -> native manifest
+ *   static-build/* -> native bundles/assets
  *
- * Zero external dependencies — uses only Node.js built-ins (http, fs, path).
+ * Web:
+ *   Normal browser requests -> Expo web export in dist/
+ *   Unknown browser routes -> dist/index.html for Expo Router
  */
 
 const http = require('http');
@@ -14,8 +15,7 @@ const fs = require('fs');
 const path = require('path');
 
 const STATIC_ROOT = path.resolve(__dirname, '..', 'static-build');
-const TEMPLATE_PATH = path.resolve(__dirname, 'templates', 'landing-page.html');
-const basePath = (process.env.BASE_PATH || '/').replace(/\/+$/, '');
+const WEB_ROOT = path.resolve(__dirname, '..', 'dist');
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -35,14 +35,22 @@ const MIME_TYPES = {
   '.map': 'application/json',
 };
 
-function getAppName() {
-  try {
-    const appJsonPath = path.resolve(__dirname, '..', 'app.json');
-    const appJson = JSON.parse(fs.readFileSync(appJsonPath, 'utf-8'));
-    return appJson.expo?.name || 'App Landing Page';
-  } catch {
-    return 'App Landing Page';
+function sendFile(filePath, res) {
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+    return false;
   }
+
+  const ext = path.extname(filePath).toLowerCase();
+  const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+
+  res.writeHead(200, {
+    'content-type': contentType,
+    'cache-control':
+      ext === '.html' ? 'no-cache' : 'public, max-age=31536000, immutable',
+  });
+
+  fs.createReadStream(filePath).pipe(res);
+  return true;
 }
 
 function serveManifest(platform, res) {
@@ -51,85 +59,86 @@ function serveManifest(platform, res) {
   if (!fs.existsSync(manifestPath)) {
     res.writeHead(404, { 'content-type': 'application/json' });
     res.end(
-      JSON.stringify({ error: `Manifest not found for platform: ${platform}` }),
+      JSON.stringify({
+        error: `Manifest not found for platform: ${platform}`,
+      }),
     );
     return;
   }
 
   const manifest = fs.readFileSync(manifestPath, 'utf-8');
+
   res.writeHead(200, {
     'content-type': 'application/json',
     'expo-protocol-version': '1',
     'expo-sfv-version': '0',
   });
+
   res.end(manifest);
 }
 
-function serveLandingPage(req, res, landingPageTemplate, appName) {
-  const forwardedProto = req.headers['x-forwarded-proto'];
-  const protocol = forwardedProto || 'https';
-  const host = req.headers['x-forwarded-host'] || req.headers['host'];
-  const baseUrl = `${protocol}://${host}`;
-  const expsUrl = `${host}`;
+function safeResolve(root, urlPath) {
+  const relativePath = urlPath.replace(/^\/+/, '');
+  const resolved = path.resolve(root, relativePath);
 
-  const html = landingPageTemplate
-    .replace(/BASE_URL_PLACEHOLDER/g, baseUrl)
-    .replace(/EXPS_URL_PLACEHOLDER/g, expsUrl)
-    .replace(/APP_NAME_PLACEHOLDER/g, appName);
+  if (resolved !== root && !resolved.startsWith(root + path.sep)) {
+    return null;
+  }
 
-  res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-  res.end(html);
+  return resolved;
 }
 
-function serveStaticFile(urlPath, res) {
-  const safePath = path.normalize(urlPath).replace(/^(\.\.(\/|\\|$))+/, '');
-  const filePath = path.join(STATIC_ROOT, safePath);
+function serveNativeStatic(pathname, res) {
+  const filePath = safeResolve(STATIC_ROOT, pathname);
+  if (!filePath) return false;
+  return sendFile(filePath, res);
+}
 
-  if (!filePath.startsWith(STATIC_ROOT)) {
-    res.writeHead(403);
-    res.end('Forbidden');
+function serveWeb(pathname, res) {
+  const requested = safeResolve(WEB_ROOT, pathname);
+
+  if (requested && sendFile(requested, res)) {
     return;
   }
 
-  if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
-    res.writeHead(404);
-    res.end('Not Found');
-    return;
+  // Expo Router client-side fallback.
+  const indexPath = path.join(WEB_ROOT, 'index.html');
+
+  if (!sendFile(indexPath, res)) {
+    res.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' });
+    res.end('Web build not found');
   }
-
-  const ext = path.extname(filePath).toLowerCase();
-  const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-  const content = fs.readFileSync(filePath);
-  res.writeHead(200, { 'content-type': contentType });
-  res.end(content);
 }
-
-const landingPageTemplate = fs.readFileSync(TEMPLATE_PATH, 'utf-8');
-const appName = getAppName();
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url || '/', `http://${req.headers.host}`);
-  let pathname = url.pathname;
+  const pathname = decodeURIComponent(url.pathname);
+  const platform = req.headers['expo-platform'];
 
-  if (basePath && pathname.startsWith(basePath)) {
-    pathname = pathname.slice(basePath.length) || '/';
+  // Expo Go/native clients request the manifest here.
+  if (
+    (pathname === '/' || pathname === '/manifest') &&
+    (platform === 'ios' || platform === 'android')
+  ) {
+    return serveManifest(platform, res);
   }
 
-  if (pathname === '/' || pathname === '/manifest') {
-    const platform = req.headers['expo-platform'];
-    if (platform === 'ios' || platform === 'android') {
-      return serveManifest(platform, res);
-    }
-
-    if (pathname === '/') {
-      return serveLandingPage(req, res, landingPageTemplate, appName);
-    }
+  /*
+   * Native manifests reference files inside static-build.
+   * Try native static files before web fallback.
+   */
+  if (pathname !== '/' && serveNativeStatic(pathname, res)) {
+    return;
   }
 
-  serveStaticFile(pathname, res);
+  // Everything else is the browser build.
+  serveWeb(pathname, res);
 });
 
-const port = parseInt(process.env.PORT || '3000', 10);
+const port = parseInt(process.env.PORT || '8080', 10);
+
 server.listen(port, '0.0.0.0', () => {
-  console.log(`Serving static Expo build on port ${port}`);
+  console.log(`Glassnik production server listening on port ${port}`);
+  console.log(`Native root: ${STATIC_ROOT}`);
+  console.log(`Web root: ${WEB_ROOT}`);
 });

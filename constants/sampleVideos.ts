@@ -25,13 +25,11 @@ export interface SampleVideo {
   country?: string | null;
   category?: string | null;
   /**
-   * Upload timestamp — present only for API-sourced videos (mapped from
-   * VideoAsset.createdAt). Static sample/placeholder videos below have no
-   * real upload date, so this is left undefined for them; the Explore
-   * screen sorts videos with a createdAt first (newest → oldest) and
-   * places undated sample videos after all of them.
+   * Upload timestamp — present only for API-sourced videos.
    */
   createdAt?: string;
+  /** Backend category ID — present for API-sourced videos. */
+  categoryId?: number | null;
 }
 
 export const SAMPLE_VIDEOS: SampleVideo[] = [

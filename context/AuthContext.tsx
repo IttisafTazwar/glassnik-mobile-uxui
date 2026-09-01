@@ -36,13 +36,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const persistAuth = useCallback(async (data: { user: User; accessToken: string; refreshToken: string }) => {
+    // Update application state immediately after successful authentication.
+    setUser(data.user);
+    setToken(data.accessToken);
+
+    // Persist the session for future reloads.
     await AsyncStorage.multiSet([
       ['user', JSON.stringify(data.user)],
       ['accessToken', data.accessToken],
       ['refreshToken', data.refreshToken],
     ]);
-    setUser(data.user);
-    setToken(data.accessToken);
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {

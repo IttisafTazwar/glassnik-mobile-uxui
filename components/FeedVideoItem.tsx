@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
-  Easing,
   Platform,
   Pressable,
   StyleSheet,
@@ -17,15 +16,15 @@ import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useQueryClient } from '@tanstack/react-query';
 import type { SampleVideo } from '@/constants/sampleVideos';
-import { userApi, videoApi } from '@/lib/api';
-import { useAuth } from '@/context/AuthContext';
+import { videoApi } from '@/lib/api';
 import { useMute } from '@/context/MuteContext';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface Props {
   video: SampleVideo;
   isActive: boolean;
+  itemHeight?: number;
   /** Called when the comment button is pressed; receives the video's id. */
   onCommentPress?: (videoId: string) => void;
 }
@@ -36,50 +35,52 @@ function formatCount(n: number): string {
   return String(n);
 }
 
-export function FeedVideoItem({ video, isActive, onCommentPress }: Props) {
+export function FeedVideoItem({
+  video,
+  isActive,
+  itemHeight,
+  onCommentPress,
+}: Props) {
   const { isMuted, toggleMute } = useMute();
   const onMuteToggle = toggleMute;
   const { width, height } = useWindowDimensions();
+  const isCompactMobile = width < 768;
+  const itemWidth = Platform.OS === 'web' ? '100%' : width;
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(video.likes);
   const [paused, setPaused] = useState(false);
-  // Instagram-style tap-to-hide, combined with the existing single-tap
-  // pause toggle (no separate gesture was specified).
-  const [controlsVisible, setControlsVisible] = useState(true);
+  const [overlayVisible, setOverlayVisible] = useState(true);
   const [progress, setProgress] = useState(0);
-  const [following, setFollowing] = useState(false);
-  const [followLoading, setFollowLoading] = useState(false);
   const lastTap = useRef(0);
-  const { user } = useAuth();
-  const isOwnVideo = user?.id != null && video.creatorId != null && video.creatorId === user.id;
   const router = useRouter();
-  const queryClient = useQueryClient();
 
   // ── Heart animation ──
   const heartScale = useRef(new Animated.Value(0)).current;
   const heartOpacity = useRef(new Animated.Value(0)).current;
 
-  // ── Music disc rotation ──
-  const discRotation = useRef(new Animated.Value(0)).current;
-  const discAnim = useRef<Animated.CompositeAnimation | null>(null);
-
   // ── Video player ──
-  const player = useVideoPlayer(video.uri, useCallback((p: import('expo-video').VideoPlayer) => {
+  const player = useVideoPlayer(video.uri, (p) => {
     p.loop = true;
-  }, []));
+  });
 
-  // Sync play/pause AND muted together — muted must be set before play()
-  // so the native layer never has a chance to start audio then cut it.
+  // Keep the feed player lifecycle aligned with the working Explore player.
   useEffect(() => {
     try {
       player.muted = isMuted;
-      if (isActive && !paused) {
+
+      if (isActive && !paused && video.uri) {
         player.play();
       } else {
         player.pause();
       }
     } catch {}
-  }, [isActive, paused, player, isMuted]);
+
+    return () => {
+      try {
+        player.pause();
+      } catch {}
+    };
+  }, [player, video.uri, isActive, paused, isMuted]);
 
   // Progress tracking
   useEffect(() => {
@@ -93,30 +94,6 @@ export function FeedVideoItem({ video, isActive, onCommentPress }: Props) {
     }, 500);
     return () => clearInterval(id);
   }, [isActive, player]);
-
-  // Disc spin
-  useEffect(() => {
-    discAnim.current?.stop();
-    if (isActive && !paused) {
-      discRotation.setValue(0);
-      discAnim.current = Animated.loop(
-        Animated.timing(discRotation, {
-          toValue: 1,
-          duration: 5000,
-          easing: Easing.linear,
-          useNativeDriver,
-        })
-      );
-      discAnim.current.start();
-    }
-    return () => { discAnim.current?.stop(); };
-  }, [isActive, paused, discRotation]);
-
-  const spinStyle = {
-    transform: [{
-      rotate: discRotation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }),
-    }],
-  };
 
   function triggerHeartAnim() {
     heartScale.setValue(0);
@@ -152,13 +129,13 @@ export function FeedVideoItem({ video, isActive, onCommentPress }: Props) {
 
   function handleTap() {
     const now = Date.now();
+
     if (now - lastTap.current < 280) {
       handleLike();
-      triggerHeartAnim();
     } else {
-      setPaused((p) => !p);
-      setControlsVisible((v) => !v);
+      setOverlayVisible((visible) => !visible);
     }
+
     lastTap.current = now;
   }
 
@@ -182,90 +159,69 @@ export function FeedVideoItem({ video, isActive, onCommentPress }: Props) {
     );
   }
 
-  async function handleFollow() {
-    if (!user) {
-      Alert.alert(
-        'Sign in required',
-        'You need to be signed in to follow videographers.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Sign In', onPress: () => router.push('/auth/login') },
-        ]
-      );
-      return;
-    }
-    if (!video.creatorId || followLoading) return;
-    setFollowLoading(true);
-    const wasFollowing = following;
-    // Optimistic update
-    setFollowing(!wasFollowing);
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-      if (wasFollowing) {
-        await userApi.unfollow(video.creatorId);
-      } else {
-        await userApi.follow(video.creatorId);
-      }
-      // Invalidate the current user's profile stats so following/follower counts refresh
-      queryClient.invalidateQueries({ queryKey: ['profile-stats', user.id] });
-    } catch {
-      // Revert optimistic update on failure
-      setFollowing(wasFollowing);
-    } finally {
-      setFollowLoading(false);
-    }
-  }
-
-  const ITEM_HEIGHT = height;
-
-  // Place/Tour/Transport • Location — single line, per the mockup.
-  const placeTourTransport = video.description || null;
-  const locationText = [video.place, video.city, video.country].filter(Boolean).join(', ') || null;
-  const metaLine = [placeTourTransport, locationText].filter(Boolean).join(' • ');
+  const ITEM_HEIGHT = itemHeight ?? height;
 
   return (
-    <View style={[styles.container, { width, height: ITEM_HEIGHT }]}>
+    <View style={[styles.container, { width: itemWidth, height: ITEM_HEIGHT }]}>
       {/* ── Video / thumbnail ── */}
       {isActive ? (
         <VideoView
           player={player}
-          style={StyleSheet.absoluteFill}
-          contentFit="cover"
+          style={[
+            StyleSheet.absoluteFill,
+            !isCompactMobile && styles.desktopVideoStage,
+          ]}
+          contentFit={isCompactMobile ? "cover" : "contain"}
           nativeControls={false}
         />
       ) : video.thumbnailUrl ? (
         <Image
           source={{ uri: video.thumbnailUrl }}
-          style={StyleSheet.absoluteFill}
+          style={[
+            StyleSheet.absoluteFill,
+            !isCompactMobile && styles.desktopVideoStage,
+          ]}
           contentFit="cover"
           transition={300}
         />
       ) : (
-        <View style={[StyleSheet.absoluteFill, styles.videoPlaceholder]} />
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            styles.videoPlaceholder,
+            !isCompactMobile && styles.desktopVideoStage,
+          ]}
+        />
       )}
 
-      {/* ── Tap handler ──
-          touchAction: 'pan-y' on web tells the browser this element should
-          still allow native vertical scroll/swipe gestures to pass through,
-          instead of the touch being fully claimed by RN-Web's Pressable
-          responder system. Without this, a full-screen Pressable sitting on
-          top of the scrollable feed blocks mobile-browser scroll entirely —
-          this is the fix for the "scroll not working over the videos on
-          mobile" report. */}
+      {/* ── Tap handler ── */}
       <Pressable
         style={[
           StyleSheet.absoluteFill,
+          styles.videoTapLayer,
+          !isCompactMobile && styles.desktopVideoStage,
           Platform.OS === 'web' ? ({ touchAction: 'pan-y' } as any) : null,
         ]}
         onPress={handleTap}
       />
 
-      {/* ── Bottom gradient layer (kept subtle since the info box now
-          carries its own background) ── */}
-      <View style={[styles.gradientBottom, { pointerEvents: 'none' }]} />
+      {/* ── Bottom gradient layers (simulate linear gradient) ── */}
+      <View style={[styles.gradientTop, { pointerEvents: 'none' }]} />
+      <LinearGradient
+        pointerEvents="none"
+        colors={[
+          'transparent',
+          'rgba(0,0,0,0.08)',
+          'rgba(0,0,0,0.35)',
+        ]}
+        locations={[0, 0.55, 1]}
+        style={[
+          styles.gradientBottom,
+          !isCompactMobile && { bottom: 58 },
+        ]}
+      />
 
-      {/* ── Pause indicator — independent of controlsVisible; this is
-          playback-state feedback, not a "control" to hide ── */}
+      {/* ── Pause indicator ── */}
       {paused && isActive && (
         <View style={[styles.pauseOverlay, { pointerEvents: 'none' }]}>
           <View style={styles.pauseIcon}>
@@ -281,134 +237,113 @@ export function FeedVideoItem({ video, isActive, onCommentPress }: Props) {
         <Feather name="heart" size={90} color="#fff" />
       </Animated.View>
 
-      {/* ── Right sidebar — avatar/follow, Music disc. Save removed per
-          spec; the floating pink "+" follow badge removed per spec
-          (Steve flagged it as an unidentified button interfering with
-          immersion) — the avatar itself and follow interaction are kept,
-          just moved to a plain outline badge instead of a filled pink one. */}
-      {controlsVisible && (
-        <View style={[styles.sidebar, { bottom: Platform.OS === 'web' ? 170 : 170 + 34 }]}>
-          {!isOwnVideo && (
-            <Pressable style={styles.sideItem} onPress={video.creatorId ? handleFollow : undefined} disabled={followLoading}>
-              <View style={[styles.avatar, { backgroundColor: video.creator.color }]}>
-                {video.creator.avatarUrl ? (
-                  <Image
-                    source={{ uri: video.creator.avatarUrl }}
-                    style={styles.avatarImage}
-                    contentFit="cover"
-                    transition={200}
-                  />
-                ) : (
-                  <Text style={styles.avatarText}>{video.creator.initial}</Text>
-                )}
-              </View>
-              {video.creatorId && !following && (
-                <View style={styles.followBtn}>
-                  <Feather name="plus" size={12} color="#fff" />
-                </View>
-              )}
-              {video.creatorId && following && (
-                <View style={[styles.followBtn, styles.followBtnActive]}>
-                  <Feather name="check" size={11} color="#fff" />
-                </View>
-              )}
-            </Pressable>
-          )}
+      {/* ── Bottom action bar — Love / Comment / Share / Report ── */}
+      {overlayVisible && (
+      <View
+        style={[
+          styles.actionBar,
+          isCompactMobile
+            ? { bottom: 82 }
+            : styles.desktopActionBar,
+        ]}
+      >
+        <Pressable style={styles.actionItem} onPress={handleLike}>
+          <Feather
+            name="heart"
+            size={24}
+            color={liked ? '#FE2C55' : '#fff'}
+          />
+          <Text style={styles.actionLabel}>{formatCount(likeCount)}</Text>
+        </Pressable>
 
-          {/* Spinning music disc */}
-          <Pressable style={styles.sideItem} onPress={onMuteToggle}>
-            <Animated.View style={[styles.disc, spinStyle]}>
-              <View style={[styles.discInner, { backgroundColor: video.creator.color }]}>
-                <Text style={styles.discNote}>♪</Text>
-              </View>
-            </Animated.View>
-          </Pressable>
-        </View>
+        <Pressable
+          style={styles.actionItem}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            onCommentPress?.(video.id);
+          }}
+        >
+          <Feather name="message-circle" size={24} color="#fff" />
+          <Text style={styles.actionLabel}>{formatCount(video.comments)}</Text>
+        </Pressable>
+
+        <Pressable style={styles.actionItem}>
+          <Feather name="share-2" size={22} color="#fff" />
+          <Text style={styles.actionLabel}>{formatCount(video.shares)}</Text>
+        </Pressable>
+
+        <Pressable style={styles.actionItem} onPress={handleReport}>
+          <Feather name="flag" size={22} color="#fff" />
+          <Text style={styles.actionLabel}>Report</Text>
+        </Pressable>
+      </View>
       )}
 
-      {/* ── Bottom info/control box — overlays the video, flush to the
-          bottom and both side edges, compact and semi-transparent.
-          Progress bar sits immediately above it. Both hidden together on
-          tap per the spec. Save button removed; action icons are Like/
-          Comment/Share/Report only, smaller and soft grey. */}
-      {controlsVisible && (
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
-        </View>
-      )}
+      {/* ── Bottom info ── */}
+      {overlayVisible && (
+      <View
+        pointerEvents="box-none"
+        style={[
+          styles.bottomInfo,
+          { paddingBottom: isCompactMobile ? 124 : 72 },
+        ]}
+      >
+                {/* Location + category on one line — tappable, navigates to Explore */}
+        {(video.place || video.city || video.country || video.category) ? (
+          <View style={styles.metaRow}>
+            {(video.place || video.city || video.country) ? (
+              <Pressable
+                style={styles.locationWrap}
+                onPress={() => {
+                  const location = [video.place, video.city, video.country]
+                    .filter(Boolean)
+                    .join(', ');
 
-      {controlsVisible && (
-        <View style={styles.bottomBox}>
-          {!isOwnVideo && (
-            <View style={styles.creatorRow}>
-              <Text style={styles.creatorName}>@{video.creator.username}</Text>
-              {video.creatorId && (
-                <Pressable
-                  style={[styles.followTextBtn, following && styles.followTextBtnActive]}
-                  onPress={handleFollow}
-                  disabled={followLoading}
-                >
-                  {following ? (
-                    <View style={styles.followingRow}>
-                      <Feather name="check" size={11} color="#fff" />
-                      <Text style={styles.followTextBtnLabel}>Following</Text>
-                    </View>
-                  ) : (
-                    <Text style={styles.followTextBtnLabel}>Follow</Text>
-                  )}
-                </Pressable>
-              )}
-            </View>
-          )}
-
-          {metaLine ? (
-            <View style={styles.metaRow}>
-              <Text style={styles.metaText} numberOfLines={1}>
-                {metaLine}
-              </Text>
-              {video.category ? (
-                <View style={styles.categoryPill}>
-                  <Text style={styles.categoryText}>{video.category.toUpperCase()}</Text>
-                </View>
-              ) : null}
-            </View>
-          ) : null}
-
-          <View style={styles.divider} />
-
-          <View style={styles.actionRow}>
-            <Pressable style={styles.actionItem} onPress={handleLike}>
-              <Feather
-                name="heart"
-                size={18}
-                color={liked ? '#FE2C55' : 'rgba(255,255,255,0.7)'}
-              />
-              <Text style={styles.actionLabel}>{formatCount(likeCount)}</Text>
-            </Pressable>
-
-            <Pressable
-              style={styles.actionItem}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                onCommentPress?.(video.id);
-              }}
-            >
-              <Feather name="message-circle" size={18} color="rgba(255,255,255,0.7)" />
-              <Text style={styles.actionLabel}>{formatCount(video.comments)}</Text>
-            </Pressable>
-
-            <Pressable style={styles.actionItem}>
-              <Feather name="share-2" size={17} color="rgba(255,255,255,0.7)" />
-              <Text style={styles.actionLabel}>{formatCount(video.shares)}</Text>
-            </Pressable>
-
-            <Pressable style={styles.actionItem} onPress={handleReport}>
-              <Feather name="flag" size={17} color="rgba(255,255,255,0.7)" />
-              <Text style={styles.actionLabel}>Report</Text>
-            </Pressable>
+                  if (location) {
+                    router.push(
+                      `/explore?location=${encodeURIComponent(location)}`
+                    );
+                  } else {
+                    router.push('/explore');
+                  }
+                }}
+              >
+                <Feather name="map-pin" size={11} color="rgba(255,255,255,0.85)" />
+                <Text style={styles.locationText}>
+                  {[video.place, video.city, video.country].filter(Boolean).join(' · ')}
+                </Text>
+              </Pressable>
+            ) : null}
+            {video.category ? (
+              <Pressable
+                style={styles.categoryPill}
+                onPress={() => {
+                  if (video.categoryId && video.category) {
+                    router.push(
+                      `/explore?categoryId=${video.categoryId}&category=${encodeURIComponent(video.category)}`
+                    );
+                  } else {
+                    router.push('/explore');
+                  }
+                }}
+              >
+                <Text style={styles.categoryText}>{video.category.toUpperCase()}</Text>
+              </Pressable>
+            ) : null}
           </View>
-        </View>
+        ) : null}
+      </View>
       )}
+
+      {/* ── Progress bar ── */}
+      <View
+        style={[
+          styles.progressTrack,
+          { bottom: isCompactMobile ? 54 : 58 },
+        ]}
+      >
+        <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+      </View>
     </View>
   );
 }
@@ -420,6 +355,12 @@ const styles = StyleSheet.create({
   },
   videoPlaceholder: {
     backgroundColor: '#111',
+  },
+  desktopVideoStage: {
+    bottom: 58,
+  },
+  videoTapLayer: {
+    zIndex: 1,
   },
   gradientTop: {
     position: 'absolute',
@@ -434,8 +375,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 200,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    height: 300,
   },
 
   // Pause
@@ -466,10 +406,19 @@ const styles = StyleSheet.create({
     right: 12,
     alignItems: 'center',
     gap: 20,
+    zIndex: 30,
   },
   sideItem: {
     alignItems: 'center',
     gap: 4,
+  },
+  muteButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   avatar: {
     width: 48,
@@ -490,76 +439,76 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 24,
   },
-  // Follow badge — plain dark outline instead of the filled pink circle
-  // Steve flagged as an unidentified button interfering with immersion.
   followBtn: {
     position: 'absolute',
     bottom: -12,
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderWidth: 1.5,
-    borderColor: '#fff',
+    backgroundColor: '#FE2C55',
     alignItems: 'center',
     justifyContent: 'center',
   },
   followBtnActive: {
     backgroundColor: '#555',
-    borderColor: '#555',
   },
-
-  // Music disc
-  disc: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#333',
-    borderWidth: 3,
-    borderColor: '#555',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  discInner: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  discNote: {
+  followPlus: {
     color: '#fff',
-    fontSize: 11,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '900',
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  sideLabel: {
+    color: '#fff',
+    fontSize: 12,
+    fontFamily: 'Inter_600SemiBold',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 
-  // Progress bar — flush above the bottom box
-  progressTrack: {
+  // Bottom action bar (Love / Comment / Share / Report)
+  actionBar: {
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 84,
-    height: 2,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    zIndex: 30,
   },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#fff',
-    minWidth: 2,
-  },
-
-  // Bottom info/control box
-  bottomBox: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
+  desktopActionBar: {
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    height: 58,
+    backgroundColor: '#000',
+    borderTopWidth: 1,
+    borderTopColor: '#1f1f1f',
+    paddingHorizontal: 18,
+  },
+  actionItem: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  actionLabel: {
+    color: '#fff',
+    fontSize: 12,
+    fontFamily: 'Inter_600SemiBold',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+
+  // Bottom info
+  bottomInfo: {
+    position: 'absolute',
+    bottom: 0,
+    zIndex: 10,
+    left: 0,
+    right: 0,
     paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 14,
-    gap: 8,
+    gap: 4,
   },
   creatorRow: {
     flexDirection: 'row',
@@ -568,7 +517,7 @@ const styles = StyleSheet.create({
   },
   creatorName: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Inter_700Bold',
     textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowOffset: { width: 0, height: 1 },
@@ -598,46 +547,50 @@ const styles = StyleSheet.create({
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: 8,
+    flexWrap: 'nowrap',
   },
-  metaText: {
-    flex: 1,
-    color: 'rgba(255,255,255,0.9)',
+  locationWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flexShrink: 1,
+  },
+  locationText: {
+    color: 'rgba(255,255,255,0.85)',
     fontSize: 13,
     fontFamily: 'Inter_400Regular',
+    flexShrink: 1,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   categoryPill: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(255,255,255,0.18)',
     borderRadius: 4,
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
-    flexShrink: 0,
+    borderColor: 'rgba(255,255,255,0.3)',
   },
   categoryText: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 10,
+    color: '#fff',
+    fontSize: 11,
     fontFamily: 'Inter_700Bold',
     letterSpacing: 0.5,
   },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+
+  // Progress bar
+  progressTrack: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: 'rgba(255,255,255,0.3)',
   },
-  actionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-evenly',
-    alignItems: 'center',
-  },
-  actionItem: {
-    alignItems: 'center',
-    gap: 3,
-  },
-  actionLabel: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 11,
-    fontFamily: 'Inter_500Medium',
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#fff',
+    minWidth: 2,
   },
 });

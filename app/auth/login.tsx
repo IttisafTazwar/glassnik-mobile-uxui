@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 
@@ -21,6 +21,7 @@ const TIKTOK_RED = '#FE2C55';
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { login } = useAuth();
+  const router = useRouter();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,6 +29,7 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
 
   async function handleLogin() {
+    console.log('LOGIN BUTTON CLICKED', { email, hasPassword: !!password });
     if (!email.trim() || !password) {
       Alert.alert('Missing fields', 'Please enter your email and password.');
       return;
@@ -35,6 +37,14 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await login(email.trim().toLowerCase(), password);
+      console.log('LOGIN PERSISTED - REDIRECTING HOME');
+
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.location.replace('/');
+        return;
+      }
+
+      router.replace('/');
     } catch (err: any) {
       Alert.alert('Login failed', err?.message ?? 'Please check your credentials.');
     } finally {

@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { Feather } from '@expo/vector-icons';
 import { mobileApi } from '@/lib/api';
-import { SAMPLE_VIDEOS, type SampleVideo } from '@/constants/sampleVideos';
+import { type SampleVideo } from '@/constants/sampleVideos';
 import type { VideoAsset } from '@/types';
 import { TopNav } from '@/components/TopNav';
 import { Sidebar, SIDEBAR_WIDTH } from '@/components/Sidebar';
@@ -76,7 +76,8 @@ function apiVideoToSample(v: VideoAsset): SampleVideo {
     place: v.place ?? undefined,
     city: v.city ?? undefined,
     country: v.country ?? undefined,
-    category: v.category ?? undefined,
+    category: v.category ?? v.categories?.[0]?.name ?? undefined,
+    categoryId: v.categories?.[0]?.id ?? null,
     createdAt: v.createdAt,
   };
 }
@@ -91,7 +92,10 @@ export default function ExploreScreen() {
 
   const { data: apiVideos, isLoading } = useQuery<VideoAsset[]>({
     queryKey: ['explore'],
-    queryFn: () => mobileApi.getFeed(1, 50),
+    queryFn: async () => {
+      const response = await mobileApi.getExplore(1, 50);
+      return response.items;
+    },
     retry: false,
   });
 
@@ -106,7 +110,7 @@ export default function ExploreScreen() {
       const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
       return tb - ta;
     });
-    return [...sortedApi, ...SAMPLE_VIDEOS];
+    return sortedApi;
   }, [apiVideos]);
 
   const trendingDestinations = useMemo(() => {
@@ -559,7 +563,7 @@ function WebVideoThumb({ uri, isFirst }: { uri: string; isFirst: boolean }) {
       left: 0,
       width: '100%',
       height: '100%',
-      objectFit: 'cover',
+      objectFit: 'contain',
     },
   });
 }

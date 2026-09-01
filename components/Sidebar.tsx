@@ -44,7 +44,7 @@ export function Sidebar() {
               style={[styles.navItem, isActive && styles.navItemActive]}
               onPress={() => router.push(item.route as any)}
             >
-              <Feather name={item.icon} size={16} color={isActive ? '#000' : '#fff'} />
+              <Feather name={item.icon} size={19} color={isActive ? '#000' : '#fff'} />
               <Text style={[styles.navItemText, isActive && styles.navItemTextActive]}>{item.label}</Text>
             </Pressable>
           );
@@ -83,7 +83,7 @@ export function Sidebar() {
   );
 }
 
-const SIDEBAR_WIDTH = 260;
+const SIDEBAR_WIDTH = 300;
 export { SIDEBAR_WIDTH };
 
 const styles = StyleSheet.create({
@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   navItemActive: { backgroundColor: '#fff' },
-  navItemText: { color: '#fff', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  navItemText: { color: '#fff', fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   navItemTextActive: { color: '#000' },
 
   joinBox: {
