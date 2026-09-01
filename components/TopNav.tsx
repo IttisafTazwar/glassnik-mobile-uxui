@@ -3,6 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View, Linking, Platform } from 'rea
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
 
 const NAV_LINKS = [
   { label: 'Premium', url: 'https://www.glassnik.com/glassnik-premium' },
@@ -17,6 +18,7 @@ const NAV_LINKS = [
 export function TopNav() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { user } = useAuth();
   const topPad = Platform.OS === 'web' ? 10 : insets.top + 6;
 
   return (
@@ -43,8 +45,15 @@ export function TopNav() {
           <Pressable hitSlop={8}>
             <Feather name="search" size={18} color="rgba(255,255,255,0.85)" />
           </Pressable>
-          <Pressable style={styles.loginBtn} onPress={() => router.push('/auth/login' as any)}>
-            <Text style={styles.loginText}>Log In</Text>
+          <Pressable
+            style={styles.loginBtn}
+            onPress={() =>
+              router.push(user ? '/(tabs)/profile' as any : '/auth/login' as any)
+            }
+          >
+            <Text style={styles.loginText}>
+              {user ? 'Profile' : 'Log In'}
+            </Text>
           </Pressable>
         </View>
       </View>

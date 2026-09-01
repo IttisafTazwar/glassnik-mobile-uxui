@@ -19,12 +19,13 @@ import * as ImagePicker from 'expo-image-picker';
 import * as LegacyFS from 'expo-file-system/legacy';
 import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { useNavigation, useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
 import { mobileApi, userApi, videoApi } from '@/lib/api';
 import { useUploadGuard } from '@/context/UploadGuardContext';
+import { TopNav } from '@/components/TopNav';
+import { Sidebar } from '@/components/Sidebar';
 
 // ─── Notification handler (must be set before any schedule call) ──────────────
 
@@ -35,28 +36,28 @@ import { useUploadGuard } from '@/context/UploadGuardContext';
 
 // ─── Category list (matches Explore) ───────────────────────────────────────────
 const UPLOAD_CATEGORIES = [
-  'City Walks',
-  'Local Life',
-  'Food & Markets',
-  'Nature & Scenery',
-  'Beaches & Coastlines',
-  'Architecture & Landmarks',
-  'Attractions',
-  'Hidden Gems',
-  'Peaceful Places',
-  'Cafes',
-  'Shopping',
-  'Museums & Galleries',
-  'Parks & Gardens',
-  'Trails & Hiking',
-  'Adventure',
-  'Rides & Transport',
-  'Scenic Drives',
-  'Sports',
-  'Events & Festivals',
-  'Music & Performance',
-  'Sacred Places',
-  'After Dark',
+  { id: 1, name: 'Attractions' },
+  { id: 2, name: 'City Walks' },
+  { id: 3, name: 'Local Life' },
+  { id: 4, name: 'Hidden Gems' },
+  { id: 5, name: 'Peaceful Places' },
+  { id: 6, name: 'Food & Markets' },
+  { id: 7, name: 'Cafes' },
+  { id: 8, name: 'Shopping' },
+  { id: 9, name: 'Architecture & Landmarks' },
+  { id: 10, name: 'Museums & Galleries' },
+  { id: 11, name: 'Parks & Gardens' },
+  { id: 12, name: 'Beaches & Coastlines' },
+  { id: 13, name: 'Nature & Scenery' },
+  { id: 14, name: 'Trails & Hiking' },
+  { id: 15, name: 'Adventure' },
+  { id: 16, name: 'Rides & Transport' },
+  { id: 17, name: 'Scenic Drives' },
+  { id: 18, name: 'Sports' },
+  { id: 19, name: 'Events & Festivals' },
+  { id: 20, name: 'Music & Performance' },
+  { id: 21, name: 'Sacred Places' },
+  { id: 22, name: 'After Dark' },
 ];
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -69,14 +70,15 @@ export default function UploadScreen() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const router = useRouter();
+  const isMobile = Platform.OS !== 'web';
 
   const [pickedUri, setPickedUri] = useState<string | null>(null);
   const [pickedName, setPickedName] = useState<string>('');
   const [pickedSize, setPickedSize] = useState<number>(0);
   const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
   const [category, setCategory] = useState<string | null>(null);
+  const [categoryOpen, setCategoryOpen] = useState(false);
   const [confirmedGuidelines, setConfirmedGuidelines] = useState(false);
   const [phase, setPhase] = useState<UploadPhase>('idle');
   const [uploadProgress, setUploadProgress] = useState(0); // 0–1
@@ -129,7 +131,7 @@ export default function UploadScreen() {
     (c: any) => c.capability?.name === 'mobile.creator' && c.status === 'ACTIVE',
   );
 
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  const topPad = Platform.OS === 'web' ? 0 : insets.top;
   const isUploading = phase === 'uploading' || phase === 'processing';
 
 
@@ -278,7 +280,6 @@ export default function UploadScreen() {
         setPickedName('');
         setPickedSize(0);
         setTitle('');
-        setDescription('');
         setLocation('');
         setCategory(null);
         setConfirmedGuidelines(false);
@@ -324,13 +325,15 @@ export default function UploadScreen() {
     fileUri: string;
     fileSize: number;
     title: string;
-    description: string;
+    locationName?: string;
+    categoryId?: number;
   }) {
     const {
       fileUri,
       fileSize,
       title: uploadTitle,
-      description: uploadDesc,
+      locationName,
+      categoryId,
     } = opts;
 
     clearPollTimer();
@@ -339,14 +342,14 @@ export default function UploadScreen() {
     setStatusMsg('');
 
     try {
-      // Create the backend video record and obtain a fresh GCS signed URL.
-      // NOTE: mobileApi.requestUpload currently only accepts title/size/description.
-      // location/category are captured in UI state above but not yet sent to the
-      // backend — that requires a backend-side change outside this session's scope.
+      // Create the backend video record and obtain a fresh GCS signed URL,
+      // including the Experience metadata selected on the upload form.
       const slot = await mobileApi.requestUpload(
         uploadTitle.trim(),
         fileSize,
-        uploadDesc.trim() || undefined,
+        undefined,
+        locationName?.trim() || undefined,
+        categoryId,
       );
 
       const uploadUrl = slot.uploadUrl;
@@ -442,13 +445,12 @@ Haptics.notificationAsync(
 );
 
 setPhase('done');
-setStatusMsg('Video uploaded successfully!');
+setStatusMsg('Video submitted successfully!');
 
 setPickedUri(null);
 setPickedName('');
 setPickedSize(0);
 setTitle('');
-setDescription('');
 setLocation('');
 setCategory(null);
 setConfirmedGuidelines(false);
@@ -490,12 +492,29 @@ setConfirmedGuidelines(false);
   }
 
   async function handleUpload() {
+    console.log('UPLOAD BUTTON CLICKED', {
+      pickedUri: !!pickedUri,
+      pickedSize,
+      title: title.trim(),
+      category,
+      confirmedGuidelines,
+      platform: Platform.OS,
+    });
+
     if (!pickedUri) {
       Alert.alert('No video selected', 'Please pick a video first.');
       return;
     }
     if (!title.trim()) {
-      Alert.alert('Title required', 'Please add a title before uploading.');
+      Alert.alert(
+        'Place / Tour / Transport required',
+        'Please enter the Place, Tour or Transport experience.'
+      );
+      return;
+    }
+
+    if (!location.trim()) {
+      Alert.alert('Location required', 'Please add the location before submitting.');
       return;
     }
     if (!category) {
@@ -517,7 +536,29 @@ setConfirmedGuidelines(false);
       return;
     }
 
-    await runUpload({ fileUri: pickedUri, fileSize, title, description });
+    const selectedCategory = UPLOAD_CATEGORIES.find(
+      (cat) => cat.name === category,
+    );
+
+    if (!selectedCategory) {
+      Alert.alert('Category error', 'Could not resolve the selected category.');
+      return;
+    }
+
+    console.log('UPLOAD VALIDATION PASSED - STARTING RUNUPLOAD', {
+      fileSize,
+      category,
+      categoryId: selectedCategory.id,
+      location,
+    });
+
+    await runUpload({
+      fileUri: pickedUri,
+      fileSize,
+      title,
+      locationName: location,
+      categoryId: selectedCategory.id,
+    });
   }
 
 
@@ -588,11 +629,21 @@ setConfirmedGuidelines(false);
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
-        <Text style={[styles.headerTitle, { color: colors.foreground }]}>Upload</Text>
-      </View>
+      {!isMobile && (
+        <View style={{ paddingTop: topPad }}>
+          <TopNav />
+        </View>
+      )}
 
-      <ScrollView
+      <View style={{ flex: 1, flexDirection: 'row', paddingTop: isMobile ? topPad : 0 }}>
+        {!isMobile && <Sidebar />}
+
+        <View style={{ flex: 1 }}>
+          <View style={[styles.header, { paddingTop: isMobile ? 12 : 12, borderBottomColor: colors.border }]}>
+            <Text style={[styles.headerTitle, { color: colors.foreground }]}>Upload</Text>
+          </View>
+
+          <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -706,19 +757,40 @@ setConfirmedGuidelines(false);
           disabled={isUploading}
         >
           {pickedUri ? (
-            <View style={styles.pickedPreview}>
-              <Image source={{ uri: pickedUri }} style={styles.previewImg} contentFit="cover" />
-              <View style={[styles.pickedBadge, { backgroundColor: colors.primary }]}>
-                <Feather name="check" size={14} color="#fff" />
-              </View>
-              {!isUploading && (
-                <Pressable
-                  onPress={pickVideo}
-                  style={[styles.changeBtn, { backgroundColor: 'rgba(0,0,0,0.55)' }]}
+            <View
+              style={{
+                width: '100%',
+                paddingHorizontal: 16,
+                paddingVertical: 14,
+                gap: 6,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Feather name="check-circle" size={18} color={colors.primary} />
+                <Text
+                  style={{
+                    flex: 1,
+                    color: colors.foreground,
+                    fontFamily: 'Inter_600SemiBold',
+                    fontSize: 14,
+                  }}
+                  numberOfLines={1}
                 >
-                  <Feather name="refresh-cw" size={13} color="#fff" />
-                  <Text style={styles.changeBtnText}>Change</Text>
-                </Pressable>
+                  Video selected — {pickedName}
+                </Text>
+              </View>
+
+              {!isUploading && (
+                <Text
+                  style={{
+                    color: colors.primary,
+                    fontFamily: 'Inter_600SemiBold',
+                    fontSize: 13,
+                    marginLeft: 26,
+                  }}
+                >
+                  Change video
+                </Text>
               )}
             </View>
           ) : (
@@ -730,7 +802,7 @@ setConfirmedGuidelines(false);
                 Tap to select a video
               </Text>
               <Text style={[styles.pickerHint, { color: colors.mutedForeground }]}>
-                MP4, MOV · from your photo library
+                MP4 or MOV
               </Text>
             </View>
           )}
@@ -739,100 +811,169 @@ setConfirmedGuidelines(false);
         {pickedUri && !isUploading && phase !== 'done' && (
           <View style={styles.fields}>
             <View>
-              <View style={styles.labelRow}>
-                <Text style={[styles.fieldLabel, { color: colors.mutedForeground, marginBottom: 0 }]}>
-                  Title <Text style={{ color: colors.primary }}>*</Text>
-                </Text>
-                <Pressable
-                  hitSlop={8}
-                  onPress={() =>
-                    Alert.alert('Title', 'Example: "Sunset walk through Shibuya"')
-                  }
-                >
-                  <Feather name="info" size={13} color={colors.mutedForeground} />
-                </Pressable>
-              </View>
-              <View style={[styles.inputWrap, { backgroundColor: colors.input, borderColor: colors.border }]}>
+              <Text
+                style={[
+                  styles.fieldLabel,
+                  {
+                    color: colors.foreground,
+                    fontFamily: 'Inter_600SemiBold',
+                  },
+                ]}
+              >
+                Place / Tour / Transport / Walk <Text style={{ color: colors.primary }}>*</Text>
+              </Text>
+
+              <View
+                style={[
+                  styles.inputWrap,
+                  {
+                    backgroundColor: colors.input,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
                 <TextInput
                   style={[styles.input, { color: colors.foreground }]}
-                  placeholder="Give your video a title…"
+                  placeholder="Enter Place / Tour / Transport"
                   placeholderTextColor={colors.mutedForeground}
                   value={title}
                   onChangeText={setTitle}
                 />
               </View>
-            </View>
 
-            <View>
-              <View style={styles.labelRow}>
-                <Text style={[styles.fieldLabel, { color: colors.mutedForeground, marginBottom: 0 }]}>Description</Text>
-                <Pressable
-                  hitSlop={8}
-                  onPress={() =>
-                    Alert.alert('Description', 'One or two sentences describing what viewers will experience in the video.')
-                  }
-                >
-                  <Feather name="info" size={13} color={colors.mutedForeground} />
-                </Pressable>
-              </View>
-              <View
-                style={[
-                  styles.inputWrap,
-                  styles.textareaWrap,
-                  { backgroundColor: colors.input, borderColor: colors.border },
-                ]}
+              <Text
+                style={{
+                  marginTop: 6,
+                  color: colors.mutedForeground,
+                  fontSize: 12,
+                  fontFamily: 'Inter_400Regular',
+                  lineHeight: 18,
+                }}
               >
-                <TextInput
-                  style={[styles.input, styles.textarea, { color: colors.foreground }]}
-                  placeholder="Describe what's in this video…"
-                  placeholderTextColor={colors.mutedForeground}
-                  value={description}
-                  onChangeText={setDescription}
-                  multiline
-                  numberOfLines={3}
-                />
-              </View>
+                e.g. Rundle Mall, Kuala Lumpur City Bus Tour, Train from London to Manchester, Bangkok Streets
+              </Text>
             </View>
 
             <View>
               <Text style={[styles.fieldLabel, { color: colors.foreground, fontFamily: 'Inter_600SemiBold' }]}>
-                Location
+                Location <Text style={{ color: colors.primary }}>*</Text>
               </Text>
-              <View style={[styles.inputWrap, { backgroundColor: colors.input, borderColor: colors.primary, borderWidth: 1.5 }]}>
+              <View
+                style={[
+                  styles.inputWrap,
+                  {
+                    backgroundColor: colors.input,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
                 <TextInput
                   style={[styles.input, { color: colors.foreground }]}
-                  placeholder="Where was this filmed?"
+                  placeholder="City / State / Region, Country"
                   placeholderTextColor={colors.mutedForeground}
                   value={location}
                   onChangeText={setLocation}
                 />
               </View>
+              <Text
+                style={{
+                  marginTop: 6,
+                  color: colors.mutedForeground,
+                  fontSize: 12,
+                  fontFamily: 'Inter_400Regular',
+                }}
+              >
+                City / State / Region, Country
+              </Text>
             </View>
 
             <View>
-              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>
+              <Text
+                style={[
+                  styles.fieldLabel,
+                  {
+                    color: colors.foreground,
+                    fontFamily: 'Inter_600SemiBold',
+                  },
+                ]}
+              >
                 Category <Text style={{ color: colors.primary }}>*</Text>
               </Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
-                {UPLOAD_CATEGORIES.map((cat) => {
-                  const isActive = category === cat;
-                  return (
+
+              <Pressable
+                onPress={() => setCategoryOpen((open) => !open)}
+                style={[
+                  styles.inputWrap,
+                  {
+                    backgroundColor: colors.input,
+                    borderColor: colors.border,
+                    minHeight: 48,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingHorizontal: 14,
+                  },
+                ]}
+              >
+                <Text
+                  style={{
+                    color: category ? colors.foreground : colors.mutedForeground,
+                    fontFamily: 'Inter_400Regular',
+                    fontSize: 14,
+                  }}
+                >
+                  {category || 'Select a category'}
+                </Text>
+
+                <Feather
+                  name={categoryOpen ? 'chevron-up' : 'chevron-down'}
+                  size={18}
+                  color={colors.mutedForeground}
+                />
+              </Pressable>
+
+              {categoryOpen && (
+                <View
+                  style={{
+                    marginTop: 6,
+                    borderWidth: StyleSheet.hairlineWidth,
+                    borderColor: colors.border,
+                    borderRadius: 10,
+                    backgroundColor: colors.card,
+                    overflow: 'hidden',
+                  }}
+                >
+                  {UPLOAD_CATEGORIES.map((cat) => (
                     <Pressable
-                      key={cat}
-                      onPress={() => setCategory(cat)}
-                      style={[
-                        styles.categoryPill,
-                        { borderColor: colors.border, backgroundColor: colors.input },
-                        isActive && { backgroundColor: colors.primary, borderColor: colors.primary },
-                      ]}
+                      key={cat.id}
+                      onPress={() => {
+                        setCategory(cat.name);
+                        setCategoryOpen(false);
+                      }}
+                      style={({ pressed }) => ({
+                        paddingHorizontal: 14,
+                        paddingVertical: 11,
+                        borderBottomWidth: StyleSheet.hairlineWidth,
+                        borderBottomColor: colors.border,
+                        backgroundColor: pressed ? colors.muted : colors.card,
+                      })}
                     >
-                      <Text style={[styles.categoryPillText, { color: isActive ? '#fff' : colors.mutedForeground }]}>
-                        {cat}
+                      <Text
+                        style={{
+                          color: colors.foreground,
+                          fontFamily:
+                            category === cat.name
+                              ? 'Inter_600SemiBold'
+                              : 'Inter_400Regular',
+                          fontSize: 14,
+                        }}
+                      >
+                        {cat.name}
                       </Text>
                     </Pressable>
-                  );
-                })}
-              </ScrollView>
+                  ))}
+                </View>
+              )}
             </View>
 
             <Pressable
@@ -861,17 +1002,24 @@ setConfirmedGuidelines(false);
             <View style={styles.progressHeader}>
               <ActivityIndicator size="small" color={colors.primary} />
               <Text style={[styles.progressLabel, { color: colors.foreground }]}>
-                Uploading… {Math.round(uploadProgress * 100)}%
+                {Platform.OS === 'web'
+                  ? 'Uploading video…'
+                  : `Uploading… ${Math.round(uploadProgress * 100)}%`}
               </Text>
             </View>
-            <View style={[styles.progressTrack, { backgroundColor: colors.muted }]}>
-              <View
-                style={[
-                  styles.progressFill,
-                  { backgroundColor: colors.primary, width: `${Math.round(uploadProgress * 100)}%` },
-                ]}
-              />
-            </View>
+            {Platform.OS !== 'web' && (
+              <View style={[styles.progressTrack, { backgroundColor: colors.muted }]}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      backgroundColor: colors.primary,
+                      width: `${Math.round(uploadProgress * 100)}%`,
+                    },
+                  ]}
+                />
+              </View>
+            )}
             <Text style={[styles.progressHint, { color: colors.mutedForeground }]}>
               Keep the app open until the upload finishes.
             </Text>
@@ -920,26 +1068,71 @@ setConfirmedGuidelines(false);
             onPress={handleUpload}
           >
             <Feather name="upload-cloud" size={18} color="#fff" />
-            <Text style={styles.uploadBtnText}>Upload Video</Text>
+            <Text style={styles.uploadBtnText}>Submit for Review</Text>
           </Pressable>
         )}
 
         {phase === 'done' && (
-          <View style={[styles.doneCard, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-            <Feather name="check-circle" size={18} color={colors.primary} />
-            <Text style={[styles.doneText, { color: colors.foreground }]}>Video uploaded successfully!</Text>
+          <View
+            style={[
+              styles.doneCard,
+              {
+                backgroundColor: colors.secondary,
+                borderColor: colors.border,
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+                gap: 10,
+              },
+            ]}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Feather name="check-circle" size={18} color={colors.primary} />
+              <Text style={[styles.doneText, { color: colors.foreground }]}>
+                Video submitted successfully!
+              </Text>
+            </View>
+
+            <Text
+              style={{
+                color: colors.mutedForeground,
+                fontFamily: 'Inter_400Regular',
+                fontSize: 13,
+                lineHeight: 19,
+              }}
+            >
+              Your Experience has been sent for review. You'll be notified when it's published.
+            </Text>
+
+            <Pressable
+              onPress={() => {
+                setPhase('idle');
+                setUploadProgress(0);
+                setStatusMsg('');
+              }}
+              style={[
+                styles.uploadBtn,
+                {
+                  backgroundColor: colors.primary,
+                  alignSelf: 'stretch',
+                  marginTop: 4,
+                },
+              ]}
+            >
+              <Feather name="plus" size={18} color="#fff" />
+              <Text style={styles.uploadBtnText}>Upload another video</Text>
+            </Pressable>
           </View>
         )}
 
         <View style={[styles.note, { backgroundColor: colors.muted, borderColor: colors.border }]}>
           <Feather name="info" size={14} color={colors.mutedForeground} />
           <Text style={[styles.noteText, { color: colors.mutedForeground }]}>
-            Videos are uploaded to Google Cloud Storage and then shared to the Glassnik mobile feed. Only
-            accounts with the{' '}
-            <Text style={{ fontFamily: 'Inter_600SemiBold' }}>mobile.creator</Text> capability can upload.
+            Upload a smart-glasses Eye-POV video to create a new Glassnik Experience.
           </Text>
         </View>
-      </ScrollView>
+          </ScrollView>
+        </View>
+      </View>
     </View>
   );
 }
@@ -958,12 +1151,18 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 2,
     borderStyle: 'dashed',
-    minHeight: 200,
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  pickerContent: { alignItems: 'center', gap: 12, padding: 32 },
+  pickerContent: {
+    minHeight: 200,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    padding: 32,
+  },
   pickerIcon: { width: 60, height: 60, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   pickerLabel: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   pickerHint: { fontSize: 13, fontFamily: 'Inter_400Regular' },

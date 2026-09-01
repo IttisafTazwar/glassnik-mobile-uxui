@@ -17,6 +17,8 @@ import { router } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { notificationsApi } from '@/lib/api';
 import type { Notification } from '@/types';
+import { TopNav } from '@/components/TopNav';
+import { Sidebar } from '@/components/Sidebar';
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -51,6 +53,7 @@ function Avatar({ name, size = 40 }: { name: string; size?: number }) {
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const isMobile = Platform.OS !== 'web';
   const queryClient = useQueryClient();
   const [markingAll, setMarkingAll] = useState(false);
 
@@ -134,7 +137,7 @@ export default function NotificationsScreen() {
     );
   }, [markOneMutation]);
 
-  const topPad = Platform.OS === 'web' ? 8 : insets.top + 8;
+  const topPad = Platform.OS === 'web' ? 0 : insets.top + 8;
 
   if (!user) {
     return (
@@ -147,8 +150,18 @@ export default function NotificationsScreen() {
 
   return (
     <View style={styles.root}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: topPad }]}>
+      {!isMobile && (
+        <View style={{ paddingTop: topPad }}>
+          <TopNav />
+        </View>
+      )}
+
+      <View style={{ flex: 1, flexDirection: 'row', paddingTop: isMobile ? topPad : 0 }}>
+        {!isMobile && <Sidebar />}
+
+        <View style={{ flex: 1 }}>
+          {/* Header */}
+          <View style={[styles.header, !isMobile && styles.headerDesktop]}>
         <Text style={styles.headerTitle}>Notifications</Text>
         {unreadCount > 0 && (
           <Pressable
@@ -197,7 +210,9 @@ export default function NotificationsScreen() {
           }
           ItemSeparatorComponent={() => <View style={styles.separator} />}
         />
-      )}
+          )}
+        </View>
+      </View>
     </View>
   );
 }
@@ -210,10 +225,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingBottom: 14,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 16,
     borderBottomWidth: 0.5,
     borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  headerDesktop: {
+    paddingTop: 14,
+    paddingBottom: 16,
   },
   headerTitle: { color: '#fff', fontSize: 22, fontFamily: 'Inter_700Bold' },
   markAllBtn: { paddingHorizontal: 12, paddingVertical: 6 },

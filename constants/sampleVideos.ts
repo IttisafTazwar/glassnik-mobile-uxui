@@ -24,6 +24,8 @@ export interface SampleVideo {
   city?: string | null;
   country?: string | null;
   category?: string | null;
+  /** Backend category ID — present for API-sourced videos. */
+  categoryId?: number | null;
 }
 
 export const SAMPLE_VIDEOS: SampleVideo[] = [

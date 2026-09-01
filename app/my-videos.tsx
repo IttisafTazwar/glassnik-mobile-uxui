@@ -23,7 +23,7 @@ import { useAuth } from '@/context/AuthContext';
 import { videoApi } from '@/lib/api';
 import type { VideoItem } from '@/types';
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.glassnik.com';
+const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://glassnik-backend-vub3pcnoma-ts.a.run.app';
 
 // Matches the category list used on Explore and Upload.
 const EDIT_CATEGORIES = [

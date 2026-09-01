@@ -39,6 +39,14 @@ export interface VideoAsset {
   city?: string | null;
   country?: string | null;
   category?: string | null;
+
+  // Production video metadata
+  locationName?: string | null;
+  categories?: Array<{
+    id: number;
+    name: string;
+    slug?: string | null;
+  }>;
 }
 
 export interface VideoItem {

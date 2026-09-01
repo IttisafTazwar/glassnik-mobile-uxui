@@ -1,8 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  ImageBackground,
   Linking,
   Platform,
   Pressable,
@@ -14,10 +13,12 @@ import {
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { Feather } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { mobileApi } from '@/lib/api';
 import { SAMPLE_VIDEOS, type SampleVideo } from '@/constants/sampleVideos';
 import type { VideoAsset } from '@/types';
@@ -50,6 +51,31 @@ const CATEGORIES = [
   'After Dark',
 ];
 
+const CATEGORY_IDS: Record<string, number> = {
+  'Attractions': 1,
+  'City Walks': 2,
+  'Local Life': 3,
+  'Hidden Gems': 4,
+  'Peaceful Places': 5,
+  'Food & Markets': 6,
+  'Cafes': 7,
+  'Shopping': 8,
+  'Architecture & Landmarks': 9,
+  'Museums & Galleries': 10,
+  'Parks & Gardens': 11,
+  'Beaches & Coastlines': 12,
+  'Nature & Scenery': 13,
+  'Trails & Hiking': 14,
+  'Adventure': 15,
+  'Rides & Transport': 16,
+  'Scenic Drives': 17,
+  'Sports': 18,
+  'Events & Festivals': 19,
+  'Music & Performance': 20,
+  'Sacred Places': 21,
+  'After Dark': 22,
+};
+
 const DISCOVERY_TABS = ['Explore', 'Trending', 'Nearby', 'Global'] as const;
 type DiscoveryTab = typeof DISCOVERY_TABS[number];
 
@@ -66,28 +92,63 @@ function apiVideoToSample(v: VideoAsset): SampleVideo {
     music: 'Original Sound',
     likes: 0, comments: 0, shares: 0,
     place: v.place ?? undefined,
-    city: v.city ?? undefined,
+    city: v.city ?? v.locationName ?? undefined,
     country: v.country ?? undefined,
-    category: v.category ?? undefined,
+    category: v.category ?? v.categories?.[0]?.name ?? undefined,
+    categoryId: v.categories?.[0]?.id ?? undefined,
   };
 }
 
 export default function ExploreScreen() {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const [query, setQuery] = useState('');
-  const [activeCategory, setActiveCategory] = useState('All');
-  const [activeDiscoveryTab, setActiveDiscoveryTab] = useState<DiscoveryTab>('Explore');
+  const router = useRouter();
+  const params = useLocalSearchParams<{
+    categoryId?: string;
+    category?: string;
+    location?: string;
+  }>();
 
-  const { data: apiVideos, isLoading } = useQuery<VideoAsset[]>({
-    queryKey: ['explore'],
-    queryFn: () => mobileApi.getFeed(1, 50),
+  const routeCategoryId = params.categoryId
+    ? Number(params.categoryId)
+    : undefined;
+
+  const routeCategory =
+    typeof params.category === 'string' && params.category
+      ? params.category
+      : 'All';
+
+  const routeLocation =
+    typeof params.location === 'string' && params.location
+      ? params.location
+      : '';
+
+  const isMobile = width < 768;
+  const [query, setQuery] = useState(routeLocation);
+  const [activeCategory, setActiveCategory] = useState(routeCategory);
+  const [activeDiscoveryTab, setActiveDiscoveryTab] = useState<DiscoveryTab>('Explore');
+  const [activePreviewId, setActivePreviewId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setActiveCategory(routeCategory);
+  }, [routeCategory]);
+
+  useEffect(() => {
+    setQuery(routeLocation);
+  }, [routeLocation]);
+
+  const { data: exploreResponse, isLoading } = useQuery({
+    queryKey: ['explore', routeCategoryId],
+    queryFn: () => mobileApi.getExplore(1, 50, routeCategoryId),
     retry: false,
   });
 
+  const apiVideos: VideoAsset[] = exploreResponse?.items ?? [];
+
   const allVideos = useMemo(() => {
-    const api = (apiVideos ?? []).filter((v) => !!v.publicUrl).map(apiVideoToSample);
-    return [...SAMPLE_VIDEOS, ...api];
+    return (apiVideos ?? [])
+      .filter((v) => !!v.publicUrl)
+      .map(apiVideoToSample);
   }, [apiVideos]);
 
   const trendingDestinations = useMemo(() => {
@@ -125,12 +186,32 @@ export default function ExploreScreen() {
     );
   }, [allVideos, query, activeCategory]);
 
-  const contentWidth = width - SIDEBAR_WIDTH;
+  // Desktop web: autoplay the newest/first visible Explore video.
+  // Mobile preview behaviour remains unchanged.
+  useEffect(() => {
+    if (Platform.OS === 'web' && !isMobile && filtered.length > 0) {
+      setActivePreviewId(filtered[0].id);
+    }
+  }, [filtered, isMobile]);
 
-  const COLS = 4;
+  const contentWidth = isMobile ? width : width - SIDEBAR_WIDTH;
+
+  const COLS = isMobile ? 2 : 3;
   const CELL_GAP = 6;
-  const GRID_PADDING = 14;
-  const cellWidth = (contentWidth - GRID_PADDING * 2 - CELL_GAP * (COLS - 1)) / COLS;
+
+  // Desktop: keep the Experience grid more compact on laptop/desktop screens.
+  // Mobile sizing remains unchanged.
+  const DESKTOP_GRID_MAX_WIDTH = 980;
+  const gridWidth = isMobile
+    ? contentWidth
+    : Math.min(contentWidth, DESKTOP_GRID_MAX_WIDTH);
+
+  const GRID_PADDING = isMobile
+    ? 8
+    : Math.max(14, (contentWidth - gridWidth) / 2);
+
+  const cellWidth =
+    (contentWidth - GRID_PADDING * 2 - CELL_GAP * (COLS - 1)) / COLS;
   const cellHeight = cellWidth * (16 / 9);
 
   const topPad = Platform.OS === 'web' ? 0 : insets.top;
@@ -154,7 +235,15 @@ export default function ExploreScreen() {
                 <Text style={styles.sectionTitle}>Trending Destinations</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tagsRow}>
                   {trendingDestinations.map((d) => (
-                    <Pressable key={d.label} style={styles.trendChip} onPress={() => setQuery(d.label)}>
+                    <Pressable
+                      key={d.label}
+                      style={styles.trendChip}
+                      onPress={() =>
+                        router.replace(
+                          `/explore?location=${encodeURIComponent(d.label)}`
+                        )
+                      }
+                    >
                       <Feather name="map-pin" size={12} color="#FE2C55" />
                       <Text style={styles.trendChipTag}>{d.label}</Text>
                       <Text style={styles.trendChipCount}>
@@ -175,7 +264,14 @@ export default function ExploreScreen() {
       columnWrapperStyle={styles.columnWrapper}
       contentContainerStyle={{ paddingHorizontal: GRID_PADDING }}
       renderItem={({ item }) => (
-        <VideoGridCell video={item} width={cellWidth} height={cellHeight} />
+        <VideoGridCell
+          video={item}
+          width={cellWidth}
+          height={cellHeight}
+          isActive={activePreviewId === item.id}
+          onActivate={() => setActivePreviewId(item.id)}
+          onDeactivate={() => setActivePreviewId(null)}
+        />
       )}
       ListEmptyComponent={
         isLoading ? (
@@ -194,12 +290,14 @@ export default function ExploreScreen() {
 
   return (
     <View style={styles.screenRoot}>
-      <View style={{ paddingTop: topPad }}>
-        <TopNav />
-      </View>
+      {!isMobile && (
+        <View style={{ paddingTop: topPad }}>
+          <TopNav />
+        </View>
+      )}
 
-      <View style={{ flex: 1, flexDirection: 'row' }}>
-        <Sidebar />
+      <View style={{ flex: 1, flexDirection: 'row', paddingTop: isMobile ? topPad : 0 }}>
+        {!isMobile && <Sidebar />}
 
         <ScrollView
           style={{ flex: 1 }}
@@ -207,20 +305,36 @@ export default function ExploreScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Banner — heading near top, search bar at the bottom of the banner */}
-          <ImageBackground
-            source={require('@/assets/images/explore-banner.png')}
-            style={styles.banner}
-            imageStyle={{ opacity: 0.75 }}
-            resizeMode="contain"
+          <View
+            style={[
+              styles.banner,
+              isMobile && {
+                paddingHorizontal: 16,
+                paddingTop: 22,
+                paddingBottom: 20,
+              },
+            ]}
           >
+            <Image
+              source={require('@/assets/images/home-banner.png')}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              contentPosition="right"
+            />
             <LinearGradient
               colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.75)']}
               style={StyleSheet.absoluteFill}
             />
 
-            <View style={styles.bannerContent}>
+            <View style={[
+              styles.bannerContent,
+              isMobile && { maxWidth: '100%' },
+            ]}>
               <View style={styles.hero}>
-                <Text style={styles.heroTitle}>
+                <Text style={[
+                  styles.heroTitle,
+                  isMobile && { fontSize: 28, lineHeight: 34 },
+                ]}>
                   Don't scroll through the world.{'\n'}
                   <Text style={styles.heroTitleAccent}>Experience</Text> it.
                 </Text>
@@ -230,8 +344,18 @@ export default function ExploreScreen() {
               </View>
             </View>
 
-            <View style={styles.bannerSearchRow}>
-              <View style={styles.searchWrap}>
+            <View style={[
+              styles.bannerSearchRow,
+              isMobile && {
+                alignItems: 'stretch',
+                paddingRight: 0,
+                marginTop: 18,
+              },
+            ]}>
+              <View style={[
+                styles.searchWrap,
+                isMobile && { width: '100%' },
+              ]}>
                 <Feather name="search" size={16} color="rgba(255,255,255,0.5)" />
                 <TextInput
                   style={styles.searchInput}
@@ -251,7 +375,7 @@ export default function ExploreScreen() {
                 )}
               </View>
             </View>
-          </ImageBackground>
+          </View>
 
           {/* Discovery tabs + categories — sit in the black area below the banner */}
           <View style={styles.header}>
@@ -266,7 +390,20 @@ export default function ExploreScreen() {
                 return (
                   <Pressable
                     key={cat}
-                    onPress={() => setActiveCategory(cat)}
+                    onPress={() => {
+                      if (cat === 'All') {
+                        router.replace('/explore');
+                        return;
+                      }
+
+                      const categoryId = CATEGORY_IDS[cat];
+
+                      if (categoryId) {
+                        router.replace(
+                          `/explore?categoryId=${categoryId}&category=${encodeURIComponent(cat)}`
+                        );
+                      }
+                    }}
                     style={[styles.categoryPill, isActive && styles.categoryPillActive]}
                   >
                     <Text style={[styles.categoryPillText, isActive && styles.categoryPillTextActive]}>
@@ -392,39 +529,139 @@ function DiscoveryTabs({
   );
 }
 
+function ExploreVideoPreview({
+  uri,
+  isActive,
+}: {
+  uri: string;
+  isActive: boolean;
+}) {
+  const player = useVideoPlayer(uri, (p) => {
+    p.loop = true;
+  });
+
+  useEffect(() => {
+    try {
+      player.muted = true;
+
+      if (isActive) {
+        player.play();
+      } else {
+        player.pause();
+      }
+    } catch {}
+
+    return () => {
+      try {
+        player.pause();
+      } catch {}
+    };
+  }, [player, isActive]);
+
+  return (
+    <VideoView
+      player={player}
+      style={StyleSheet.absoluteFill}
+      contentFit="contain"
+      nativeControls={false}
+    />
+  );
+}
+
 function VideoGridCell({
   video,
   width,
   height,
+  isActive,
+  onActivate,
+  onDeactivate,
 }: {
   video: SampleVideo;
   width: number;
   height: number;
+  isActive: boolean;
+  onActivate: () => void;
+  onDeactivate: () => void;
 }) {
-  const locationLabel = [video.place, video.city, video.country].filter(Boolean).join(', ');
+  const { width: viewportWidth } = useWindowDimensions();
+  const isCompactMobile = viewportWidth < 768;
+
+  const locationLabel = [video.place, video.city, video.country]
+    .filter(Boolean)
+    .join(', ');
 
   return (
     <View style={{ width, marginBottom: 14 }}>
       <Pressable
+        onHoverIn={() => {
+          if (!isCompactMobile) onActivate();
+        }}
+        onHoverOut={() => {
+          if (!isCompactMobile) onDeactivate();
+        }}
+        onPress={() => {
+          if (isCompactMobile) {
+            if (isActive) {
+              onDeactivate();
+            } else {
+              onActivate();
+            }
+          }
+        }}
         style={({ pressed }) => [
           styles.cell,
           { width, height, opacity: pressed ? 0.9 : 1 },
         ]}
       >
-        {video.thumbnailUrl ? (
+        {video.thumbnailUrl && !isActive ? (
           <Image
             source={{ uri: video.thumbnailUrl }}
             style={StyleSheet.absoluteFill}
             contentFit="cover"
             transition={200}
           />
+        ) : video.uri ? (
+          <ExploreVideoPreview
+            uri={video.uri}
+            isActive={isActive}
+          />
         ) : (
           <>
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: video.creator.color, opacity: 0.25 }]} />
+            <View
+              style={[
+                StyleSheet.absoluteFill,
+                {
+                  backgroundColor: video.creator.color || '#111',
+                  opacity: 0.18,
+                },
+              ]}
+            />
+
             <View style={styles.cellThumb}>
-              <Text style={[styles.cellInitial, { color: video.creator.color }]}>
+              <Text
+                style={[
+                  styles.cellInitial,
+                  { color: video.creator.color || '#fff' },
+                ]}
+              >
                 {video.creator.initial}
               </Text>
+
+              {video.uri ? (
+                <View
+                  style={{
+                    marginTop: 12,
+                    width: 38,
+                    height: 38,
+                    borderRadius: 19,
+                    backgroundColor: 'rgba(0,0,0,0.55)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Feather name="play" size={18} color="#fff" />
+                </View>
+              ) : null}
             </View>
           </>
         )}
@@ -432,7 +669,10 @@ function VideoGridCell({
         <View style={styles.cellScrim} />
 
         <View style={styles.cellTopRow}>
-          <Text style={styles.cellUsername} numberOfLines={1}>@{video.creator.username}</Text>
+          <Text style={styles.cellUsername} numberOfLines={1}>
+            @{video.creator.username}
+          </Text>
+
           <View style={styles.cellMiniTabs}>
             <Text style={styles.cellMiniTabActive}>For You</Text>
             <Text style={styles.cellMiniTab}>Following</Text>
@@ -441,13 +681,19 @@ function VideoGridCell({
 
         <View style={styles.cellTag}>
           <Text style={styles.cellTagText} numberOfLines={1}>
-            {video.category ? video.category.toUpperCase() : `#${video.hashtags[0]}`}
+            {video.category
+              ? video.category.toUpperCase()
+              : `#${video.hashtags[0]}`}
           </Text>
         </View>
 
         {locationLabel ? (
           <View style={styles.cellLocation}>
-            <Feather name="map-pin" size={8} color="rgba(255,255,255,0.85)" />
+            <Feather
+              name="map-pin"
+              size={8}
+              color="rgba(255,255,255,0.85)"
+            />
             <Text style={styles.cellLocationText} numberOfLines={1}>
               {locationLabel}
             </Text>
@@ -456,10 +702,26 @@ function VideoGridCell({
       </Pressable>
 
       <View style={styles.cellActions}>
-        <Feather name="heart" size={13} color="rgba(255,255,255,0.7)" />
-        <Feather name="message-circle" size={13} color="rgba(255,255,255,0.7)" />
-        <Feather name="send" size={12} color="rgba(255,255,255,0.7)" />
-        <Feather name="flag" size={12} color="rgba(255,255,255,0.7)" />
+        <Feather
+          name="heart"
+          size={13}
+          color="rgba(255,255,255,0.7)"
+        />
+        <Feather
+          name="message-circle"
+          size={13}
+          color="rgba(255,255,255,0.7)"
+        />
+        <Feather
+          name="send"
+          size={12}
+          color="rgba(255,255,255,0.7)"
+        />
+        <Feather
+          name="flag"
+          size={12}
+          color="rgba(255,255,255,0.7)"
+        />
       </View>
     </View>
   );
@@ -470,18 +732,20 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000' },
 
   banner: {
+    height: 220,
     paddingHorizontal: 20,
-    paddingTop: 28,
-    paddingBottom: 28,
+    paddingTop: 20,
+    paddingBottom: 16,
     backgroundColor: '#0a0f14',
     overflow: 'hidden',
+    justifyContent: 'space-between',
   },
-  bannerContent: { gap: 10, maxWidth: '60%' },
-  bannerSearchRow: { marginTop: 24, alignItems: 'flex-end', paddingRight: '5%' },
-  hero: { gap: 10 },
-  heroTitle: { color: '#fff', fontSize: 44, fontFamily: 'Inter_700Bold', lineHeight: 50 },
+  bannerContent: { gap: 6, maxWidth: '60%' },
+  bannerSearchRow: { alignItems: 'flex-end', paddingRight: '5%' },
+  hero: { gap: 6 },
+  heroTitle: { color: '#fff', fontSize: 30, fontFamily: 'Inter_700Bold', lineHeight: 34 },
   heroTitleAccent: { color: '#5eead4' },
-  heroSubtitle: { color: 'rgba(255,255,255,0.75)', fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 20 },
+  heroSubtitle: { color: 'rgba(255,255,255,0.75)', fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 16 },
 
   header: {
     backgroundColor: '#000',

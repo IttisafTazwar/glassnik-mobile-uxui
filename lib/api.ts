@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE_URL = 'http://localhost:3000';
+const BASE_URL =
+  process.env.EXPO_PUBLIC_API_URL ?? 'https://glassnik-backend-vub3pcnoma-ts.a.run.app';
 
 async function getToken(): Promise<string | null> {
   return AsyncStorage.getItem('accessToken');
@@ -90,24 +91,45 @@ export const mobileApi = {
   getFeed: (page = 1, limit = 20) =>
     request<any[]>(`/mobile/feed?page=${page}&limit=${limit}`),
 
+  getExplore: (page = 1, limit = 50, categoryId?: number, city?: string) => {
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
+    });
+
+    if (categoryId) params.set('categoryId', String(categoryId));
+    if (city) params.set('city', city);
+
+    return request<{
+      page: number;
+      limit: number;
+      total: number;
+      items: any[];
+    }>(`/mobile/explore?${params.toString()}`);
+  },
+
  /** Request a Google Cloud Storage signed upload URL from the backend. */
   requestUpload: (
-  title: string,
-  fileSize: number,
-  description?: string,
-) =>
-  request<{ id: number; uploadUrl: string }>(
-    '/videos/request-upload',
-    {
-      method: 'POST',
-      body: JSON.stringify({
-  title,
-  fileSize,
-  description,
-  source: 'MOBILE',
-}),
-    },
-  ),
+    title: string,
+    fileSize: number,
+    description?: string,
+    locationName?: string,
+    categoryId?: number,
+  ) =>
+    request<{ id: number; uploadUrl: string }>(
+      '/videos/request-upload',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          title,
+          fileSize,
+          description,
+          locationName,
+          categoryId,
+          source: 'MOBILE',
+        }),
+      },
+    ),
 
   completeUpload: (videoId: number) =>
   request(`/videos/${videoId}/complete`, {

@@ -37,14 +37,21 @@ export function Sidebar() {
     <View style={styles.wrap}>
       <View style={styles.navGroup}>
         {navItems.map((item) => {
-          const isActive = pathname === item.route || (item.route === '/(tabs)/explore' && pathname === '/explore');
+          const browserRoute =
+            item.route === '/(tabs)/explore' ? '/explore' :
+            item.route === '/(tabs)/upload' ? '/upload' :
+            item.route === '/(tabs)/notifications' ? '/notifications' :
+            item.route === '/(tabs)/profile' ? '/profile' :
+            item.route;
+
+          const isActive = pathname === item.route || pathname === browserRoute;
           return (
             <Pressable
               key={item.label}
               style={[styles.navItem, isActive && styles.navItemActive]}
               onPress={() => router.push(item.route as any)}
             >
-              <Feather name={item.icon} size={16} color={isActive ? '#000' : '#fff'} />
+              <Feather name={item.icon} size={19} color={isActive ? '#000' : '#fff'} />
               <Text style={[styles.navItemText, isActive && styles.navItemTextActive]}>{item.label}</Text>
             </Pressable>
           );
@@ -55,7 +62,7 @@ export function Sidebar() {
         <View style={styles.joinBox}>
           <View style={styles.joinIconRow}>
             <Feather name="star" size={14} color="#5eead4" />
-            <Text style={styles.joinTitle}>Join Glassnik</Text>
+            <Text style={styles.joinTitle}>Become a Glassnik Videographer</Text>
           </View>
           <Text style={styles.joinBody}>
             Start exploring real Eye-POV experiences from around the world.
@@ -83,7 +90,7 @@ export function Sidebar() {
   );
 }
 
-const SIDEBAR_WIDTH = 260;
+const SIDEBAR_WIDTH = 300;
 export { SIDEBAR_WIDTH };
 
 const styles = StyleSheet.create({
@@ -106,7 +113,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   navItemActive: { backgroundColor: '#fff' },
-  navItemText: { color: '#fff', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  navItemText: { color: '#fff', fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   navItemTextActive: { color: '#000' },
 
   joinBox: {

@@ -15,7 +15,9 @@ import { useQuery } from '@tanstack/react-query';
 import { Feather } from '@expo/vector-icons';
 import { FeedVideoItem } from '@/components/FeedVideoItem';
 import { CommentsSheet } from '@/components/CommentsSheet';
-import { SAMPLE_VIDEOS, type SampleVideo } from '@/constants/sampleVideos';
+import { TopNav } from '@/components/TopNav';
+import { Sidebar } from '@/components/Sidebar';
+import { type SampleVideo } from '@/constants/sampleVideos';
 import { mobileApi } from '@/lib/api';
 import { useMute } from '@/context/MuteContext';
 import { useAuth } from '@/context/AuthContext';
@@ -46,15 +48,22 @@ function apiVideoToSample(v: VideoAsset): SampleVideo {
     comments: 0,
     shares: 0,
     place: v.place ?? null,
-    city: v.city ?? null,
+    city: v.city ?? v.locationName ?? null,
     country: v.country ?? null,
-    category: v.category ?? null,
+    category: v.category ?? v.categories?.[0]?.name ?? null,
+    categoryId: v.categories?.[0]?.id ?? null,
   };
 }
 
 export default function FeedScreen() {
-  const { height } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const isMobile = width < 768;
+  const desktopTopNavHeight = 64;
+  const feedItemHeight = isMobile
+    ? height
+    : Math.min(720, Math.max(400, height - desktopTopNavHeight));
+
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<ActiveTab>('foryou');
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -67,14 +76,10 @@ export default function FeedScreen() {
     retry: false,
   });
 
-  // Merge: sample videos first, then any API videos with URLs
-  // Merge: real API videos first, then sample/demo videos
-const allVideos: SampleVideo[] = [
-  ...(apiVideos ?? [])
+  // Production feed: real API videos only
+  const allVideos: SampleVideo[] = (apiVideos ?? [])
     .filter((v) => !!v.publicUrl)
-    .map(apiVideoToSample),
-  ...SAMPLE_VIDEOS,
-];
+    .map(apiVideoToSample);
 
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -87,25 +92,42 @@ const allVideos: SampleVideo[] = [
 
   const renderItem = useCallback(
     ({ item, index }: { item: SampleVideo; index: number }) => (
-      <FeedVideoItem
-        video={item}
-        isActive={index === currentIndex}
-        onCommentPress={(videoId) => setCommentsVideoId(videoId)}
-      />
+      <View
+        style={{
+          height: feedItemHeight,
+          overflow: 'hidden',
+          backgroundColor: '#000',
+        }}
+      >
+        <FeedVideoItem
+          video={item}
+          isActive={index === currentIndex}
+          itemHeight={feedItemHeight}
+          onCommentPress={(videoId) => setCommentsVideoId(videoId)}
+        />
+      </View>
     ),
-    [currentIndex]
+    [currentIndex, feedItemHeight]
   );
 
   const getItemLayout = useCallback(
-    (_: any, index: number) => ({ length: height, offset: height * index, index }),
-    [height]
+    (_: any, index: number) => ({
+      length: feedItemHeight,
+      offset: feedItemHeight * index,
+      index,
+    }),
+    [feedItemHeight]
   );
 
   const topInset = Platform.OS === 'web' ? 0 : insets.top;
 
-  return (
-    <View style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+  const feedContent = (
+    <View style={styles.feedArea}>
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor="transparent"
+        translucent
+      />
 
       {/* ── Video feed ── */}
       <FlatList
@@ -113,7 +135,7 @@ const allVideos: SampleVideo[] = [
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         getItemLayout={getItemLayout}
-        snapToInterval={height}
+        snapToInterval={feedItemHeight}
         snapToAlignment="start"
         decelerationRate="fast"
         pagingEnabled={Platform.OS !== 'web'}
@@ -127,47 +149,96 @@ const allVideos: SampleVideo[] = [
       />
 
       {/* ── Top overlay: For You | Following + icons ── */}
-      <View style={[styles.topBar, { paddingTop: topInset + (Platform.OS === 'web' ? 8 : 12), pointerEvents: 'box-none' }]}>
+      <View
+        style={[
+          styles.topBar,
+          {
+            paddingTop:
+              topInset + (Platform.OS === 'web' ? 8 : 12),
+            pointerEvents: 'box-none',
+          },
+        ]}
+      >
         <View style={[styles.topLeft, { pointerEvents: 'none' }]}>
           {allVideos[currentIndex]?.creator?.username &&
-           allVideos[currentIndex]?.creatorId !== user?.id ? (
+          allVideos[currentIndex]?.creatorId !== user?.id ? (
             <Text style={styles.creatorHandle}>
               @{allVideos[currentIndex].creator.username}
             </Text>
           ) : null}
         </View>
 
-        {/* Tab switcher */}
         <View style={styles.tabSwitcher}>
           <Pressable onPress={() => setActiveTab('foryou')}>
-            <Text style={[styles.tabText, activeTab === 'foryou' && styles.tabTextActive]}>
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === 'foryou' && styles.tabTextActive,
+              ]}
+            >
               For You
             </Text>
             {activeTab === 'foryou' && <View style={styles.tabUnderline} />}
           </Pressable>
+
           <Pressable onPress={() => setActiveTab('following')}>
-            <Text style={[styles.tabText, activeTab === 'following' && styles.tabTextActive]}>
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === 'following' && styles.tabTextActive,
+              ]}
+            >
               Following
             </Text>
             {activeTab === 'following' && <View style={styles.tabUnderline} />}
           </Pressable>
         </View>
 
-        {/* Right icons */}
         <View style={styles.topRight}>
           <Pressable onPress={toggleMute} hitSlop={8}>
-            <Feather name={isMuted ? 'volume-x' : 'volume-2'} size={22} color="#fff" />
+            <Feather
+              name={isMuted ? 'volume-x' : 'volume-2'}
+              size={22}
+              color="#fff"
+            />
           </Pressable>
         </View>
       </View>
 
-      {/* ── Comments Sheet ── */}
       <CommentsSheet
         videoId={commentsVideoId}
         onClose={() => setCommentsVideoId(null)}
       />
     </View>
   );
+
+  if (isMobile) {
+    return <View style={styles.root}>{feedContent}</View>;
+  }
+
+  return (
+    <View style={styles.root}>
+      <TopNav />
+
+      <View style={styles.desktopBody}>
+        <Sidebar />
+
+        <View style={styles.desktopFeedOuter}>
+          <View
+            style={[
+              styles.desktopFeed,
+              {
+                width: Math.min(520, Math.max(380, height * 0.56)),
+              },
+            ]}
+          >
+            {feedContent}
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+
 }
 
 const styles = StyleSheet.create({
@@ -175,6 +246,34 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
   },
+
+  feedArea: {
+    flex: 1,
+    position: 'relative',
+    backgroundColor: '#000',
+    overflow: 'hidden',
+  },
+
+  desktopBody: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: '#000',
+  },
+
+  desktopFeedOuter: {
+    flex: 1,
+    minWidth: 0,
+    backgroundColor: '#000',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+
+  desktopFeed: {
+    flex: 1,
+    backgroundColor: '#000',
+    overflow: 'hidden',
+  },
+
   topBar: {
     position: 'absolute',
     top: 0,

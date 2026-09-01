@@ -16,7 +16,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { MuteProvider } from '@/context/MuteContext';
 
-SplashScreen.preventAutoHideAsync();
+// SplashScreen.preventAutoHideAsync(); // TEMP diagnostic
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,13 +36,11 @@ function AuthGate() {
   useEffect(() => {
     if (isLoading) return;
     const inAuthGroup = segments[0] === 'auth';
-    // TEMP: bypassed for local UI preview only — no backend to authenticate against.
-    // Restore this before sending any changes back to Tenzin/Pratik.
-    // if (!user && !inAuthGroup) {
-    //   router.replace('/auth/login');
-    // } else if (user && inAuthGroup) {
-    //   router.replace('/(tabs)');
-    // }
+    // Guests may browse the main app without signing in.
+    // Once authenticated, leave the auth screens and enter the main tabs.
+    if (user && inAuthGroup) {
+      router.replace('/');
+    }
   }, [user, isLoading, segments]);
 
   return (
@@ -66,13 +64,14 @@ export default function RootLayout() {
     Inter_700Bold,
   });
 
-  useEffect(() => {
-    if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync();
-    }
-  }, [fontsLoaded, fontError]);
+  // TEMP diagnostic: don't block rendering on font loading
+  // useEffect(() => {
+  //   if (fontsLoaded || fontError) {
+  //     SplashScreen.hideAsync();
+  //   }
+  // }, [fontsLoaded, fontError]);
 
-  if (!fontsLoaded && !fontError) return null;
+  // if (!fontsLoaded && !fontError) return null;
 
   return (
     <SafeAreaProvider>

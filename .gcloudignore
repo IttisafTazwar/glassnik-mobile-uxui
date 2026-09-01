@@ -1,0 +1,35 @@
+.gcloudignore
+.git
+.git/**
+node_modules
+node_modules/**
+.expo
+.expo/**
+*.log
+
+# Source code not needed by production container
+app
+app/**
+assets
+assets/**
+components
+components/**
+constants
+constants/**
+context
+context/**
+hooks
+hooks/**
+lib
+lib/**
+scripts
+scripts/**
+types
+types/**
+
+# Production container files
+!Dockerfile
+!server/**
+!package.json
+!dist/**
+!static-build/**
