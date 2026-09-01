@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -15,6 +15,7 @@ import {
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Feather } from '@expo/vector-icons';
 import { mobileApi } from '@/lib/api';
@@ -26,9 +27,6 @@ import { TrendingSection } from '@/components/TrendingSection';
 import { NearbySection } from '@/components/NearbySection';
 import { GlobalSection } from '@/components/GlobalSection';
 
-// Same breakpoint as TopNav.tsx — keep these in sync. Below this width,
-// Sidebar is not rendered at all (per the mobile nav spec: no separate
-// side drawer on mobile, the TopNav hamburger menu covers all nav there).
 const MOBILE_BREAKPOINT = 768;
 
 const CATEGORIES = [
@@ -85,9 +83,21 @@ export default function ExploreScreen() {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const isMobile = width < MOBILE_BREAKPOINT;
+  const params = useLocalSearchParams<{ discovery?: string }>();
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [activeDiscoveryTab, setActiveDiscoveryTab] = useState<DiscoveryTab>('Explore');
+
+  useEffect(() => {
+    const fromParam = params.discovery;
+    if (fromParam && (DISCOVERY_TABS as readonly string[]).includes(fromParam)) {
+      if (fromParam !== activeDiscoveryTab) {
+        setActiveDiscoveryTab(fromParam as DiscoveryTab);
+      }
+    } else if (!fromParam && activeDiscoveryTab !== 'Explore') {
+      setActiveDiscoveryTab('Explore');
+    }
+  }, [params.discovery]);
 
   const { data: apiVideos, isLoading } = useQuery<VideoAsset[]>({
     queryKey: ['explore'],
@@ -97,10 +107,6 @@ export default function ExploreScreen() {
 
   const allVideos = useMemo(() => {
     const api = (apiVideos ?? []).filter((v) => !!v.publicUrl).map(apiVideoToSample);
-    // Newest-first: videos with a real createdAt (all API videos) are sorted
-    // newest → oldest and placed first. Static sample/placeholder videos have
-    // no createdAt at all (nothing to rank them by), so they're kept as a
-    // trailing fallback after all dated videos, in their existing order.
     const sortedApi = [...api].sort((a, b) => {
       const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
       const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
@@ -144,27 +150,28 @@ export default function ExploreScreen() {
     );
   }, [allVideos, query, activeCategory]);
 
-  // contentWidth no longer subtracts SIDEBAR_WIDTH on mobile, since Sidebar
-  // isn't rendered there at all — without this, cells would be calculated
-  // as if 260px of (nonexistent) sidebar was still eating into the width.
   const contentWidth = isMobile ? width : width - SIDEBAR_WIDTH;
 
-  // 4 columns is too cramped on a phone-width screen — dropped to 2 on mobile.
-  const COLS = isMobile ? 2 : 4;
+  // Instagram/TikTok-style portrait cards on both mobile and desktop —
+  // reverted from an earlier landscape attempt. Desktop columns bumped
+  // from 3 to 4 to compensate: portrait cards are much taller per row,
+  // so narrower/more columns is what keeps the "first row visible without
+  // scrolling at 1366×768" requirement intact alongside this shape.
+  const COLS = isMobile ? 2 : 3;
   const CELL_GAP = 6;
-  const GRID_PADDING = 14;
+  const GRID_PADDING = isMobile ? 14 : 20;
   const cellWidth = (contentWidth - GRID_PADDING * 2 - CELL_GAP * (COLS - 1)) / COLS;
   const cellHeight = cellWidth * (16 / 9);
 
   const topPad = Platform.OS === 'web' ? 0 : insets.top;
 
-  // Shared handler: Trending/Nearby/Global destination cards use this to
-  // jump back to the Explore tab with a search query set to that
-  // destination — reusing the same filter mechanism the existing Explore
-  // "Trending Destinations" chip row already uses.
   function handleDestinationPress(label: string) {
     setActiveDiscoveryTab('Explore');
     setQuery(label);
+  }
+
+  function handleViewAllDestinations() {
+    setActiveDiscoveryTab('Trending');
   }
 
   let discoveryContent: React.ReactNode;
@@ -177,7 +184,7 @@ export default function ExploreScreen() {
         contentWidth={contentWidth}
         cellWidth={cellWidth}
         cellHeight={cellHeight}
-        renderVideoCard={(v) => <VideoGridCell video={v} width={cellWidth} height={cellHeight} />}
+        renderVideoCard={(v) => <VideoGridCell video={v} width={cellWidth} height={cellHeight} isMobile={isMobile} />}
         onDestinationPress={handleDestinationPress}
       />
     );
@@ -209,7 +216,7 @@ export default function ExploreScreen() {
         ListHeaderComponent={
           !query ? (
             <View>
-              {trendingDestinations.length > 0 && (
+              {isMobile && trendingDestinations.length > 0 && (
                 <View style={styles.section}>
                   <Text style={styles.sectionTitle}>Trending Destinations</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tagsRow}>
@@ -225,7 +232,12 @@ export default function ExploreScreen() {
                   </ScrollView>
                 </View>
               )}
-              <View style={styles.sectionHeaderRow}>
+              <View
+                style={[
+                  styles.sectionHeaderRow,
+                  !isMobile && styles.sectionHeaderRowDesktop,
+                ]}
+              >
                 <Text style={styles.sectionTitle}>Discover New Experiences</Text>
                 <Text style={styles.sectionCount}>{filtered.length} experiences</Text>
               </View>
@@ -240,6 +252,7 @@ export default function ExploreScreen() {
             width={cellWidth}
             height={cellHeight}
             isFirst={index === 0}
+            isMobile={isMobile}
           />
         )}
         ListEmptyComponent={
@@ -265,8 +278,6 @@ export default function ExploreScreen() {
       </View>
 
       <View style={{ flex: 1, flexDirection: 'row' }}>
-        {/* Sidebar only renders on desktop width — on mobile, TopNav's
-            hamburger menu is the sole navigation surface (no side drawer). */}
         {!isMobile && <Sidebar />}
 
         <ScrollView
@@ -274,11 +285,6 @@ export default function ExploreScreen() {
           contentContainerStyle={{ paddingBottom: insets.bottom }}
           showsVerticalScrollIndicator={false}
         >
-          {/* Banner — desktop keeps hero text + search bar side-by-side.
-              Mobile switches to a stacked layout with a content-based
-              height instead of a fixed one, since the fixed height was
-              cutting off/wrapping the hero text and pushing the search bar
-              off-screen at phone widths. */}
           {isMobile ? (
             <View style={styles.bannerMobile}>
               <Image
@@ -328,7 +334,7 @@ export default function ExploreScreen() {
                 source={require('@/assets/images/home-banner.png')}
                 style={StyleSheet.absoluteFill}
                 contentFit="cover"
-                contentPosition="right"
+                contentPosition="top right"
               />
               <LinearGradient
                 colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.75)']}
@@ -337,9 +343,8 @@ export default function ExploreScreen() {
 
               <View style={styles.bannerRow}>
                 <View style={styles.hero}>
-                  <Text style={styles.heroTitle}>
-                    Don't scroll through the world.{'\n'}
-                    <Text style={styles.heroTitleAccent}>Experience</Text> it.
+                  <Text style={styles.heroTitle} numberOfLines={1}>
+                    Don't scroll through the world. <Text style={styles.heroTitleAccent}>Experience</Text> it.
                   </Text>
                   <Text style={styles.heroSubtitle}>
                     Glassnik turns real-world smart-glasses Eye-POV videos into immersive experiences.
@@ -369,34 +374,86 @@ export default function ExploreScreen() {
             </View>
           )}
 
-          {/* Discovery tabs + categories — sit in the black area below the banner */}
-          <View style={styles.header}>
-            <DiscoveryTabs active={activeDiscoveryTab} onChange={setActiveDiscoveryTab} />
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categoryRow}
-            >
-              {CATEGORIES.map((cat) => {
-                const isActive = activeCategory === cat;
-                return (
-                  <Pressable
-                    key={cat}
-                    onPress={() => setActiveCategory(cat)}
-                    style={[styles.categoryPill, isActive && styles.categoryPillActive]}
+          <View style={[styles.header, !isMobile && styles.headerDesktop]}>
+            {isMobile && (
+              <DiscoveryTabs active={activeDiscoveryTab} onChange={setActiveDiscoveryTab} />
+            )}
+
+            {isMobile ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.categoryRow}
+              >
+                {CATEGORIES.map((cat) => {
+                  const isActive = activeCategory === cat;
+                  return (
+                    <Pressable
+                      key={cat}
+                      onPress={() => setActiveCategory(cat)}
+                      style={[styles.categoryPill, isActive && styles.categoryPillActive]}
+                    >
+                      <Text style={[styles.categoryPillText, isActive && styles.categoryPillTextActive]}>
+                        {cat}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            ) : (
+              <>
+                <View style={styles.labeledRow}>
+                  <Text style={styles.rowLabel}>Categories:</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.categoryRow}
                   >
-                    <Text style={[styles.categoryPillText, isActive && styles.categoryPillTextActive]}>
-                      {cat}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+                    {CATEGORIES.map((cat) => {
+                      const isActive = activeCategory === cat;
+                      return (
+                        <Pressable
+                          key={cat}
+                          onPress={() => setActiveCategory(cat)}
+                          style={[styles.categoryPill, isActive && styles.categoryPillActive]}
+                        >
+                          <Text style={[styles.categoryPillText, isActive && styles.categoryPillTextActive]}>
+                            {cat}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+
+                {trendingDestinations.length > 0 && (
+                  <View style={styles.labeledRow}>
+                    <Text style={styles.rowLabel}>Trending Destinations:</Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.categoryRow}
+                      style={{ flex: 1 }}
+                    >
+                      {trendingDestinations.map((d) => (
+                        <Pressable key={d.label} style={styles.trendChipCompact} onPress={() => setQuery(d.label)}>
+                          <Feather name="map-pin" size={11} color="#FE2C55" />
+                          <Text style={styles.trendChipCompactTag}>{d.label}</Text>
+                          <Text style={styles.trendChipCompactCount}>{d.count}</Text>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                    <Pressable onPress={handleViewAllDestinations} hitSlop={8}>
+                      <Text style={styles.viewAllText}>View all</Text>
+                    </Pressable>
+                  </View>
+                )}
+              </>
+            )}
           </View>
 
           {discoveryContent}
 
-          {/* Footer */}
           <View style={styles.footer}>
             <View style={styles.footerColumnsRow}>
               {FOOTER_COLUMNS.map((col) => (
@@ -508,10 +565,6 @@ function DiscoveryTabs({
   );
 }
 
-// Web-only video thumbnail. Uses a ref to imperatively set `.muted = true`
-// on the real DOM node before calling play()/seeking — setting `muted` as
-// a JSX prop on a raw <video> element is unreliable in React and often
-// fails silently, which is why an earlier attempt rendered nothing.
 function WebVideoThumb({ uri, isFirst }: { uri: string; isFirst: boolean }) {
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
 
@@ -519,19 +572,13 @@ function WebVideoThumb({ uri, isFirst }: { uri: string; isFirst: boolean }) {
     const el = videoRef.current;
     if (!el) return;
 
-    // Must be set imperatively, not via JSX props, or autoplay/frame
-    // rendering gets silently blocked by the browser.
     el.muted = true;
     el.defaultMuted = true;
 
     if (isFirst) {
       const playPromise = el.play();
       if (playPromise && typeof playPromise.catch === 'function') {
-        playPromise.catch(() => {
-          // Autoplay blocked for some other reason (e.g. data-saver mode) —
-          // fail silently rather than throwing; card just shows the poster
-          // frame once metadata loads instead.
-        });
+        playPromise.catch(() => {});
       }
     } else {
       const showFrame = () => {
@@ -560,38 +607,23 @@ function WebVideoThumb({ uri, isFirst }: { uri: string; isFirst: boolean }) {
       width: '100%',
       height: '100%',
       objectFit: 'cover',
+      objectPosition: 'center',
     },
   });
 }
 
-// ── Video grid cell — redesigned to match the Viewer's info layout:
-// Place/Tour/Transport • Location on one line, Category pill on the right,
-// and Like/Comment/Share/Report icons with counts underneath, scaled down
-// to fit a small grid tile. Exported so Trending/Nearby/Global sections
-// can reuse the exact same card.
-//
-// Thumbnail behavior:
-// - If the API returned a real thumbnailUrl, always use it (all platforms).
-// - Otherwise on WEB, render an actual <video> element via WebVideoThumb
-//   instead of a flat color block — muted (set imperatively via ref, since
-//   JSX props alone were unreliable), preload="metadata", so the browser
-//   shows a real frame from the video. The first card in the grid (isFirst)
-//   also autoplays (muted, looped) per spec.
-// - On NATIVE, there's no cheap client-side way to grab a video frame
-//   without either playing the file or having the backend generate a real
-//   thumbnail image — so native still falls back to the color block. This
-//   is a real platform limitation, not a bug: closing this gap properly
-//   needs Tenzin to wire up backend thumbnail generation. ──
 export function VideoGridCell({
   video,
   width,
   height,
   isFirst = false,
+  isMobile = false,
 }: {
   video: SampleVideo;
   width: number;
   height: number;
   isFirst?: boolean;
+  isMobile?: boolean;
 }) {
   const locationText = [video.place, video.city, video.country].filter(Boolean).join(', ');
   const placeTourTransport = video.description || null;
@@ -605,6 +637,27 @@ export function VideoGridCell({
 
   const canUseWebVideoFallback = Platform.OS === 'web' && !video.thumbnailUrl && !!video.uri;
 
+  const thumbnailNode = video.thumbnailUrl ? (
+    <Image
+      source={{ uri: video.thumbnailUrl }}
+      style={StyleSheet.absoluteFill}
+      contentFit="cover"
+      contentPosition="center"
+      transition={200}
+    />
+  ) : canUseWebVideoFallback ? (
+    <WebVideoThumb uri={video.uri} isFirst={isFirst} />
+  ) : (
+    <>
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: video.creator.color, opacity: 0.25 }]} />
+      <View style={styles.cellThumb}>
+        <Text style={[styles.cellInitial, { color: video.creator.color }]}>
+          {video.creator.initial}
+        </Text>
+      </View>
+    </>
+  );
+
   return (
     <View style={{ width, marginBottom: 14 }}>
       <Pressable
@@ -613,49 +666,57 @@ export function VideoGridCell({
           { width, height, opacity: pressed ? 0.9 : 1 },
         ]}
       >
-        {video.thumbnailUrl ? (
-          <Image
-            source={{ uri: video.thumbnailUrl }}
-            style={StyleSheet.absoluteFill}
-            contentFit="cover"
-            transition={200}
-          />
-        ) : canUseWebVideoFallback ? (
-          <WebVideoThumb uri={video.uri} isFirst={isFirst} />
-        ) : (
-          <>
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: video.creator.color, opacity: 0.25 }]} />
-            <View style={styles.cellThumb}>
-              <Text style={[styles.cellInitial, { color: video.creator.color }]}>
-                {video.creator.initial}
-              </Text>
-            </View>
-          </>
-        )}
-
+        {thumbnailNode}
         <View style={styles.cellScrim} />
 
-        <View style={styles.cellTopRow}>
-          <Text style={styles.cellUsername} numberOfLines={1}>@{video.creator.username}</Text>
-        </View>
-
-        {/* Bottom info block — mirrors the Viewer's bottomBox layout */}
-        <View style={styles.cellBottomBox}>
-          {metaLine ? (
-            <View style={styles.cellMetaRow}>
-              <Text style={styles.cellMetaText} numberOfLines={1}>
-                {metaLine}
-              </Text>
-              {video.category ? (
-                <View style={styles.cellCategoryPill}>
-                  <Text style={styles.cellCategoryText} numberOfLines={1}>
-                    {video.category.toUpperCase()}
+        {isMobile ? (
+          <>
+            <View style={styles.cellTopRow}>
+              <Text style={styles.cellUsername} numberOfLines={1}>@{video.creator.username}</Text>
+            </View>
+            <View style={styles.cellBottomBox}>
+              {metaLine ? (
+                <View style={styles.cellMetaRow}>
+                  <Text style={styles.cellMetaText} numberOfLines={1}>
+                    {metaLine}
                   </Text>
+                  {video.category ? (
+                    <View style={styles.cellCategoryPill}>
+                      <Text style={styles.cellCategoryText} numberOfLines={1}>
+                        {video.category.toUpperCase()}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
               ) : null}
             </View>
-          ) : null}
-        </View>
+          </>
+        ) : (
+          <>
+            <View style={styles.cellTopRowDesktop}>
+              <Text style={styles.cellUsername} numberOfLines={1}>@{video.creator.username}</Text>
+              <View style={styles.cellMiniTabs}>
+                <Text style={styles.cellMiniTabActive}>For You</Text>
+                <Text style={styles.cellMiniTab}>Following</Text>
+              </View>
+            </View>
+            {video.category ? (
+              <View style={styles.cellTagDesktop}>
+                <Text style={styles.cellTagTextDesktop} numberOfLines={1}>
+                  {video.category.toUpperCase()}
+                </Text>
+              </View>
+            ) : null}
+            {locationText ? (
+              <View style={styles.cellLocationDesktop}>
+                <Feather name="map-pin" size={8} color="rgba(255,255,255,0.85)" />
+                <Text style={styles.cellLocationTextDesktop} numberOfLines={1}>
+                  {locationText}
+                </Text>
+              </View>
+            ) : null}
+          </>
+        )}
       </Pressable>
 
       <View style={styles.cellActions}>
@@ -683,9 +744,8 @@ const styles = StyleSheet.create({
   screenRoot: { flex: 1, backgroundColor: '#000' },
   root: { flex: 1, backgroundColor: '#000' },
 
-  // ── Desktop banner (unchanged) ──
   banner: {
-    height: 140,
+    height: 118,
     paddingHorizontal: 20,
     backgroundColor: '#0a0f14',
     overflow: 'hidden',
@@ -693,13 +753,12 @@ const styles = StyleSheet.create({
   },
   bannerRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: 24,
-    marginTop: 12,
   },
-  hero: { gap: 6, flexShrink: 1, maxWidth: '55%' },
-  heroTitle: { color: '#fff', fontSize: 24, fontFamily: 'Inter_700Bold', lineHeight: 28 },
+  hero: { gap: 6, flexShrink: 1, maxWidth: '62%' },
+  heroTitle: { color: '#fff', fontSize: 21, fontFamily: 'Inter_700Bold', lineHeight: 25 },
   heroTitleAccent: { color: '#5eead4' },
   heroSubtitle: { color: 'rgba(255,255,255,0.75)', fontSize: 11, fontFamily: 'Inter_400Regular', lineHeight: 15 },
 
@@ -713,14 +772,10 @@ const styles = StyleSheet.create({
     height: 34,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.15)',
-    width: '34%',
-    minWidth: 200,
-    marginTop: 56,
+    width: '30%',
+    minWidth: 180,
   },
 
-  // ── Mobile banner — stacked layout, content-based height instead of a
-  // fixed one, so the hero text never gets cut off and the search bar
-  // always stays visible below it. ──
   bannerMobile: {
     paddingHorizontal: 16,
     paddingTop: 20,
@@ -755,6 +810,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     gap: 12,
   },
+  headerDesktop: {
+    paddingTop: 10,
+    paddingBottom: 10,
+    paddingHorizontal: 20,
+    gap: 8,
+  },
 
   discoveryRow: { flexDirection: 'row', gap: 20 },
   discoveryTab: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingBottom: 8, position: 'relative' },
@@ -763,6 +824,10 @@ const styles = StyleSheet.create({
   discoveryTabUnderline: {
     position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, backgroundColor: '#fff', borderRadius: 1,
   },
+
+  labeledRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  rowLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontFamily: 'Inter_600SemiBold', flexShrink: 0 },
+  viewAllText: { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontFamily: 'Inter_600SemiBold', flexShrink: 0, marginLeft: 8 },
 
   categoryRow: { gap: 8, paddingRight: 14 },
   categoryPill: {
@@ -779,6 +844,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline',
     marginBottom: 12, marginTop: 36, paddingHorizontal: 14,
   },
+  sectionHeaderRowDesktop: {
+    marginTop: 14,
+    paddingHorizontal: 0,
+  },
   sectionCount: { color: 'rgba(255,255,255,0.4)', fontSize: 12, fontFamily: 'Inter_400Regular' },
   tagsRow: { paddingHorizontal: 14, gap: 8 },
   trendChip: {
@@ -789,9 +858,15 @@ const styles = StyleSheet.create({
   trendChipTag: { color: '#fff', fontSize: 14, fontFamily: 'Inter_700Bold' },
   trendChipCount: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontFamily: 'Inter_400Regular', marginLeft: 4 },
 
+  trendChipCompact: {
+    flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 16, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+  },
+  trendChipCompactTag: { color: '#fff', fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  trendChipCompactCount: { color: '#FE2C55', fontSize: 11, fontFamily: 'Inter_700Bold' },
+
   columnWrapper: { gap: 6 },
 
-  // ── Grid cell (redesigned) ──
   cell: { overflow: 'hidden', borderRadius: 8, backgroundColor: '#111', alignItems: 'center', justifyContent: 'center' },
   cellThumb: {
     width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.08)',
@@ -799,57 +874,42 @@ const styles = StyleSheet.create({
   },
   cellInitial: { fontSize: 14, fontFamily: 'Inter_700Bold' },
   cellScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.2)' },
-  cellTopRow: {
-    position: 'absolute',
-    top: 6,
-    left: 6,
-    right: 6,
-  },
+
+  cellTopRow: { position: 'absolute', top: 6, left: 6, right: 6 },
   cellUsername: {
     color: '#fff', fontSize: 10, fontFamily: 'Inter_700Bold',
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
-  // Bottom box — mirrors FeedVideoItem's bottomBox: overlay, flush to
-  // bottom+sides, compact and semi-transparent.
   cellBottomBox: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    paddingHorizontal: 6,
-    paddingVertical: 5,
+    position: 'absolute', left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 6, paddingVertical: 5,
   },
-  cellMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  cellMetaText: {
-    flex: 1,
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 7,
-    fontFamily: 'Inter_500Medium',
-  },
+  cellMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  cellMetaText: { flex: 1, color: 'rgba(255,255,255,0.9)', fontSize: 7, fontFamily: 'Inter_500Medium' },
   cellCategoryPill: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 3,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
-    flexShrink: 0,
-    maxWidth: '45%',
+    backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 3, paddingHorizontal: 4, paddingVertical: 1,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)', flexShrink: 0, maxWidth: '45%',
   },
-  cellCategoryText: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 6,
-    fontFamily: 'Inter_700Bold',
-    letterSpacing: 0.3,
-  },
+  cellCategoryText: { color: 'rgba(255,255,255,0.9)', fontSize: 6, fontFamily: 'Inter_700Bold', letterSpacing: 0.3 },
 
-  // Action row below the card — matches the Viewer's Like/Comment/Share/
-  // Report set (Report has no visible count, same as the full-screen version).
+  cellTopRowDesktop: {
+    position: 'absolute', top: 6, left: 6, right: 6,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+  },
+  cellMiniTabs: { flexDirection: 'row', gap: 6, marginLeft: 'auto' },
+  cellMiniTabActive: { color: '#fff', fontSize: 9, fontFamily: 'Inter_700Bold', textDecorationLine: 'underline' },
+  cellMiniTab: { color: 'rgba(255,255,255,0.55)', fontSize: 9, fontFamily: 'Inter_500Medium' },
+  cellTagDesktop: { position: 'absolute', bottom: 20, left: 6 },
+  cellTagTextDesktop: {
+    backgroundColor: 'rgba(0,0,0,0.5)', color: '#fff', fontSize: 7, fontFamily: 'Inter_600SemiBold',
+    paddingHorizontal: 4, paddingVertical: 2, borderRadius: 3, overflow: 'hidden',
+  },
+  cellLocationDesktop: {
+    position: 'absolute', bottom: 5, left: 6, right: 6,
+    flexDirection: 'row', alignItems: 'center', gap: 2,
+  },
+  cellLocationTextDesktop: { color: 'rgba(255,255,255,0.85)', fontSize: 7, fontFamily: 'Inter_500Medium', flexShrink: 1 },
+
   cellActions: { flexDirection: 'row', justifyContent: 'space-around', paddingTop: 6 },
   cellActionItem: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   cellActionLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 9, fontFamily: 'Inter_500Medium' },

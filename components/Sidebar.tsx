@@ -1,20 +1,17 @@
 import React from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useRouter, usePathname } from 'expo-router';
+import { useRouter, usePathname, useLocalSearchParams } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
+import { userApi } from '@/lib/api';
 
-const ALWAYS_VISIBLE_ITEMS: { label: string; icon: React.ComponentProps<typeof Feather>['name']; route: string }[] = [
-  { label: 'Explore', icon: 'compass', route: '/(tabs)/explore' },
-  { label: 'For You', icon: 'home', route: '/' },
-];
-
-const LOGGED_IN_ONLY_ITEMS: { label: string; icon: React.ComponentProps<typeof Feather>['name']; route: string }[] = [
-  { label: 'Upload', icon: 'plus-square', route: '/(tabs)/upload' },
-  { label: 'Activity', icon: 'bell', route: '/(tabs)/notifications' },
-];
-
-const PROFILE_ITEM = { label: 'Profile', icon: 'user' as const, route: '/(tabs)/profile' };
+type Leaf = {
+  label: string;
+  icon: React.ComponentProps<typeof Feather>['name'];
+  route: string;
+  discovery?: string; // query param value for Explore sub-items
+};
 
 const FOOTER_LINKS = [
   { label: 'Company', url: 'https://www.glassnik.com/about-us' },
@@ -22,30 +19,105 @@ const FOOTER_LINKS = [
   { label: 'Support', url: 'https://www.glassnik.com/reviews' },
 ];
 
+// Explore's sub-items — navigate to the same Explore route with a
+// `discovery` query param; explore.tsx reads this to set its active tab.
+const EXPLORE_CHILDREN: Leaf[] = [
+  { label: 'Trending', icon: 'trending-up', route: '/(tabs)/explore', discovery: 'Trending' },
+  { label: 'Nearby', icon: 'map-pin', route: '/(tabs)/explore', discovery: 'Nearby' },
+  { label: 'Global', icon: 'globe', route: '/(tabs)/explore', discovery: 'Global' },
+];
+
+// Profile's sub-items — shown only when the user is logged in AND has the
+// videographer (mobile.creator) capability, per spec.
+const PROFILE_CHILDREN: Leaf[] = [
+  { label: 'Upload', icon: 'plus-square', route: '/(tabs)/upload' },
+  { label: 'Activity', icon: 'bell', route: '/(tabs)/notifications' },
+];
+
 export function Sidebar() {
   const router = useRouter();
   const pathname = usePathname();
+  const params = useLocalSearchParams<{ discovery?: string }>();
   const { user } = useAuth();
 
-  const navItems = [
-    ...ALWAYS_VISIBLE_ITEMS,
-    ...(user ? LOGGED_IN_ONLY_ITEMS : []),
-    PROFILE_ITEM,
-  ];
+  const { data: capabilities } = useQuery({
+    queryKey: ['my-capabilities'],
+    queryFn: userApi.getMyCapabilities,
+    enabled: !!user,
+  });
+  const hasCreatorCap = capabilities?.some(
+    (c: any) => c.capability?.name === 'mobile.creator' && c.status === 'ACTIVE',
+  );
+
+  const onExplorePage = pathname === '/(tabs)/explore' || pathname === '/explore';
+  const currentDiscovery = onExplorePage ? (params.discovery ?? 'Explore') : null;
+
+  function goExplore(discovery?: string) {
+    if (discovery) {
+      router.push({ pathname: '/(tabs)/explore', params: { discovery } } as any);
+    } else {
+      router.push('/(tabs)/explore' as any);
+    }
+  }
 
   return (
     <View style={styles.wrap}>
       <View style={styles.navGroup}>
-        {navItems.map((item) => {
-          const isActive = pathname === item.route || (item.route === '/(tabs)/explore' && pathname === '/explore');
+        {/* Explore + indented sub-items */}
+        <Pressable
+          style={[styles.navItem, onExplorePage && currentDiscovery === 'Explore' && styles.navItemActive]}
+          onPress={() => goExplore()}
+        >
+          <Feather name="compass" size={16} color={onExplorePage && currentDiscovery === 'Explore' ? '#000' : '#fff'} />
+          <Text style={[styles.navItemText, onExplorePage && currentDiscovery === 'Explore' && styles.navItemTextActive]}>
+            Explore
+          </Text>
+        </Pressable>
+
+        {EXPLORE_CHILDREN.map((child) => {
+          const isActive = onExplorePage && currentDiscovery === child.discovery;
           return (
             <Pressable
-              key={item.label}
-              style={[styles.navItem, isActive && styles.navItemActive]}
-              onPress={() => router.push(item.route as any)}
+              key={child.label}
+              style={[styles.navItemChild, isActive && styles.navItemActive]}
+              onPress={() => goExplore(child.discovery)}
             >
-              <Feather name={item.icon} size={16} color={isActive ? '#000' : '#fff'} />
-              <Text style={[styles.navItemText, isActive && styles.navItemTextActive]}>{item.label}</Text>
+              <Feather name={child.icon} size={14} color={isActive ? '#000' : 'rgba(255,255,255,0.75)'} />
+              <Text style={[styles.navItemChildText, isActive && styles.navItemTextActive]}>{child.label}</Text>
+            </Pressable>
+          );
+        })}
+
+        {/* For You */}
+        <Pressable
+          style={[styles.navItem, pathname === '/' && styles.navItemActive]}
+          onPress={() => router.push('/' as any)}
+        >
+          <Feather name="home" size={16} color={pathname === '/' ? '#000' : '#fff'} />
+          <Text style={[styles.navItemText, pathname === '/' && styles.navItemTextActive]}>For You</Text>
+        </Pressable>
+
+        {/* Profile + indented sub-items (logged-in videographers only) */}
+        <Pressable
+          style={[styles.navItem, pathname === '/(tabs)/profile' && styles.navItemActive]}
+          onPress={() => router.push('/(tabs)/profile' as any)}
+        >
+          <Feather name="user" size={16} color={pathname === '/(tabs)/profile' ? '#000' : '#fff'} />
+          <Text style={[styles.navItemText, pathname === '/(tabs)/profile' && styles.navItemTextActive]}>
+            Profile
+          </Text>
+        </Pressable>
+
+        {user && hasCreatorCap && PROFILE_CHILDREN.map((child) => {
+          const isActive = pathname === child.route;
+          return (
+            <Pressable
+              key={child.label}
+              style={[styles.navItemChild, isActive && styles.navItemActive]}
+              onPress={() => router.push(child.route as any)}
+            >
+              <Feather name={child.icon} size={14} color={isActive ? '#000' : 'rgba(255,255,255,0.75)'} />
+              <Text style={[styles.navItemChildText, isActive && styles.navItemTextActive]}>{child.label}</Text>
             </Pressable>
           );
         })}
@@ -105,8 +177,19 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: 8,
   },
+  // Indented ~18px, per spec.
+  navItemChild: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginLeft: 18,
+    borderRadius: 8,
+  },
   navItemActive: { backgroundColor: '#fff' },
   navItemText: { color: '#fff', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  navItemChildText: { color: 'rgba(255,255,255,0.75)', fontSize: 12, fontFamily: 'Inter_500Medium' },
   navItemTextActive: { color: '#000' },
 
   joinBox: {
