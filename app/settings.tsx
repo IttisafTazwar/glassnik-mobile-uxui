@@ -82,7 +82,24 @@ export default function SettingsScreen() {
     );
   }
 
-  async function handleLogout() {
+  async function performLogout() {
+    setLoggingOut(true);
+    try {
+      await logout();
+      router.replace('/auth/login');
+    } catch {
+      setLoggingOut(false);
+    }
+  }
+
+  function handleLogout() {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to sign out?')) {
+        void performLogout();
+      }
+      return;
+    }
+
     Alert.alert(
       'Sign out',
       'Are you sure you want to sign out?',
@@ -91,14 +108,8 @@ export default function SettingsScreen() {
         {
           text: 'Sign out',
           style: 'destructive',
-          onPress: async () => {
-            setLoggingOut(true);
-            try {
-              await logout();
-              // Auth context will clear user; root layout redirects to login
-            } catch {
-              setLoggingOut(false);
-            }
+          onPress: () => {
+            void performLogout();
           },
         },
       ],

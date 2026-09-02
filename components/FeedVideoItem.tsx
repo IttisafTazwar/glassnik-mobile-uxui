@@ -26,6 +26,8 @@ import { useMute } from '@/context/MuteContext';
 interface Props {
   video: SampleVideo;
   isActive: boolean;
+  itemWidth?: number;
+  itemHeight?: number;
   /** Called when the comment button is pressed; receives the video's id. */
   onCommentPress?: (videoId: string) => void;
 }
@@ -36,10 +38,82 @@ function formatCount(n: number): string {
   return String(n);
 }
 
-export function FeedVideoItem({ video, isActive, onCommentPress }: Props) {
+
+function WebFeedVideo({
+  uri,
+  isActive,
+  isMuted,
+}: {
+  uri: string;
+  isActive: boolean;
+  isMuted: boolean;
+}) {
+  const videoRef = React.useRef<HTMLVideoElement | null>(null);
+
+  React.useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+
+    // Always configure autoplay-safe properties before play().
+    el.playsInline = true;
+    el.loop = true;
+
+    if (isActive) {
+      // Browsers reliably allow muted autoplay.
+      // Respect the user's mute preference where the browser permits it.
+      el.muted = isMuted;
+
+      try {
+        el.currentTime = 0;
+      } catch {}
+
+      const playPromise = el.play();
+
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch(() => {
+          // If the browser blocks unmuted autoplay, retry muted.
+          if (el && !el.muted) {
+            el.muted = true;
+            el.play().catch(() => {});
+          }
+        });
+      }
+    } else {
+      el.pause();
+
+      try {
+        el.currentTime = 0;
+      } catch {}
+    }
+  }, [isActive, isMuted, uri]);
+
+  return React.createElement('video', {
+    ref: videoRef,
+    src: uri,
+    playsInline: true,
+    muted: isMuted,
+    autoPlay: isActive,
+    preload: 'auto',
+    loop: true,
+    style: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      width: '100%',
+      height: '100%',
+      // Show the complete original video without zooming/cropping.
+      objectFit: 'contain',
+      objectPosition: 'center',
+      backgroundColor: '#000',
+    },
+  });
+}
+
+export function FeedVideoItem({ video, isActive, itemWidth, itemHeight, onCommentPress }: Props) {
   const { isMuted, toggleMute } = useMute();
   const onMuteToggle = toggleMute;
   const { width, height } = useWindowDimensions();
+  const resolvedWidth = itemWidth ?? width;
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(video.likes);
   const [paused, setPaused] = useState(false);
@@ -68,18 +142,38 @@ export function FeedVideoItem({ video, isActive, onCommentPress }: Props) {
     p.loop = true;
   }, []));
 
-  // Sync play/pause AND muted together — muted must be set before play()
-  // so the native layer never has a chance to start audio then cut it.
+  // Automatically play the video that becomes active in the feed.
+  // Leaving a video pauses and resets it so every scroll starts fresh.
   useEffect(() => {
     try {
       player.muted = isMuted;
-      if (isActive && !paused) {
+
+      if (isActive) {
+        setPaused(false);
+        player.currentTime = 0;
         player.play();
       } else {
         player.pause();
+        player.currentTime = 0;
       }
     } catch {}
-  }, [isActive, paused, player, isMuted]);
+  }, [isActive, player]);
+
+  // Keep mute changes and manual pause/play controls in sync without
+  // restarting the active video.
+  useEffect(() => {
+    try {
+      player.muted = isMuted;
+
+      if (!isActive) return;
+
+      if (paused) {
+        player.pause();
+      } else {
+        player.play();
+      }
+    } catch {}
+  }, [paused, isMuted, isActive, player]);
 
   // Progress tracking
   useEffect(() => {
@@ -216,7 +310,18 @@ export function FeedVideoItem({ video, isActive, onCommentPress }: Props) {
     }
   }
 
-  const ITEM_HEIGHT = height;
+  const ITEM_HEIGHT = itemHeight ?? height;
+  const isDesktopWeb = Platform.OS === 'web' && itemWidth != null;
+  // Desktop For You:
+  // Reserve a separate area underneath the video for the controls.
+  // The video itself uses contain so its original aspect ratio is preserved.
+  // Desktop: the complete card remains ITEM_HEIGHT.
+  // Reserve the bottom portion INSIDE that card for creator,
+  // metadata and reaction controls.
+  const desktopInfoHeight = isDesktopWeb ? 58 : 0;
+  const desktopVideoHeight = isDesktopWeb
+    ? Math.max(1, ITEM_HEIGHT - desktopInfoHeight)
+    : ITEM_HEIGHT;
 
   // Place/Tour/Transport • Location — single line, per the mockup.
   const placeTourTransport = video.description || null;
@@ -224,15 +329,40 @@ export function FeedVideoItem({ video, isActive, onCommentPress }: Props) {
   const metaLine = [placeTourTransport, locationText].filter(Boolean).join(' • ');
 
   return (
-    <View style={[styles.container, { width, height: ITEM_HEIGHT }]}>
+    <View style={[
+      styles.container,
+      {
+        width: resolvedWidth,
+        height: ITEM_HEIGHT,
+      },
+    ]}>
       {/* ── Video / thumbnail ── */}
+      <View
+        style={
+          isDesktopWeb
+            ? {
+                width: resolvedWidth,
+                height: desktopVideoHeight,
+                position: 'relative',
+              }
+            : StyleSheet.absoluteFill
+        }
+      >
       {isActive ? (
-        <VideoView
-          player={player}
-          style={StyleSheet.absoluteFill}
-          contentFit="cover"
-          nativeControls={false}
-        />
+        Platform.OS === 'web' ? (
+          <WebFeedVideo
+            uri={video.uri}
+            isActive={isActive}
+            isMuted={isMuted}
+          />
+        ) : (
+          <VideoView
+            player={player}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            nativeControls={false}
+          />
+        )
       ) : video.thumbnailUrl ? (
         <Image
           source={{ uri: video.thumbnailUrl }}
@@ -243,6 +373,7 @@ export function FeedVideoItem({ video, isActive, onCommentPress }: Props) {
       ) : (
         <View style={[StyleSheet.absoluteFill, styles.videoPlaceholder]} />
       )}
+      </View>
 
       {/* ── Tap handler ──
           touchAction: 'pan-y' on web tells the browser this element should
@@ -253,16 +384,26 @@ export function FeedVideoItem({ video, isActive, onCommentPress }: Props) {
           this is the fix for the "scroll not working over the videos on
           mobile" report. */}
       <Pressable
-        style={[
-          StyleSheet.absoluteFill,
-          Platform.OS === 'web' ? ({ touchAction: 'pan-y' } as any) : null,
-        ]}
+        style={
+          isDesktopWeb
+            ? ({
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: desktopVideoHeight,
+                touchAction: 'pan-y',
+              } as any)
+            : [
+                StyleSheet.absoluteFill,
+                Platform.OS === 'web' ? ({ touchAction: 'pan-y' } as any) : null,
+              ]
+        }
         onPress={handleTap}
       />
 
-      {/* ── Bottom gradient layer (kept subtle since the info box now
-          carries its own background) ── */}
-      <View style={[styles.gradientBottom, { pointerEvents: 'none' }]} />
+      {/* No dark gradient over the video.
+          Controls are displayed completely outside the video on desktop. */}
 
       {/* ── Pause indicator — independent of controlsVisible; this is
           playback-state feedback, not a "control" to hide ── */}
@@ -331,20 +472,29 @@ export function FeedVideoItem({ video, isActive, onCommentPress }: Props) {
           Progress bar sits immediately above it. Both hidden together on
           tap per the spec. Save button removed; action icons are Like/
           Comment/Share/Report only, smaller and soft grey. */}
-      {controlsVisible && (
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
-        </View>
-      )}
-
-      {controlsVisible && (
-        <View style={styles.bottomBox}>
+      {/* Desktop creator + metadata overlay.
+          These remain inside the video. Reactions sit below the video. */}
+      {controlsVisible && isDesktopWeb && (
+        <View
+          style={{
+            position: 'absolute',
+            left: 14,
+            right: 14,
+            bottom: desktopInfoHeight + 12,
+            zIndex: 20,
+            gap: 6,
+          }}
+        >
           {!isOwnVideo && (
             <View style={styles.creatorRow}>
               <Text style={styles.creatorName}>@{video.creator.username}</Text>
+
               {video.creatorId && (
                 <Pressable
-                  style={[styles.followTextBtn, following && styles.followTextBtnActive]}
+                  style={[
+                    styles.followTextBtn,
+                    following && styles.followTextBtnActive,
+                  ]}
                   onPress={handleFollow}
                   disabled={followLoading}
                 >
@@ -366,6 +516,78 @@ export function FeedVideoItem({ video, isActive, onCommentPress }: Props) {
               <Text style={styles.metaText} numberOfLines={1}>
                 {metaLine}
               </Text>
+
+              {video.category ? (
+                <View style={styles.categoryPill}>
+                  <Text style={styles.categoryText}>
+                    {video.category.toUpperCase()}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
+      )}
+
+      {controlsVisible && (
+        <View
+          style={[
+            styles.progressTrack,
+            isDesktopWeb && {
+              bottom: desktopInfoHeight,
+            },
+          ]}
+        >
+          <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+        </View>
+      )}
+
+      {controlsVisible && (
+        <View
+          style={[
+            styles.bottomBox,
+            isDesktopWeb && {
+              position: 'absolute',
+              top: desktopVideoHeight,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: desktopInfoHeight,
+              backgroundColor: '#000',
+              paddingHorizontal: 8,
+              paddingTop: 8,
+              paddingBottom: 6,
+              justifyContent: 'center',
+            },
+          ]}
+        >
+          {!isDesktopWeb && !isOwnVideo && (
+            <View style={styles.creatorRow}>
+              <Text style={styles.creatorName}>@{video.creator.username}</Text>
+              {video.creatorId && (
+                <Pressable
+                  style={[styles.followTextBtn, following && styles.followTextBtnActive]}
+                  onPress={handleFollow}
+                  disabled={followLoading}
+                >
+                  {following ? (
+                    <View style={styles.followingRow}>
+                      <Feather name="check" size={11} color="#fff" />
+                      <Text style={styles.followTextBtnLabel}>Following</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.followTextBtnLabel}>Follow</Text>
+                  )}
+                </Pressable>
+              )}
+            </View>
+          )}
+
+          {!isDesktopWeb && metaLine ? (
+            <View style={styles.metaRow}>
+              <Text style={styles.metaText} numberOfLines={1}>
+                {metaLine}
+              </Text>
               {video.category ? (
                 <View style={styles.categoryPill}>
                   <Text style={styles.categoryText}>{video.category.toUpperCase()}</Text>
@@ -374,7 +596,7 @@ export function FeedVideoItem({ video, isActive, onCommentPress }: Props) {
             </View>
           ) : null}
 
-          <View style={styles.divider} />
+          {!isDesktopWeb && <View style={styles.divider} />}
 
           <View style={styles.actionRow}>
             <Pressable style={styles.actionItem} onPress={handleLike}>
@@ -429,14 +651,8 @@ const styles = StyleSheet.create({
     height: 140,
     backgroundColor: 'transparent',
   },
-  gradientBottom: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 200,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-  },
+  // Intentionally no bottom gradient.
+  // The video remains unobstructed and the controls sit below it.
 
   // Pause
   pauseOverlay: {
@@ -555,7 +771,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: '#000',
     paddingHorizontal: 14,
     paddingTop: 10,
     paddingBottom: 14,
@@ -628,12 +844,16 @@ const styles = StyleSheet.create({
   },
   actionRow: {
     flexDirection: 'row',
-    justifyContent: 'space-evenly',
+    justifyContent: 'space-around',
     alignItems: 'center',
+    paddingTop: 2,
+    paddingBottom: 0,
   },
   actionItem: {
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 3,
+    minWidth: 48,
   },
   actionLabel: {
     color: 'rgba(255,255,255,0.6)',

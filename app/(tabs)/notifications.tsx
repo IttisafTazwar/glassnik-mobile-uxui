@@ -15,6 +15,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { DesktopAppShell } from '@/components/DesktopAppShell';
 import { notificationsApi } from '@/lib/api';
 import type { Notification } from '@/types';
 
@@ -138,16 +139,19 @@ export default function NotificationsScreen() {
 
   if (!user) {
     return (
-      <View style={[styles.root, styles.center]}>
-        <Feather name="bell-off" size={36} color="rgba(255,255,255,0.2)" />
-        <Text style={styles.emptyText}>Sign in to see notifications</Text>
-      </View>
+      <DesktopAppShell>
+        <View style={[styles.root, styles.center]}>
+          <Feather name="bell-off" size={36} color="rgba(255,255,255,0.2)" />
+          <Text style={styles.emptyText}>Sign in to see notifications</Text>
+        </View>
+      </DesktopAppShell>
     );
   }
 
   return (
-    <View style={styles.root}>
-      {/* Header */}
+    <DesktopAppShell>
+      <View style={styles.root}>
+        {/* Header */}
       <View style={[styles.header, { paddingTop: topPad }]}>
         <Text style={styles.headerTitle}>Notifications</Text>
         {unreadCount > 0 && (
@@ -198,7 +202,8 @@ export default function NotificationsScreen() {
           ItemSeparatorComponent={() => <View style={styles.separator} />}
         />
       )}
-    </View>
+      </View>
+    </DesktopAppShell>
   );
 }
 

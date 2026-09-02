@@ -22,6 +22,7 @@ import { Feather } from '@expo/vector-icons';
 import { useNavigation, useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
+import { DesktopAppShell } from '@/components/DesktopAppShell';
 import { mobileApi, userApi, videoApi } from '@/lib/api';
 import { useUploadGuard } from '@/context/UploadGuardContext';
 
@@ -35,7 +36,7 @@ const UPLOAD_CATEGORIES = [
   'Food & Markets',
   'Cafes',
   'Shopping',
-  'Architecture & Landmarks',
+  'Architecture, Buildings and Landmarks',
   'Museums & Galleries',
   'Parks & Gardens',
   'Beaches & Coastlines',
@@ -49,6 +50,7 @@ const UPLOAD_CATEGORIES = [
   'Music & Performance',
   'Sacred Places',
   'After Dark',
+  'Tours and Cruises',
 ];
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -561,39 +563,44 @@ export default function UploadScreen() {
 
   if (capsLoading) {
     return (
-      <View style={[styles.root, { backgroundColor: colors.background }]}>
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={colors.primary} />
+      <DesktopAppShell>
+        <View style={[styles.root, { backgroundColor: colors.background }]}>
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
         </View>
-      </View>
+      </DesktopAppShell>
     );
   }
 
   if (!hasCreatorCap) {
     return (
-      <View style={[styles.root, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
-          <Text style={[styles.headerTitle, { color: colors.foreground }]}>Upload</Text>
-        </View>
-        <View style={styles.centered}>
-          <View style={[styles.lockIcon, { backgroundColor: colors.muted }]}>
-            <Feather name="lock" size={32} color={colors.mutedForeground} />
+      <DesktopAppShell>
+        <View style={[styles.root, { backgroundColor: colors.background }]}>
+          <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
+            <Text style={[styles.headerTitle, { color: colors.foreground }]}>Upload</Text>
           </View>
-          <Text style={[styles.lockTitle, { color: colors.foreground }]}>Videographer Access Required</Text>
-          <Text style={[styles.lockSubtitle, { color: colors.mutedForeground }]}>
-            You need videographer access to upload Experiences.
-          </Text>
-          <Text style={[styles.lockHint, { color: colors.mutedForeground }]}>
-            Apply in your profile or contact the team to get access.
-          </Text>
+          <View style={styles.centered}>
+            <View style={[styles.lockIcon, { backgroundColor: colors.muted }]}>
+              <Feather name="lock" size={32} color={colors.mutedForeground} />
+            </View>
+            <Text style={[styles.lockTitle, { color: colors.foreground }]}>Videographer Access Required</Text>
+            <Text style={[styles.lockSubtitle, { color: colors.mutedForeground }]}>
+              You need videographer access to upload Experiences.
+            </Text>
+            <Text style={[styles.lockHint, { color: colors.mutedForeground }]}>
+              Apply in your profile or contact the team to get access.
+            </Text>
+          </View>
         </View>
-      </View>
+      </DesktopAppShell>
     );
   }
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
+    <DesktopAppShell>
+      <View style={[styles.root, { backgroundColor: colors.background }]}>
+        <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Upload</Text>
       </View>
 
@@ -973,7 +980,8 @@ export default function UploadScreen() {
           </Text>
         </View>
       </ScrollView>
-    </View>
+      </View>
+    </DesktopAppShell>
   );
 }
 

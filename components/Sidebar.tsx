@@ -59,6 +59,18 @@ export function Sidebar() {
   const onExplorePage = pathname === '/(tabs)/explore' || pathname === '/explore';
   const currentDiscovery = onExplorePage ? (params.discovery ?? 'Explore') : null;
 
+  // expo-router returns public URL paths on web, e.g. /profile rather
+  // than /(tabs)/profile. Support both forms so active states work
+  // consistently across web and native navigation.
+  const onProfilePage =
+    pathname === '/profile' || pathname === '/(tabs)/profile';
+
+  const onUploadPage =
+    pathname === '/upload' || pathname === '/(tabs)/upload';
+
+  const onActivityPage =
+    pathname === '/notifications' || pathname === '/(tabs)/notifications';
+
   function goExplore(discovery?: string) {
     if (discovery) {
       router.push({ pathname: '/(tabs)/explore', params: { discovery } } as any);
@@ -106,17 +118,17 @@ export function Sidebar() {
 
         {/* Profile + indented sub-items (logged-in videographers only) */}
         <Pressable
-          style={[styles.navItem, pathname === '/(tabs)/profile' && styles.navItemActive]}
+          style={[styles.navItem, onProfilePage && styles.navItemActive]}
           onPress={() => router.push('/(tabs)/profile' as any)}
         >
-          <Feather name="user" size={16} color={pathname === '/(tabs)/profile' ? '#000' : '#fff'} />
-          <Text style={[styles.navItemText, pathname === '/(tabs)/profile' && styles.navItemTextActive]}>
+          <Feather name="user" size={16} color={onProfilePage ? '#000' : '#fff'} />
+          <Text style={[styles.navItemText, onProfilePage && styles.navItemTextActive]}>
             Profile
           </Text>
         </Pressable>
 
         {user && hasCreatorCap && (() => {
-          const isActive = pathname === UPLOAD_ITEM.route;
+          const isActive = onUploadPage;
           return (
             <Pressable
               style={[styles.navItemChild, isActive && styles.navItemActive]}
@@ -129,7 +141,7 @@ export function Sidebar() {
         })()}
 
         {user && (() => {
-          const isActive = pathname === ACTIVITY_ITEM.route;
+          const isActive = onActivityPage;
           return (
             <Pressable
               style={[styles.navItemChild, isActive && styles.navItemActive]}

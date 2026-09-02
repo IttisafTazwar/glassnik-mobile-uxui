@@ -2,5 +2,7 @@
 .git/**
 node_modules
 node_modules/**
+!dist/assets/node_modules/
+!dist/assets/node_modules/**
 dist-before-current-export
 dist-before-current-export/**

@@ -20,6 +20,7 @@ import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useAuth } from '@/context/AuthContext';
+import { DesktopAppShell } from '@/components/DesktopAppShell';
 import { userApi, videoApi } from '@/lib/api';
 import type { VideoItem } from '@/types';
 
@@ -209,8 +210,9 @@ const videos = allVideos.filter((v) => {
   }
 
   return (
-    <View style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+    <DesktopAppShell>
+      <View style={styles.root}>
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
@@ -552,7 +554,8 @@ const videos = allVideos.filter((v) => {
           </View>
         )}
       </ScrollView>
-    </View>
+      </View>
+    </DesktopAppShell>
   );
 }
 

@@ -1,6 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import {
   FlatList,
+  ScrollView,
   Platform,
   Pressable,
   StatusBar,
@@ -14,6 +15,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { Feather } from '@expo/vector-icons';
 import { FeedVideoItem } from '@/components/FeedVideoItem';
+import { TopNav } from '@/components/TopNav';
+import { Sidebar } from '@/components/Sidebar';
 import { CommentsSheet } from '@/components/CommentsSheet';
 import { type SampleVideo } from '@/constants/sampleVideos';
 import { mobileApi } from '@/lib/api';
@@ -54,8 +57,12 @@ function apiVideoToSample(v: VideoAsset): SampleVideo {
 }
 
 export default function FeedScreen() {
-  const { height } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const isMobile = width < 768;
+  const desktopTopNavHeight = 64;
+  const feedHeight = isMobile ? height : Math.max(1, height - desktopTopNavHeight);
+  const desktopFeedWidth = Math.min(width, feedHeight * (9 / 16));
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<ActiveTab>('foryou');
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -64,13 +71,18 @@ export default function FeedScreen() {
 
   const { data: apiVideos } = useQuery<VideoAsset[]>({
     queryKey: ['feed'],
-    queryFn: () => mobileApi.getFeed(1, 20),
+    queryFn: () => mobileApi.getFeed(1, 50),
     retry: false,
   });
 
   // Production feed: real API videos only
-  const allVideos: SampleVideo[] = (apiVideos ?? [])
+  const allVideos: SampleVideo[] = [...(apiVideos ?? [])]
     .filter((v) => !!v.publicUrl)
+    .sort((a, b) => {
+      const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return tb - ta;
+    })
     .map(apiVideoToSample);
 
   const onViewableItemsChanged = useRef(
@@ -87,15 +99,17 @@ export default function FeedScreen() {
       <FeedVideoItem
         video={item}
         isActive={index === currentIndex}
+        itemWidth={isMobile ? undefined : desktopFeedWidth}
+        itemHeight={isMobile ? undefined : feedHeight}
         onCommentPress={(videoId) => setCommentsVideoId(videoId)}
       />
     ),
-    [currentIndex]
+    [currentIndex, isMobile, desktopFeedWidth, feedHeight]
   );
 
   const getItemLayout = useCallback(
-    (_: any, index: number) => ({ length: height, offset: height * index, index }),
-    [height]
+    (_: any, index: number) => ({ length: feedHeight, offset: feedHeight * index, index }),
+    [feedHeight]
   );
 
   const topInset = Platform.OS === 'web' ? 0 : insets.top;
@@ -104,36 +118,92 @@ export default function FeedScreen() {
     <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
+      {!isMobile && <TopNav />}
+
+      <View style={styles.pageRow}>
+        {!isMobile && <Sidebar />}
+
+        <View style={styles.feedArea}>
+          <View
+            style={[
+              styles.feedViewport,
+              !isMobile && {
+                width: desktopFeedWidth,
+                height: feedHeight,
+              },
+            ]}
+          >
       {/* ── Video feed ── */}
-      <FlatList
-        data={allVideos}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        getItemLayout={getItemLayout}
-        snapToInterval={height}
-        snapToAlignment="start"
-        decelerationRate="fast"
-        pagingEnabled={Platform.OS !== 'web'}
-        showsVerticalScrollIndicator={false}
-        onViewableItemsChanged={onViewableItemsChanged.current}
-        viewabilityConfig={viewabilityConfig.current}
-        removeClippedSubviews={false}
-        maxToRenderPerBatch={3}
-        windowSize={5}
-        initialNumToRender={2}
-      />
+      {Platform.OS === 'web' && !isMobile ? (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          style={{
+            height: feedHeight,
+            width: desktopFeedWidth,
+          }}
+          contentContainerStyle={{
+            width: desktopFeedWidth,
+          }}
+          snapToInterval={feedHeight}
+          snapToAlignment="start"
+          decelerationRate="fast"
+          onScroll={(event) => {
+            const y = event.nativeEvent.contentOffset?.y ?? 0;
+            const nextIndex = Math.max(
+              0,
+              Math.min(
+                allVideos.length - 1,
+                Math.round(y / feedHeight)
+              )
+            );
 
-      {/* ── Top overlay: For You | Following + icons ── */}
+            if (nextIndex !== currentIndex) {
+              setCurrentIndex(nextIndex);
+            }
+          }}
+          scrollEventThrottle={16}
+        >
+          {allVideos.map((item, index) => (
+            <View
+              key={item.id}
+              style={{
+                width: desktopFeedWidth,
+                height: feedHeight,
+                scrollSnapAlign: 'start',
+              } as any}
+            >
+              <FeedVideoItem
+                video={item}
+                isActive={index === currentIndex}
+                itemWidth={desktopFeedWidth}
+                itemHeight={feedHeight}
+                onCommentPress={(videoId) => setCommentsVideoId(videoId)}
+              />
+            </View>
+          ))}
+        </ScrollView>
+      ) : (
+        <FlatList
+          data={allVideos}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          getItemLayout={getItemLayout}
+          snapToInterval={feedHeight}
+          snapToAlignment="start"
+          decelerationRate="fast"
+          pagingEnabled
+          showsVerticalScrollIndicator={false}
+          onViewableItemsChanged={onViewableItemsChanged.current}
+          viewabilityConfig={viewabilityConfig.current}
+          removeClippedSubviews={false}
+          maxToRenderPerBatch={3}
+          windowSize={5}
+          initialNumToRender={2}
+        />
+      )}
+
+
       <View style={[styles.topBar, { paddingTop: topInset + (Platform.OS === 'web' ? 8 : 12), pointerEvents: 'box-none' }]}>
-        <View style={[styles.topLeft, { pointerEvents: 'none' }]}>
-          {allVideos[currentIndex]?.creator?.username &&
-           allVideos[currentIndex]?.creatorId !== user?.id ? (
-            <Text style={styles.creatorHandle}>
-              @{allVideos[currentIndex].creator.username}
-            </Text>
-          ) : null}
-        </View>
-
         {/* Tab switcher */}
         <View style={styles.tabSwitcher}>
           <Pressable onPress={() => setActiveTab('foryou')}>
@@ -163,6 +233,9 @@ export default function FeedScreen() {
         videoId={commentsVideoId}
         onClose={() => setCommentsVideoId(null)}
       />
+          </View>
+        </View>
+      </View>
     </View>
   );
 }
@@ -171,6 +244,22 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: '#000',
+  },
+  pageRow: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  feedArea: {
+    flex: 1,
+    backgroundColor: '#000',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  feedViewport: {
+    flex: 1,
+    width: '100%',
+    position: 'relative',
+    overflow: 'hidden',
   },
   topBar: {
     position: 'absolute',

@@ -19,7 +19,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Feather } from '@expo/vector-icons';
 import { mobileApi } from '@/lib/api';
-import { SAMPLE_VIDEOS, type SampleVideo } from '@/constants/sampleVideos';
+import { type SampleVideo } from '@/constants/sampleVideos';
 import type { VideoAsset } from '@/types';
 import { TopNav } from '@/components/TopNav';
 import { Sidebar, SIDEBAR_WIDTH } from '@/components/Sidebar';
@@ -36,12 +36,13 @@ const CATEGORIES = [
   'Food & Markets',
   'Nature & Scenery',
   'Beaches & Coastlines',
-  'Architecture & Landmarks',
+  'Architecture, Buildings and Landmarks',
   'Attractions',
   'Hidden Gems',
   'Peaceful Places',
   'Cafes',
   'Shopping',
+  'Tours and Cruises',
   'Museums & Galleries',
   'Parks & Gardens',
   'Trails & Hiking',
@@ -112,7 +113,7 @@ export default function ExploreScreen() {
       const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
       return tb - ta;
     });
-    return [...sortedApi, ...SAMPLE_VIDEOS];
+    return sortedApi;
   }, [apiVideos]);
 
   const trendingDestinations = useMemo(() => {
@@ -251,7 +252,6 @@ export default function ExploreScreen() {
             video={item}
             width={cellWidth}
             height={cellHeight}
-            isFirst={index === 0}
             isMobile={isMobile}
           />
         )}
@@ -565,7 +565,13 @@ function DiscoveryTabs({
   );
 }
 
-function WebVideoThumb({ uri, isFirst }: { uri: string; isFirst: boolean }) {
+function WebVideoThumb({
+  uri,
+  hovered,
+}: {
+  uri: string;
+  hovered: boolean;
+}) {
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
 
   React.useEffect(() => {
@@ -575,31 +581,28 @@ function WebVideoThumb({ uri, isFirst }: { uri: string; isFirst: boolean }) {
     el.muted = true;
     el.defaultMuted = true;
 
-    if (isFirst) {
+    if (hovered) {
       const playPromise = el.play();
+
       if (playPromise && typeof playPromise.catch === 'function') {
         playPromise.catch(() => {});
       }
     } else {
-      const showFrame = () => {
-        try {
-          el.currentTime = 0.1;
-        } catch {}
-      };
-      if (el.readyState >= 1) {
-        showFrame();
-      } else {
-        el.addEventListener('loadedmetadata', showFrame, { once: true });
-      }
+      el.pause();
+
+      try {
+        el.currentTime = 0;
+      } catch {}
     }
-  }, [uri, isFirst]);
+  }, [hovered, uri]);
 
   return React.createElement('video', {
     ref: videoRef,
     src: uri,
     playsInline: true,
+    muted: true,
     preload: 'metadata',
-    loop: isFirst,
+    loop: true,
     style: {
       position: 'absolute',
       top: 0,
@@ -616,15 +619,15 @@ export function VideoGridCell({
   video,
   width,
   height,
-  isFirst = false,
   isMobile = false,
 }: {
   video: SampleVideo;
   width: number;
   height: number;
-  isFirst?: boolean;
   isMobile?: boolean;
 }) {
+  const [isHovered, setIsHovered] = React.useState(false);
+
   const locationText = [video.place, video.city, video.country].filter(Boolean).join(', ');
   const placeTourTransport = video.description || null;
   const metaLine = [placeTourTransport, locationText].filter(Boolean).join(' • ');
@@ -637,11 +640,11 @@ export function VideoGridCell({
 
   const shouldUseWebVideo =
     Platform.OS === 'web' &&
-    !!video.uri &&
-    (isFirst || !video.thumbnailUrl);
+    !isMobile &&
+    !!video.uri;
 
   const thumbnailNode = shouldUseWebVideo ? (
-    <WebVideoThumb uri={video.uri} isFirst={isFirst} />
+    <WebVideoThumb uri={video.uri} hovered={isHovered} />
   ) : video.thumbnailUrl ? (
     <Image
       source={{ uri: video.thumbnailUrl }}
@@ -664,6 +667,16 @@ export function VideoGridCell({
   return (
     <View style={{ width, marginBottom: 14 }}>
       <Pressable
+        onHoverIn={() => {
+          if (Platform.OS === 'web' && !isMobile) {
+            setIsHovered(true);
+          }
+        }}
+        onHoverOut={() => {
+          if (Platform.OS === 'web' && !isMobile) {
+            setIsHovered(false);
+          }
+        }}
         style={({ pressed }) => [
           styles.cell,
           { width, height, opacity: pressed ? 0.9 : 1 },

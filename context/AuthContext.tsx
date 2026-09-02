@@ -56,10 +56,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [persistAuth]);
 
   const logout = useCallback(async () => {
-    await authApi.logout();
-    await AsyncStorage.multiRemove(['user', 'accessToken', 'refreshToken']);
-    setUser(null);
-    setToken(null);
+    try {
+      await authApi.logout();
+    } finally {
+      await AsyncStorage.multiRemove(['user', 'accessToken', 'refreshToken']);
+      setUser(null);
+      setToken(null);
+    }
   }, []);
 
   const updateUser = useCallback(async (data: { displayName?: string; username?: string; avatarUrl?: string }) => {
