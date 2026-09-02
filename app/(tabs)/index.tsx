@@ -130,9 +130,13 @@ export default function FeedScreen() {
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         getItemLayout={getItemLayout}
-        snapToInterval={feedItemHeight}
+        snapToInterval={
+          Platform.OS === 'web' && isMobile ? undefined : feedItemHeight
+        }
         snapToAlignment="start"
-        decelerationRate="fast"
+        decelerationRate={
+          Platform.OS === 'web' && isMobile ? 'normal' : 'fast'
+        }
         pagingEnabled={Platform.OS !== 'web'}
         showsVerticalScrollIndicator={false}
         onViewableItemsChanged={onViewableItemsChanged.current}
