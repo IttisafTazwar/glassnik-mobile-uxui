@@ -11,6 +11,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from 'react-native';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,6 +21,8 @@ import * as LegacyFS from 'expo-file-system/legacy';
 import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation, useRouter } from 'expo-router';
+import { TopNav } from '@/components/TopNav';
+import { Sidebar } from '@/components/Sidebar';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
 import { mobileApi, userApi, videoApi } from '@/lib/api';
@@ -58,6 +61,8 @@ type UploadPhase = 'idle' | 'uploading' | 'processing' | 'done' | 'error';
 export default function UploadScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -310,11 +315,15 @@ export default function UploadScreen() {
     fileUri: string;
     fileSize: number;
     title: string;
+    locationName?: string;
+    categoryId?: number;
   }) {
     const {
       fileUri,
       fileSize,
       title: uploadTitle,
+      locationName,
+      categoryId,
     } = opts;
 
     clearPollTimer();
@@ -329,7 +338,8 @@ export default function UploadScreen() {
         uploadTitle.trim(),
         fileSize,
         undefined,
-        location.trim(),
+        locationName?.trim() || undefined,
+        categoryId,
       );
 
       const uploadUrl = slot.uploadUrl;
@@ -505,7 +515,20 @@ export default function UploadScreen() {
       return;
     }
 
-    await runUpload({ fileUri: pickedUri, fileSize, title });
+    const selectedCategoryId = UPLOAD_CATEGORIES.indexOf(category) + 1;
+
+    if (selectedCategoryId <= 0) {
+      Alert.alert('Category error', 'Could not resolve the selected category.');
+      return;
+    }
+
+    await runUpload({
+      fileUri: pickedUri,
+      fileSize,
+      title,
+      locationName: location,
+      categoryId: selectedCategoryId,
+    });
   }
 
 
@@ -548,39 +571,43 @@ export default function UploadScreen() {
     );
   }
 
-  if (!hasCreatorCap) {
-    return (
-      <View style={[styles.root, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
-          <Text style={[styles.headerTitle, { color: colors.foreground }]}>Upload</Text>
-        </View>
-        <View style={styles.centered}>
-          <View style={[styles.lockIcon, { backgroundColor: colors.muted }]}>
-            <Feather name="lock" size={32} color={colors.mutedForeground} />
-          </View>
-          <Text style={[styles.lockTitle, { color: colors.foreground }]}>Videographer Access Required</Text>
-          <Text style={[styles.lockSubtitle, { color: colors.mutedForeground }]}>
-            You need videographer access to upload Experiences.
-          </Text>
-          <Text style={[styles.lockHint, { color: colors.mutedForeground }]}>
-            Apply in your profile or contact the team to get access.
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
-        <Text style={[styles.headerTitle, { color: colors.foreground }]}>Upload</Text>
-      </View>
+      {!isMobile && (
+        <View style={{ paddingTop: topPad }}>
+          <TopNav />
+        </View>
+      )}
 
-      <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={{ flex: 1, flexDirection: 'row' }}>
+        {!isMobile && <Sidebar />}
+
+        <View style={{ flex: 1 }}>
+          <View style={[styles.header, { paddingTop: 12, borderBottomColor: colors.border }]}>
+            <Text style={[styles.headerTitle, { color: colors.foreground }]}>Upload</Text>
+          </View>
+
+          {!hasCreatorCap ? (
+            <View style={styles.centered}>
+              <View style={[styles.lockIcon, { backgroundColor: colors.muted }]}>
+                <Feather name="lock" size={32} color={colors.mutedForeground} />
+              </View>
+              <Text style={[styles.lockTitle, { color: colors.foreground }]}>
+                Videographer Access Required
+              </Text>
+              <Text style={[styles.lockSubtitle, { color: colors.mutedForeground }]}>
+                You need videographer access to upload Experiences.
+              </Text>
+              <Text style={[styles.lockHint, { color: colors.mutedForeground }]}>
+                Apply in your profile or contact the team to get access.
+              </Text>
+            </View>
+          ) : (
+            <ScrollView
+              contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
 
 
         {/* Processing videos from prior sessions */}
@@ -951,7 +978,10 @@ export default function UploadScreen() {
             Upload a smart-glasses Eye-POV video to create a new Glassnik Experience.
           </Text>
         </View>
-      </ScrollView>
+                </ScrollView>
+          )}
+        </View>
+      </View>
     </View>
   );
 }
