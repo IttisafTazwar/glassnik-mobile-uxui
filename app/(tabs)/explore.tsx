@@ -635,9 +635,14 @@ export function VideoGridCell({
     return String(n);
   }
 
-  const canUseWebVideoFallback = Platform.OS === 'web' && !video.thumbnailUrl && !!video.uri;
+  const shouldUseWebVideo =
+    Platform.OS === 'web' &&
+    !!video.uri &&
+    (isFirst || !video.thumbnailUrl);
 
-  const thumbnailNode = video.thumbnailUrl ? (
+  const thumbnailNode = shouldUseWebVideo ? (
+    <WebVideoThumb uri={video.uri} isFirst={isFirst} />
+  ) : video.thumbnailUrl ? (
     <Image
       source={{ uri: video.thumbnailUrl }}
       style={StyleSheet.absoluteFill}
@@ -645,8 +650,6 @@ export function VideoGridCell({
       contentPosition="center"
       transition={200}
     />
-  ) : canUseWebVideoFallback ? (
-    <WebVideoThumb uri={video.uri} isFirst={isFirst} />
   ) : (
     <>
       <View style={[StyleSheet.absoluteFill, { backgroundColor: video.creator.color, opacity: 0.25 }]} />
