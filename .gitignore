@@ -39,3 +39,6 @@ yarn-error.*
 .vercel
 
 .env
+
+# Generated production build
+static-build/
