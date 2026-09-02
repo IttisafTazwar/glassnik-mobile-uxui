@@ -11,7 +11,6 @@ import {
   Text,
   TextInput,
   View,
-  useWindowDimensions,
 } from 'react-native';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,8 +20,6 @@ import * as LegacyFS from 'expo-file-system/legacy';
 import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation, useRouter } from 'expo-router';
-import { TopNav } from '@/components/TopNav';
-import { Sidebar } from '@/components/Sidebar';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
 import { mobileApi, userApi, videoApi } from '@/lib/api';
@@ -61,8 +58,6 @@ type UploadPhase = 'idle' | 'uploading' | 'processing' | 'done' | 'error';
 export default function UploadScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
-  const isMobile = width < 768;
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -333,6 +328,9 @@ export default function UploadScreen() {
 
     try {
       // Create the backend video record and obtain a fresh GCS signed URL.
+      // NOTE: mobileApi.requestUpload currently only accepts title/size/description.
+      // location/category are captured in UI state above but not yet sent to the
+      // backend — that requires a backend-side change outside this session's scope.
       // Description has been removed from the MVP form, so we pass undefined here.
       const slot = await mobileApi.requestUpload(
         uploadTitle.trim(),
@@ -571,43 +569,39 @@ export default function UploadScreen() {
     );
   }
 
+  if (!hasCreatorCap) {
+    return (
+      <View style={[styles.root, { backgroundColor: colors.background }]}>
+        <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
+          <Text style={[styles.headerTitle, { color: colors.foreground }]}>Upload</Text>
+        </View>
+        <View style={styles.centered}>
+          <View style={[styles.lockIcon, { backgroundColor: colors.muted }]}>
+            <Feather name="lock" size={32} color={colors.mutedForeground} />
+          </View>
+          <Text style={[styles.lockTitle, { color: colors.foreground }]}>Videographer Access Required</Text>
+          <Text style={[styles.lockSubtitle, { color: colors.mutedForeground }]}>
+            You need videographer access to upload Experiences.
+          </Text>
+          <Text style={[styles.lockHint, { color: colors.mutedForeground }]}>
+            Apply in your profile or contact the team to get access.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      {!isMobile && (
-        <View style={{ paddingTop: topPad }}>
-          <TopNav />
-        </View>
-      )}
+      <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
+        <Text style={[styles.headerTitle, { color: colors.foreground }]}>Upload</Text>
+      </View>
 
-      <View style={{ flex: 1, flexDirection: 'row' }}>
-        {!isMobile && <Sidebar />}
-
-        <View style={{ flex: 1 }}>
-          <View style={[styles.header, { paddingTop: 12, borderBottomColor: colors.border }]}>
-            <Text style={[styles.headerTitle, { color: colors.foreground }]}>Upload</Text>
-          </View>
-
-          {!hasCreatorCap ? (
-            <View style={styles.centered}>
-              <View style={[styles.lockIcon, { backgroundColor: colors.muted }]}>
-                <Feather name="lock" size={32} color={colors.mutedForeground} />
-              </View>
-              <Text style={[styles.lockTitle, { color: colors.foreground }]}>
-                Videographer Access Required
-              </Text>
-              <Text style={[styles.lockSubtitle, { color: colors.mutedForeground }]}>
-                You need videographer access to upload Experiences.
-              </Text>
-              <Text style={[styles.lockHint, { color: colors.mutedForeground }]}>
-                Apply in your profile or contact the team to get access.
-              </Text>
-            </View>
-          ) : (
-            <ScrollView
-              contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
 
 
         {/* Processing videos from prior sessions */}
@@ -978,10 +972,7 @@ export default function UploadScreen() {
             Upload a smart-glasses Eye-POV video to create a new Glassnik Experience.
           </Text>
         </View>
-                </ScrollView>
-          )}
-        </View>
-      </View>
+      </ScrollView>
     </View>
   );
 }

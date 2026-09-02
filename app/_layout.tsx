@@ -36,13 +36,11 @@ function AuthGate() {
   useEffect(() => {
     if (isLoading) return;
     const inAuthGroup = segments[0] === 'auth';
-    // TEMP: bypassed for local UI preview only — no backend to authenticate against.
-    // Restore this before sending any changes back to Tenzin/Pratik.
-    // if (!user && !inAuthGroup) {
-    //   router.replace('/auth/login');
-    // } else if (user && inAuthGroup) {
-    //   router.replace('/(tabs)');
-    // }
+    // Guests may browse the main app without signing in.
+    // Authenticated users should not remain on login/register screens.
+    if (user && inAuthGroup) {
+      router.replace('/(tabs)');
+    }
   }, [user, isLoading, segments]);
 
   return (

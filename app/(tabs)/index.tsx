@@ -15,8 +15,6 @@ import { useQuery } from '@tanstack/react-query';
 import { Feather } from '@expo/vector-icons';
 import { FeedVideoItem } from '@/components/FeedVideoItem';
 import { CommentsSheet } from '@/components/CommentsSheet';
-import { TopNav } from '@/components/TopNav';
-import { Sidebar } from '@/components/Sidebar';
 import { type SampleVideo } from '@/constants/sampleVideos';
 import { mobileApi } from '@/lib/api';
 import { useMute } from '@/context/MuteContext';
@@ -56,13 +54,8 @@ function apiVideoToSample(v: VideoAsset): SampleVideo {
 }
 
 export default function FeedScreen() {
-  const { width, height } = useWindowDimensions();
+  const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const isMobile = width < 768;
-  const desktopTopNavHeight = 64;
-  const feedItemHeight = isMobile
-    ? height
-    : Math.min(720, Math.max(400, height - desktopTopNavHeight));
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<ActiveTab>('foryou');
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -91,37 +84,24 @@ export default function FeedScreen() {
 
   const renderItem = useCallback(
     ({ item, index }: { item: SampleVideo; index: number }) => (
-      <View
-        style={{
-          height: feedItemHeight,
-          overflow: 'hidden',
-          backgroundColor: '#000',
-        }}
-      >
-        <FeedVideoItem
-          video={item}
-          isActive={index === currentIndex}
-          itemHeight={feedItemHeight}
-          onCommentPress={(videoId) => setCommentsVideoId(videoId)}
-        />
-      </View>
+      <FeedVideoItem
+        video={item}
+        isActive={index === currentIndex}
+        onCommentPress={(videoId) => setCommentsVideoId(videoId)}
+      />
     ),
-    [currentIndex, feedItemHeight]
+    [currentIndex]
   );
 
   const getItemLayout = useCallback(
-    (_: any, index: number) => ({
-      length: feedItemHeight,
-      offset: feedItemHeight * index,
-      index,
-    }),
-    [feedItemHeight]
+    (_: any, index: number) => ({ length: height, offset: height * index, index }),
+    [height]
   );
 
   const topInset = Platform.OS === 'web' ? 0 : insets.top;
 
-  const feedContent = (
-    <View style={styles.feedArea}>
+  return (
+    <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
       {/* ── Video feed ── */}
@@ -130,13 +110,9 @@ export default function FeedScreen() {
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         getItemLayout={getItemLayout}
-        snapToInterval={
-          Platform.OS === 'web' && isMobile ? undefined : feedItemHeight
-        }
+        snapToInterval={height}
         snapToAlignment="start"
-        decelerationRate={
-          Platform.OS === 'web' && isMobile ? 'normal' : 'fast'
-        }
+        decelerationRate="fast"
         pagingEnabled={Platform.OS !== 'web'}
         showsVerticalScrollIndicator={false}
         onViewableItemsChanged={onViewableItemsChanged.current}
@@ -189,62 +165,12 @@ export default function FeedScreen() {
       />
     </View>
   );
-
-  if (isMobile) {
-    return <View style={styles.root}>{feedContent}</View>;
-  }
-
-  return (
-    <View style={styles.root}>
-      <TopNav />
-
-      <View style={styles.desktopBody}>
-        <Sidebar />
-
-        <View style={styles.desktopFeedOuter}>
-          <View
-            style={[
-              styles.desktopFeed,
-              {
-                width: Math.min(520, Math.max(380, height * 0.56)),
-              },
-            ]}
-          >
-            {feedContent}
-          </View>
-        </View>
-      </View>
-    </View>
-  );
 }
 
 const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: '#000',
-  },
-  feedArea: {
-    flex: 1,
-    position: 'relative',
-    backgroundColor: '#000',
-    overflow: 'hidden',
-  },
-  desktopBody: {
-    flex: 1,
-    flexDirection: 'row',
-    backgroundColor: '#000',
-  },
-  desktopFeedOuter: {
-    flex: 1,
-    minWidth: 0,
-    backgroundColor: '#000',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  desktopFeed: {
-    flex: 1,
-    backgroundColor: '#000',
-    overflow: 'hidden',
   },
   topBar: {
     position: 'absolute',
