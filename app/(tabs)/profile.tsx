@@ -22,6 +22,8 @@ import { Image } from 'expo-image';
 import { useAuth } from '@/context/AuthContext';
 import { userApi, videoApi } from '@/lib/api';
 import type { VideoItem } from '@/types';
+import { TopNav } from '@/components/TopNav';
+import { Sidebar } from '@/components/Sidebar';
 
 type GridTab = 'videos' | 'liked';
 
@@ -41,6 +43,7 @@ function formatMemberSince(iso?: string | null): string | null {
 export default function ProfileScreen() {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const isMobile = Platform.OS !== 'web';
   const router = useRouter();
   const { user, logout, updateUser } = useAuth();
   const queryClient = useQueryClient();
@@ -149,7 +152,7 @@ const videos = allVideos.filter((v) => {
   return status === 'published' || status === 'ready';
 });
 
-  const topPad = Platform.OS === 'web' ? 8 : insets.top + 12;
+  const topPad = Platform.OS === 'web' ? 0 : insets.top + 12;
   const displayName = user?.displayName ?? user?.username ?? user?.email ?? 'User';
   const username = user?.username ?? (user?.email?.split('@')[0]) ?? 'user';
 
@@ -208,16 +211,141 @@ const videos = allVideos.filter((v) => {
     router.push({ pathname: '/video/[id]' as any, params: { id: video.id, data: JSON.stringify(video) } });
   }
 
+  if (!user) {
+    return (
+      <View style={styles.root}>
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor="transparent"
+          translucent
+        />
+
+        {!isMobile && <TopNav />}
+
+        <View
+          style={{
+            flex: 1,
+            flexDirection: 'row',
+            paddingTop: isMobile ? topPad : 0,
+          }}
+        >
+          {!isMobile && <Sidebar />}
+
+          <View
+            style={{
+              flex: 1,
+              alignItems: 'center',
+              justifyContent: 'center',
+              paddingHorizontal: 32,
+              paddingBottom: isMobile ? 0 : 60,
+            }}
+          >
+          <View
+            style={{
+              width: 88,
+              height: 88,
+              borderRadius: 44,
+              backgroundColor: '#18181b',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 24,
+            }}
+          >
+            <Feather name="user" size={42} color="#777" />
+          </View>
+
+          <Text
+            style={{
+              color: '#fff',
+              fontSize: 26,
+              fontFamily: 'Inter_700Bold',
+              marginBottom: 10,
+            }}
+          >
+            Sign in to view your profile
+          </Text>
+
+          <Text
+            style={{
+              color: '#888',
+              fontSize: 16,
+              textAlign: 'center',
+              marginBottom: 30,
+            }}
+          >
+            Create a profile, upload videos and connect with other creators.
+          </Text>
+
+          <Pressable
+            onPress={() => router.push('/auth/login')}
+            style={{
+              width: '100%',
+              backgroundColor: '#fff',
+              paddingVertical: 15,
+              borderRadius: 12,
+              alignItems: 'center',
+              marginBottom: 12,
+            }}
+          >
+            <Text
+              style={{
+                color: '#000',
+                fontSize: 16,
+                fontFamily: 'Inter_600SemiBold',
+              }}
+            >
+              Log in
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => router.push('/auth/register')}
+            style={{
+              width: '100%',
+              borderWidth: 1,
+              borderColor: '#444',
+              paddingVertical: 15,
+              borderRadius: 12,
+              alignItems: 'center',
+            }}
+          >
+            <Text
+              style={{
+                color: '#fff',
+                fontSize: 16,
+                fontFamily: 'Inter_600SemiBold',
+              }}
+            >
+              Sign up
+            </Text>
+          </Pressable>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      <ScrollView
+
+      {!isMobile && (
+        <View style={{ paddingTop: topPad }}>
+          <TopNav />
+        </View>
+      )}
+
+      <View style={{ flex: 1, flexDirection: 'row', paddingTop: isMobile ? topPad : 0 }}>
+        {!isMobile && <Sidebar />}
+
+        <View style={{ flex: 1 }}>
+          <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
         stickyHeaderIndices={[1]}
       >
         {/* ── Cover area ── */}
-        <View style={[styles.cover, { paddingTop: topPad }]}>
+        <View style={[styles.cover, { paddingTop: isMobile ? topPad : 0 }]}>
           {/* Header row: back (empty), username, settings icon */}
           <View style={styles.coverHeader}>
             <View style={{ width: 36 }} />
@@ -551,7 +679,9 @@ const videos = allVideos.filter((v) => {
             <Text style={styles.gridEmptySub}>Experiences you've liked will appear here.</Text>
           </View>
         )}
-      </ScrollView>
+          </ScrollView>
+        </View>
+      </View>
     </View>
   );
 }
