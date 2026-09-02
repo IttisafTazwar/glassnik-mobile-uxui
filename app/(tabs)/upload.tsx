@@ -324,14 +324,12 @@ export default function UploadScreen() {
 
     try {
       // Create the backend video record and obtain a fresh GCS signed URL.
-      // NOTE: mobileApi.requestUpload currently only accepts title/size/description.
-      // location/category are captured in UI state above but not yet sent to the
-      // backend — that requires a backend-side change outside this session's scope.
       // Description has been removed from the MVP form, so we pass undefined here.
       const slot = await mobileApi.requestUpload(
         uploadTitle.trim(),
         fileSize,
         undefined,
+        location.trim(),
       );
 
       const uploadUrl = slot.uploadUrl;

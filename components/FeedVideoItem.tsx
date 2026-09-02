@@ -26,6 +26,7 @@ import { useMute } from '@/context/MuteContext';
 interface Props {
   video: SampleVideo;
   isActive: boolean;
+  itemHeight?: number;
   /** Called when the comment button is pressed; receives the video's id. */
   onCommentPress?: (videoId: string) => void;
 }
@@ -36,7 +37,12 @@ function formatCount(n: number): string {
   return String(n);
 }
 
-export function FeedVideoItem({ video, isActive, onCommentPress }: Props) {
+export function FeedVideoItem({
+  video,
+  isActive,
+  itemHeight,
+  onCommentPress,
+}: Props) {
   const { isMuted, toggleMute } = useMute();
   const onMuteToggle = toggleMute;
   const { width, height } = useWindowDimensions();
@@ -216,7 +222,9 @@ export function FeedVideoItem({ video, isActive, onCommentPress }: Props) {
     }
   }
 
-  const ITEM_HEIGHT = height;
+  const isMobile = width < 768;
+  const ITEM_HEIGHT = itemHeight ?? height;
+  const itemWidth = Platform.OS === 'web' && !isMobile ? '100%' : width;
 
   // Place/Tour/Transport • Location — single line, per the mockup.
   const placeTourTransport = video.description || null;
@@ -224,13 +232,13 @@ export function FeedVideoItem({ video, isActive, onCommentPress }: Props) {
   const metaLine = [placeTourTransport, locationText].filter(Boolean).join(' • ');
 
   return (
-    <View style={[styles.container, { width, height: ITEM_HEIGHT }]}>
+    <View style={[styles.container, { width: itemWidth, height: ITEM_HEIGHT }]}>
       {/* ── Video / thumbnail ── */}
       {isActive ? (
         <VideoView
           player={player}
           style={StyleSheet.absoluteFill}
-          contentFit="cover"
+          contentFit={isMobile ? 'cover' : 'contain'}
           nativeControls={false}
         />
       ) : video.thumbnailUrl ? (
