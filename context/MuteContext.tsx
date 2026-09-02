@@ -4,11 +4,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 interface MuteContextValue {
   isMuted: boolean;
   toggleMute: () => void;
+  setMuted: (muted: boolean) => void;
 }
 
 const MuteContext = createContext<MuteContextValue>({
   isMuted: false,
   toggleMute: () => {},
+  setMuted: () => {},
 });
 
 const STORAGE_KEY = '@glassnik/muted';
@@ -31,8 +33,14 @@ export function MuteProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // Runtime synchronisation for cases such as browser autoplay policy.
+  // Unlike toggleMute(), this does not persist a forced browser state.
+  const setMuted = useCallback((muted: boolean) => {
+    setIsMuted(muted);
+  }, []);
+
   return (
-    <MuteContext.Provider value={{ isMuted, toggleMute }}>
+    <MuteContext.Provider value={{ isMuted, toggleMute, setMuted }}>
       {children}
     </MuteContext.Provider>
   );

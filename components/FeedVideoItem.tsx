@@ -43,10 +43,12 @@ function WebFeedVideo({
   uri,
   isActive,
   isMuted,
+  onAutoplayMuted,
 }: {
   uri: string;
   isActive: boolean;
   isMuted: boolean;
+  onAutoplayMuted?: () => void;
 }) {
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
 
@@ -74,6 +76,7 @@ function WebFeedVideo({
           // If the browser blocks unmuted autoplay, retry muted.
           if (el && !el.muted) {
             el.muted = true;
+            onAutoplayMuted?.();
             el.play().catch(() => {});
           }
         });
@@ -85,7 +88,7 @@ function WebFeedVideo({
         el.currentTime = 0;
       } catch {}
     }
-  }, [isActive, isMuted, uri]);
+  }, [isActive, isMuted, uri, onAutoplayMuted]);
 
   return React.createElement('video', {
     ref: videoRef,
@@ -110,8 +113,12 @@ function WebFeedVideo({
 }
 
 export function FeedVideoItem({ video, isActive, itemWidth, itemHeight, onCommentPress }: Props) {
-  const { isMuted, toggleMute } = useMute();
+  const { isMuted, toggleMute, setMuted } = useMute();
   const onMuteToggle = toggleMute;
+
+  const handleAutoplayMuted = React.useCallback(() => {
+    setMuted(true);
+  }, [setMuted]);
   const { width, height } = useWindowDimensions();
   const resolvedWidth = itemWidth ?? width;
   const [liked, setLiked] = useState(false);
@@ -318,7 +325,7 @@ export function FeedVideoItem({ video, isActive, itemWidth, itemHeight, onCommen
   // Desktop: the complete card remains ITEM_HEIGHT.
   // Reserve the bottom portion INSIDE that card for creator,
   // metadata and reaction controls.
-  const desktopInfoHeight = isDesktopWeb ? 58 : 0;
+  const desktopInfoHeight = isDesktopWeb ? 118 : 0;
   const desktopVideoHeight = isDesktopWeb
     ? Math.max(1, ITEM_HEIGHT - desktopInfoHeight)
     : ITEM_HEIGHT;
@@ -354,6 +361,7 @@ export function FeedVideoItem({ video, isActive, itemWidth, itemHeight, onCommen
             uri={video.uri}
             isActive={isActive}
             isMuted={isMuted}
+            onAutoplayMuted={handleAutoplayMuted}
           />
         ) : (
           <VideoView
@@ -422,113 +430,11 @@ export function FeedVideoItem({ video, isActive, itemWidth, itemHeight, onCommen
         <Feather name="heart" size={90} color="#fff" />
       </Animated.View>
 
-      {/* ── Right sidebar — avatar/follow, Music disc. Save removed per
-          spec; the floating pink "+" follow badge removed per spec
-          (Steve flagged it as an unidentified button interfering with
-          immersion) — the avatar itself and follow interaction are kept,
-          just moved to a plain outline badge instead of a filled pink one. */}
-      {controlsVisible && (
-        <View style={[styles.sidebar, { bottom: Platform.OS === 'web' ? 170 : 170 + 34 }]}>
-          {!isOwnVideo && (
-            <Pressable style={styles.sideItem} onPress={video.creatorId ? handleFollow : undefined} disabled={followLoading}>
-              <View style={[styles.avatar, { backgroundColor: video.creator.color }]}>
-                {video.creator.avatarUrl ? (
-                  <Image
-                    source={{ uri: video.creator.avatarUrl }}
-                    style={styles.avatarImage}
-                    contentFit="cover"
-                    transition={200}
-                  />
-                ) : (
-                  <Text style={styles.avatarText}>{video.creator.initial}</Text>
-                )}
-              </View>
-              {video.creatorId && !following && (
-                <View style={styles.followBtn}>
-                  <Feather name="plus" size={12} color="#fff" />
-                </View>
-              )}
-              {video.creatorId && following && (
-                <View style={[styles.followBtn, styles.followBtnActive]}>
-                  <Feather name="check" size={11} color="#fff" />
-                </View>
-              )}
-            </Pressable>
-          )}
-
-          {/* Spinning music disc */}
-          <Pressable style={styles.sideItem} onPress={onMuteToggle}>
-            <Animated.View style={[styles.disc, spinStyle]}>
-              <View style={[styles.discInner, { backgroundColor: video.creator.color }]}>
-                <Text style={styles.discNote}>♪</Text>
-              </View>
-            </Animated.View>
-          </Pressable>
-        </View>
-      )}
-
       {/* ── Bottom info/control box — overlays the video, flush to the
           bottom and both side edges, compact and semi-transparent.
           Progress bar sits immediately above it. Both hidden together on
           tap per the spec. Save button removed; action icons are Like/
           Comment/Share/Report only, smaller and soft grey. */}
-      {/* Desktop creator + metadata overlay.
-          These remain inside the video. Reactions sit below the video. */}
-      {controlsVisible && isDesktopWeb && (
-        <View
-          style={{
-            position: 'absolute',
-            left: 14,
-            right: 14,
-            bottom: desktopInfoHeight + 12,
-            zIndex: 20,
-            gap: 6,
-          }}
-        >
-          {!isOwnVideo && (
-            <View style={styles.creatorRow}>
-              <Text style={styles.creatorName}>@{video.creator.username}</Text>
-
-              {video.creatorId && (
-                <Pressable
-                  style={[
-                    styles.followTextBtn,
-                    following && styles.followTextBtnActive,
-                  ]}
-                  onPress={handleFollow}
-                  disabled={followLoading}
-                >
-                  {following ? (
-                    <View style={styles.followingRow}>
-                      <Feather name="check" size={11} color="#fff" />
-                      <Text style={styles.followTextBtnLabel}>Following</Text>
-                    </View>
-                  ) : (
-                    <Text style={styles.followTextBtnLabel}>Follow</Text>
-                  )}
-                </Pressable>
-              )}
-            </View>
-          )}
-
-          {metaLine ? (
-            <View style={styles.metaRow}>
-              <Text style={styles.metaText} numberOfLines={1}>
-                {metaLine}
-              </Text>
-
-              {video.category ? (
-                <View style={styles.categoryPill}>
-                  <Text style={styles.categoryText}>
-                    {video.category.toUpperCase()}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-          ) : null}
-        </View>
-      )}
-
       {controlsVisible && (
         <View
           style={[
@@ -554,14 +460,15 @@ export function FeedVideoItem({ video, isActive, itemWidth, itemHeight, onCommen
               bottom: 0,
               height: desktopInfoHeight,
               backgroundColor: '#000',
-              paddingHorizontal: 8,
-              paddingTop: 8,
-              paddingBottom: 6,
+              paddingHorizontal: 14,
+              paddingTop: 10,
+              paddingBottom: 8,
               justifyContent: 'center',
+              gap: 7,
             },
           ]}
         >
-          {!isDesktopWeb && !isOwnVideo && (
+          {!isOwnVideo && (
             <View style={styles.creatorRow}>
               <Text style={styles.creatorName}>@{video.creator.username}</Text>
               {video.creatorId && (
@@ -583,7 +490,7 @@ export function FeedVideoItem({ video, isActive, itemWidth, itemHeight, onCommen
             </View>
           )}
 
-          {!isDesktopWeb && metaLine ? (
+          {metaLine ? (
             <View style={styles.metaRow}>
               <Text style={styles.metaText} numberOfLines={1}>
                 {metaLine}
@@ -596,7 +503,7 @@ export function FeedVideoItem({ video, isActive, itemWidth, itemHeight, onCommen
             </View>
           ) : null}
 
-          {!isDesktopWeb && <View style={styles.divider} />}
+          <View style={styles.divider} />
 
           <View style={styles.actionRow}>
             <Pressable style={styles.actionItem} onPress={handleLike}>

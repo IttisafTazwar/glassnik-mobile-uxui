@@ -158,7 +158,7 @@ export default function ExploreScreen() {
   // from 3 to 4 to compensate: portrait cards are much taller per row,
   // so narrower/more columns is what keeps the "first row visible without
   // scrolling at 1366×768" requirement intact alongside this shape.
-  const COLS = isMobile ? 2 : 3;
+  const COLS = isMobile ? 2 : 4;
   const CELL_GAP = 6;
   const GRID_PADDING = isMobile ? 14 : 20;
   const cellWidth = (contentWidth - GRID_PADDING * 2 - CELL_GAP * (COLS - 1)) / COLS;
@@ -239,7 +239,7 @@ export default function ExploreScreen() {
                   !isMobile && styles.sectionHeaderRowDesktop,
                 ]}
               >
-                <Text style={styles.sectionTitle}>Discover New Experiences</Text>
+                <Text style={styles.sectionTitle}>Trending Destinations</Text>
                 <Text style={styles.sectionCount}>{filtered.length} experiences</Text>
               </View>
             </View>
@@ -253,6 +253,7 @@ export default function ExploreScreen() {
             width={cellWidth}
             height={cellHeight}
             isMobile={isMobile}
+            isFirst={index === 0}
           />
         )}
         ListEmptyComponent={
@@ -565,13 +566,7 @@ function DiscoveryTabs({
   );
 }
 
-function WebVideoThumb({
-  uri,
-  hovered,
-}: {
-  uri: string;
-  hovered: boolean;
-}) {
+function WebVideoThumb({ uri, isFirst }: { uri: string; isFirst: boolean }) {
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
 
   React.useEffect(() => {
@@ -581,28 +576,46 @@ function WebVideoThumb({
     el.muted = true;
     el.defaultMuted = true;
 
-    if (hovered) {
-      const playPromise = el.play();
+    if (isFirst) {
+      const startPlayback = () => {
+        el.muted = true;
+        el.defaultMuted = true;
 
-      if (playPromise && typeof playPromise.catch === 'function') {
-        playPromise.catch(() => {});
+        const playPromise = el.play();
+        if (playPromise && typeof playPromise.catch === 'function') {
+          playPromise.catch(() => {});
+        }
+      };
+
+      if (el.readyState >= 2) {
+        startPlayback();
+      } else {
+        el.addEventListener('canplay', startPlayback, { once: true });
       }
-    } else {
-      el.pause();
 
-      try {
-        el.currentTime = 0;
-      } catch {}
+      return () => {
+        el.removeEventListener('canplay', startPlayback);
+      };
+    } else {
+      const showFrame = () => {
+        try {
+          el.currentTime = 0.1;
+        } catch {}
+      };
+      if (el.readyState >= 1) {
+        showFrame();
+      } else {
+        el.addEventListener('loadedmetadata', showFrame, { once: true });
+      }
     }
-  }, [hovered, uri]);
+  }, [uri, isFirst]);
 
   return React.createElement('video', {
     ref: videoRef,
     src: uri,
     playsInline: true,
-    muted: true,
     preload: 'metadata',
-    loop: true,
+    loop: isFirst,
     style: {
       position: 'absolute',
       top: 0,
@@ -620,11 +633,13 @@ export function VideoGridCell({
   width,
   height,
   isMobile = false,
+  isFirst = false,
 }: {
   video: SampleVideo;
   width: number;
   height: number;
   isMobile?: boolean;
+  isFirst?: boolean;
 }) {
   const [isHovered, setIsHovered] = React.useState(false);
 
@@ -644,7 +659,8 @@ export function VideoGridCell({
     !!video.uri;
 
   const thumbnailNode = shouldUseWebVideo ? (
-    <WebVideoThumb uri={video.uri} hovered={isHovered} />
+    <WebVideoThumb uri={video.uri} hovered={isHovered}
+          />
   ) : video.thumbnailUrl ? (
     <Image
       source={{ uri: video.thumbnailUrl }}
@@ -774,9 +790,9 @@ const styles = StyleSheet.create({
     gap: 24,
   },
   hero: { gap: 6, flexShrink: 1, maxWidth: '62%' },
-  heroTitle: { color: '#fff', fontSize: 21, fontFamily: 'Inter_700Bold', lineHeight: 25 },
+  heroTitle: { color: '#fff', fontSize: 26, fontFamily: 'Inter_700Bold', lineHeight: 31 },
   heroTitleAccent: { color: '#5eead4' },
-  heroSubtitle: { color: 'rgba(255,255,255,0.75)', fontSize: 11, fontFamily: 'Inter_400Regular', lineHeight: 15 },
+  heroSubtitle: { color: 'rgba(255,255,255,0.75)', fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 19 },
 
   searchWrap: {
     flexDirection: 'row',
@@ -835,14 +851,75 @@ const styles = StyleSheet.create({
 
   discoveryRow: { flexDirection: 'row', gap: 20 },
   discoveryTab: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingBottom: 8, position: 'relative' },
-  discoveryTabText: { color: 'rgba(255,255,255,0.5)', fontSize: 13, fontFamily: 'Inter_500Medium' },
+  discoveryTabText: { color: 'rgba(255,255,255,0.5)', fontSize: 16, fontFamily: 'Inter_500Medium' },
   discoveryTabTextActive: { color: '#fff', fontFamily: 'Inter_600SemiBold' },
   discoveryTabUnderline: {
     position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, backgroundColor: '#fff', borderRadius: 1,
   },
 
+  featureBoxesRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 6,
+  },
+  featureBox: {
+    flex: 1,
+    minHeight: 76,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: 'rgba(255,255,255,0.055)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  featureBoxIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  featureBoxContent: {
+    flex: 1,
+    gap: 4,
+  },
+  featureBoxTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  featureBoxTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter_700Bold',
+    letterSpacing: 0.4,
+  },
+  featureBoxSubtitle: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 13,
+    fontFamily: 'Inter_400Regular',
+  },
+  liveBadge: {
+    backgroundColor: 'rgba(254,44,85,0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(254,44,85,0.4)',
+    borderRadius: 5,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  liveBadgeText: {
+    color: '#FE2C55',
+    fontSize: 9,
+    fontFamily: 'Inter_700Bold',
+    letterSpacing: 0.5,
+  },
+
   labeledRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  rowLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontFamily: 'Inter_600SemiBold', flexShrink: 0 },
+  rowLabel: { color: 'rgba(255,255,255,0.75)', fontSize: 15, fontFamily: 'Inter_600SemiBold', flexShrink: 0 },
   viewAllText: { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontFamily: 'Inter_600SemiBold', flexShrink: 0, marginLeft: 8 },
 
   categoryRow: { gap: 8, paddingRight: 14 },
@@ -851,11 +928,11 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
   },
   categoryPillActive: { backgroundColor: '#fff', borderColor: '#fff' },
-  categoryPillText: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontFamily: 'Inter_500Medium' },
+  categoryPillText: { color: 'rgba(255,255,255,0.75)', fontSize: 16, fontFamily: 'Inter_500Medium' },
   categoryPillTextActive: { color: '#000', fontFamily: 'Inter_600SemiBold' },
 
   section: { paddingTop: 18, paddingBottom: 10 },
-  sectionTitle: { color: '#fff', fontSize: 16, fontFamily: 'Inter_700Bold' },
+  sectionTitle: { color: 'rgba(255,255,255,0.75)', fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   sectionHeaderRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline',
     marginBottom: 12, marginTop: 36, paddingHorizontal: 14,

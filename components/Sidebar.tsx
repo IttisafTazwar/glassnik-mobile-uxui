@@ -154,8 +154,7 @@ export function Sidebar() {
         })()}
       </View>
 
-      {!user && (
-        <View style={styles.joinBox}>
+      <View style={styles.joinBox}>
           <View style={styles.joinIconRow}>
             <Feather name="star" size={14} color="#5eead4" />
             <Text style={styles.joinTitle}>Become a Glassnik videographer</Text>
@@ -163,16 +162,19 @@ export function Sidebar() {
           <Text style={styles.joinBody}>
             Start exploring real Eye-POV experiences from around the world.
           </Text>
-          <Pressable style={styles.signupBtn} onPress={() => router.push('/auth/register' as any)}>
-            <Text style={styles.signupText}>Sign up</Text>
-          </Pressable>
-          <Pressable onPress={() => router.push('/auth/login' as any)}>
-            <Text style={styles.loginHint}>
-              Already have an account? <Text style={styles.loginHintLink}>Log in</Text>
-            </Text>
-          </Pressable>
+          {!user && (
+            <>
+              <Pressable style={styles.signupBtn} onPress={() => router.push('/auth/register' as any)}>
+                <Text style={styles.signupText}>Sign up</Text>
+              </Pressable>
+              <Pressable onPress={() => router.push('/auth/login' as any)}>
+                <Text style={styles.loginHint}>
+                  Already have an account? <Text style={styles.loginHintLink}>Log in</Text>
+                </Text>
+              </Pressable>
+            </>
+          )}
         </View>
-      )}
 
       <View style={styles.footerGroup}>
         {FOOTER_LINKS.map((link) => (
@@ -219,8 +221,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   navItemActive: { backgroundColor: '#fff' },
-  navItemText: { color: '#fff', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  navItemChildText: { color: 'rgba(255,255,255,0.75)', fontSize: 12, fontFamily: 'Inter_500Medium' },
+  navItemText: { color: '#fff', fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  navItemChildText: { color: 'rgba(255,255,255,0.75)', fontSize: 15, fontFamily: 'Inter_500Medium' },
   navItemTextActive: { color: '#000' },
 
   joinBox: {

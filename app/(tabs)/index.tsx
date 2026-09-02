@@ -285,6 +285,9 @@ const styles = StyleSheet.create({
     textShadowRadius: 4,
   },
   tabSwitcher: {
+    position: 'absolute',
+    left: '50%',
+    transform: [{ translateX: -75 }],
     flexDirection: 'row',
     gap: 20,
     alignItems: 'center',
