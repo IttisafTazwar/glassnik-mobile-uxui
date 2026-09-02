@@ -29,10 +29,17 @@ const EXPLORE_CHILDREN: Leaf[] = [
 
 // Profile's sub-items — shown only when the user is logged in AND has the
 // videographer (mobile.creator) capability, per spec.
-const PROFILE_CHILDREN: Leaf[] = [
-  { label: 'Upload', icon: 'plus-square', route: '/(tabs)/upload' },
-  { label: 'Activity', icon: 'bell', route: '/(tabs)/notifications' },
-];
+const UPLOAD_ITEM: Leaf = {
+  label: 'Upload',
+  icon: 'plus-square',
+  route: '/(tabs)/upload',
+};
+
+const ACTIVITY_ITEM: Leaf = {
+  label: 'Activity',
+  icon: 'bell',
+  route: '/(tabs)/notifications',
+};
 
 export function Sidebar() {
   const router = useRouter();
@@ -108,19 +115,31 @@ export function Sidebar() {
           </Text>
         </Pressable>
 
-        {user && hasCreatorCap && PROFILE_CHILDREN.map((child) => {
-          const isActive = pathname === child.route;
+        {user && hasCreatorCap && (() => {
+          const isActive = pathname === UPLOAD_ITEM.route;
           return (
             <Pressable
-              key={child.label}
               style={[styles.navItemChild, isActive && styles.navItemActive]}
-              onPress={() => router.push(child.route as any)}
+              onPress={() => router.push(UPLOAD_ITEM.route as any)}
             >
-              <Feather name={child.icon} size={14} color={isActive ? '#000' : 'rgba(255,255,255,0.75)'} />
-              <Text style={[styles.navItemChildText, isActive && styles.navItemTextActive]}>{child.label}</Text>
+              <Feather name={UPLOAD_ITEM.icon} size={14} color={isActive ? '#000' : 'rgba(255,255,255,0.75)'} />
+              <Text style={[styles.navItemChildText, isActive && styles.navItemTextActive]}>Upload</Text>
             </Pressable>
           );
-        })}
+        })()}
+
+        {user && (() => {
+          const isActive = pathname === ACTIVITY_ITEM.route;
+          return (
+            <Pressable
+              style={[styles.navItemChild, isActive && styles.navItemActive]}
+              onPress={() => router.push(ACTIVITY_ITEM.route as any)}
+            >
+              <Feather name={ACTIVITY_ITEM.icon} size={14} color={isActive ? '#000' : 'rgba(255,255,255,0.75)'} />
+              <Text style={[styles.navItemChildText, isActive && styles.navItemTextActive]}>Activity</Text>
+            </Pressable>
+          );
+        })()}
       </View>
 
       {!user && (
