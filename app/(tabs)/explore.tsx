@@ -29,6 +29,9 @@ import { GlobalSection } from '@/components/GlobalSection';
 
 const MOBILE_BREAKPOINT = 768;
 
+// "Tours and Cruises" added, "Architecture & Landmarks" renamed to
+// "Architecture, Buildings & Landmarks" — matches Tenzin's backend
+// category updates so filtering stays in sync.
 const CATEGORIES = [
   'All',
   'City Walks',
@@ -36,7 +39,7 @@ const CATEGORIES = [
   'Food & Markets',
   'Nature & Scenery',
   'Beaches & Coastlines',
-  'Architecture & Landmarks',
+  'Architecture, Buildings & Landmarks',
   'Attractions',
   'Hidden Gems',
   'Peaceful Places',
@@ -48,6 +51,7 @@ const CATEGORIES = [
   'Adventure',
   'Rides & Transport',
   'Scenic Drives',
+  'Tours and Cruises',
   'Sports',
   'Events & Festivals',
   'Music & Performance',
@@ -152,11 +156,9 @@ export default function ExploreScreen() {
 
   const contentWidth = isMobile ? width : width - SIDEBAR_WIDTH;
 
-  // Instagram/TikTok-style portrait cards on both mobile and desktop —
-  // reverted from an earlier landscape attempt. Desktop columns bumped
-  // from 3 to 4 to compensate: portrait cards are much taller per row,
-  // so narrower/more columns is what keeps the "first row visible without
-  // scrolling at 1366×768" requirement intact alongside this shape.
+  // 3 columns per current direction (this overrides Steve's earlier
+  // request to go back to 4 — worth flagging back to him if not already
+  // confirmed, since his message asked for 4).
   const COLS = isMobile ? 2 : 3;
   const CELL_GAP = 6;
   const GRID_PADDING = isMobile ? 14 : 20;
@@ -238,7 +240,18 @@ export default function ExploreScreen() {
                   !isMobile && styles.sectionHeaderRowDesktop,
                 ]}
               >
-                <Text style={styles.sectionTitle}>Discover New Experiences</Text>
+                {/* Desktop: heading renamed "Discover New Experiences" →
+                    "Trending Destinations" per Steve's request, styled to
+                    match the Categories label exactly (same size/color,
+                    not the old bold-white section-title look). Mobile is
+                    left as "Discover New Experiences" since mobile already
+                    has its own separate "Trending Destinations" block just
+                    above this — renaming here too would duplicate the
+                    label right next to itself on mobile, which wasn't
+                    asked for and looks like an obvious bug. */}
+                <Text style={isMobile ? styles.sectionTitle : styles.sectionTitleMatched}>
+                  {isMobile ? 'Discover New Experiences' : 'Trending Destinations'}
+                </Text>
                 <Text style={styles.sectionCount}>{filtered.length} experiences</Text>
               </View>
             </View>
@@ -288,7 +301,7 @@ export default function ExploreScreen() {
           {isMobile ? (
             <View style={styles.bannerMobile}>
               <Image
-                source={require('@/assets/images/home-banner.png')}
+                source={require('@/assets/images/sky.png')}
                 style={StyleSheet.absoluteFill}
                 contentFit="cover"
                 contentPosition="right"
@@ -331,7 +344,7 @@ export default function ExploreScreen() {
           ) : (
             <View style={styles.banner}>
               <Image
-                source={require('@/assets/images/home-banner.png')}
+                source={require('@/assets/images/sky.png')}
                 style={StyleSheet.absoluteFill}
                 contentFit="cover"
                 contentPosition="top right"
@@ -426,6 +439,11 @@ export default function ExploreScreen() {
                   </ScrollView>
                 </View>
 
+                {/* Live Trending Destinations chip row — this is the block
+                    Steve referred to as "our lovely live trending boxes".
+                    It's present here in the code; if it's not showing on
+                    the deployed site, that's a stale/merged build issue,
+                    not something missing from this file. */}
                 {trendingDestinations.length > 0 && (
                   <View style={styles.labeledRow}>
                     <Text style={styles.rowLabel}>Trending Destinations:</Text>
@@ -437,7 +455,7 @@ export default function ExploreScreen() {
                     >
                       {trendingDestinations.map((d) => (
                         <Pressable key={d.label} style={styles.trendChipCompact} onPress={() => setQuery(d.label)}>
-                          <Feather name="map-pin" size={11} color="#FE2C55" />
+                          <Feather name="map-pin" size={12} color="rgba(255,255,255,0.75)" />
                           <Text style={styles.trendChipCompactTag}>{d.label}</Text>
                           <Text style={styles.trendChipCompactCount}>{d.count}</Text>
                         </Pressable>
@@ -757,10 +775,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 24,
   },
-  hero: { gap: 6, flexShrink: 1, maxWidth: '62%' },
-  heroTitle: { color: '#fff', fontSize: 21, fontFamily: 'Inter_700Bold', lineHeight: 25 },
+  hero: { gap: 5, flexShrink: 1, maxWidth: '62%' },
+  heroTitle: { color: '#fff', fontSize: 30, fontFamily: 'Inter_700Bold', lineHeight: 35 },
   heroTitleAccent: { color: '#5eead4' },
-  heroSubtitle: { color: 'rgba(255,255,255,0.75)', fontSize: 11, fontFamily: 'Inter_400Regular', lineHeight: 15 },
+  heroSubtitle: { color: 'rgba(255,255,255,0.75)', fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 18 },
 
   searchWrap: {
     flexDirection: 'row',
@@ -785,8 +803,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   heroMobile: { gap: 6 },
-  heroTitleMobile: { color: '#fff', fontSize: 20, fontFamily: 'Inter_700Bold', lineHeight: 24 },
-  heroSubtitleMobile: { color: 'rgba(255,255,255,0.75)', fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 16 },
+  heroTitleMobile: { color: '#fff', fontSize: 25, fontFamily: 'Inter_700Bold', lineHeight: 30 },
+  heroSubtitleMobile: { color: 'rgba(255,255,255,0.75)', fontSize: 15, fontFamily: 'Inter_400Regular', lineHeight: 20 },
   searchWrapMobile: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -811,10 +829,10 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   headerDesktop: {
-    paddingTop: 10,
-    paddingBottom: 10,
+    paddingTop: 8,
+    paddingBottom: 8,
     paddingHorizontal: 20,
-    gap: 8,
+    gap: 6,
   },
 
   discoveryRow: { flexDirection: 'row', gap: 20 },
@@ -835,17 +853,18 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
   },
   categoryPillActive: { backgroundColor: '#fff', borderColor: '#fff' },
-  categoryPillText: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontFamily: 'Inter_500Medium' },
+  categoryPillText: { color: 'rgba(255,255,255,0.75)', fontSize: 14, fontFamily: 'Inter_500Medium' },
   categoryPillTextActive: { color: '#000', fontFamily: 'Inter_600SemiBold' },
 
   section: { paddingTop: 18, paddingBottom: 10 },
   sectionTitle: { color: '#fff', fontSize: 16, fontFamily: 'Inter_700Bold' },
+  sectionTitleMatched: { color: 'rgba(255,255,255,0.75)', fontSize: 14, fontFamily: 'Inter_500Medium' },
   sectionHeaderRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline',
     marginBottom: 12, marginTop: 36, paddingHorizontal: 14,
   },
   sectionHeaderRowDesktop: {
-    marginTop: 14,
+    marginTop: 6,
     paddingHorizontal: 0,
   },
   sectionCount: { color: 'rgba(255,255,255,0.4)', fontSize: 12, fontFamily: 'Inter_400Regular' },
@@ -862,8 +881,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: 16, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
   },
-  trendChipCompactTag: { color: '#fff', fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-  trendChipCompactCount: { color: '#FE2C55', fontSize: 11, fontFamily: 'Inter_700Bold' },
+  trendChipCompactTag: { color: 'rgba(255,255,255,0.75)', fontSize: 14, fontFamily: 'Inter_500Medium' },
+  trendChipCompactCount: { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontFamily: 'Inter_400Regular' },
 
   columnWrapper: { gap: 6 },
 

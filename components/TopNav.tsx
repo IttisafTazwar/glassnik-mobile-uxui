@@ -46,12 +46,12 @@ const APP_NAV_ITEMS: {
   loggedInOnly?: boolean;
   requiresCreatorCap?: boolean;
 }[] = [
-  { label: 'Explore', icon: 'compass', route: '/(tabs)/explore' },
-  { label: 'For You', icon: 'home', route: '/' },
-  { label: 'Upload', icon: 'plus-square', route: '/(tabs)/upload', loggedInOnly: true, requiresCreatorCap: true },
-  { label: 'Activity', icon: 'bell', route: '/(tabs)/notifications', loggedInOnly: true },
-  { label: 'Profile', icon: 'user', route: '/(tabs)/profile' },
-];
+    { label: 'Explore', icon: 'compass', route: '/(tabs)/explore' },
+    { label: 'For You', icon: 'home', route: '/' },
+    { label: 'Upload', icon: 'plus-square', route: '/(tabs)/upload', loggedInOnly: true, requiresCreatorCap: true },
+    { label: 'Activity', icon: 'bell', route: '/(tabs)/notifications', loggedInOnly: true },
+    { label: 'Profile', icon: 'user', route: '/(tabs)/profile' },
+  ];
 
 const FOOTER_LINKS = [
   { label: 'Company', url: 'https://www.glassnik.com/about-us' },
@@ -97,7 +97,13 @@ export function TopNav() {
     await logout();
   }
 
-  // ── Desktop — unchanged from the existing implementation ─────────────────
+  // ── Desktop — links row is now a horizontal ScrollView instead of a
+  // fixed space-evenly row. At "in-between" widths (narrower than a full
+  // desktop but wider than the mobile breakpoint, e.g. a tablet or a
+  // squeezed browser window) there isn't enough room to space 7 links
+  // evenly, and they visually collapsed into each other with no gaps.
+  // Making the row scrollable means it never overlaps — it just scrolls
+  // if the viewport is tight, and lays out identically at full width. ────
   if (!isMobile) {
     return (
       <View style={[styles.wrap, { paddingTop: topPad }]}>
@@ -111,13 +117,18 @@ export function TopNav() {
             <Text style={styles.logoText}>Glassnik</Text>
           </Pressable>
 
-          <View style={styles.linksRow}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.linksRow}
+            contentContainerStyle={styles.linksRowContent}
+          >
             {MARKETING_LINKS.map((link) => (
               <Pressable key={link.label} onPress={() => Linking.openURL(link.url)}>
                 <Text style={styles.linkText}>{link.label}</Text>
               </Pressable>
             ))}
-          </View>
+          </ScrollView>
 
           <View style={styles.rightActions}>
             <Pressable hitSlop={8}>
@@ -266,12 +277,19 @@ const styles = StyleSheet.create({
   },
   logoText: { color: '#fff', fontSize: 17, fontFamily: 'Inter_700Bold' },
 
+  // linksRow is now a ScrollView container — flex:1 still lets it take up
+  // the remaining space between the logo and rightActions, but content no
+  // longer needs to fit; it scrolls instead of collapsing.
   linksRow: {
     flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-evenly',
-    alignItems: 'center',
     marginHorizontal: 20,
+  },
+  linksRowContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexGrow: 1,
+    gap: 20,
   },
   linkText: { color: 'rgba(255,255,255,0.85)', fontSize: 15, fontFamily: 'Inter_500Medium' },
 

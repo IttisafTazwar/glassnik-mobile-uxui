@@ -10,7 +10,7 @@ type Leaf = {
   label: string;
   icon: React.ComponentProps<typeof Feather>['name'];
   route: string;
-  discovery?: string; // query param value for Explore sub-items
+  discovery?: string;
 };
 
 const FOOTER_LINKS = [
@@ -19,16 +19,12 @@ const FOOTER_LINKS = [
   { label: 'Support', url: 'https://www.glassnik.com/reviews' },
 ];
 
-// Explore's sub-items — navigate to the same Explore route with a
-// `discovery` query param; explore.tsx reads this to set its active tab.
 const EXPLORE_CHILDREN: Leaf[] = [
   { label: 'Trending', icon: 'trending-up', route: '/(tabs)/explore', discovery: 'Trending' },
   { label: 'Nearby', icon: 'map-pin', route: '/(tabs)/explore', discovery: 'Nearby' },
   { label: 'Global', icon: 'globe', route: '/(tabs)/explore', discovery: 'Global' },
 ];
 
-// Profile's sub-items — shown only when the user is logged in AND has the
-// videographer (mobile.creator) capability, per spec.
 const PROFILE_CHILDREN: Leaf[] = [
   { label: 'Upload', icon: 'plus-square', route: '/(tabs)/upload' },
   { label: 'Activity', icon: 'bell', route: '/(tabs)/notifications' },
@@ -63,12 +59,11 @@ export function Sidebar() {
   return (
     <View style={styles.wrap}>
       <View style={styles.navGroup}>
-        {/* Explore + indented sub-items */}
         <Pressable
           style={[styles.navItem, onExplorePage && currentDiscovery === 'Explore' && styles.navItemActive]}
           onPress={() => goExplore()}
         >
-          <Feather name="compass" size={16} color={onExplorePage && currentDiscovery === 'Explore' ? '#000' : '#fff'} />
+          <Feather name="compass" size={18} color={onExplorePage && currentDiscovery === 'Explore' ? '#000' : '#fff'} />
           <Text style={[styles.navItemText, onExplorePage && currentDiscovery === 'Explore' && styles.navItemTextActive]}>
             Explore
           </Text>
@@ -82,27 +77,25 @@ export function Sidebar() {
               style={[styles.navItemChild, isActive && styles.navItemActive]}
               onPress={() => goExplore(child.discovery)}
             >
-              <Feather name={child.icon} size={14} color={isActive ? '#000' : 'rgba(255,255,255,0.75)'} />
+              <Feather name={child.icon} size={16} color={isActive ? '#000' : 'rgba(255,255,255,0.75)'} />
               <Text style={[styles.navItemChildText, isActive && styles.navItemTextActive]}>{child.label}</Text>
             </Pressable>
           );
         })}
 
-        {/* For You */}
         <Pressable
           style={[styles.navItem, pathname === '/' && styles.navItemActive]}
           onPress={() => router.push('/' as any)}
         >
-          <Feather name="home" size={16} color={pathname === '/' ? '#000' : '#fff'} />
+          <Feather name="home" size={18} color={pathname === '/' ? '#000' : '#fff'} />
           <Text style={[styles.navItemText, pathname === '/' && styles.navItemTextActive]}>For You</Text>
         </Pressable>
 
-        {/* Profile + indented sub-items (logged-in videographers only) */}
         <Pressable
           style={[styles.navItem, pathname === '/(tabs)/profile' && styles.navItemActive]}
           onPress={() => router.push('/(tabs)/profile' as any)}
         >
-          <Feather name="user" size={16} color={pathname === '/(tabs)/profile' ? '#000' : '#fff'} />
+          <Feather name="user" size={18} color={pathname === '/(tabs)/profile' ? '#000' : '#fff'} />
           <Text style={[styles.navItemText, pathname === '/(tabs)/profile' && styles.navItemTextActive]}>
             Profile
           </Text>
@@ -116,7 +109,7 @@ export function Sidebar() {
               style={[styles.navItemChild, isActive && styles.navItemActive]}
               onPress={() => router.push(child.route as any)}
             >
-              <Feather name={child.icon} size={14} color={isActive ? '#000' : 'rgba(255,255,255,0.75)'} />
+              <Feather name={child.icon} size={16} color={isActive ? '#000' : 'rgba(255,255,255,0.75)'} />
               <Text style={[styles.navItemChildText, isActive && styles.navItemTextActive]}>{child.label}</Text>
             </Pressable>
           );
@@ -126,7 +119,7 @@ export function Sidebar() {
       {!user && (
         <View style={styles.joinBox}>
           <View style={styles.joinIconRow}>
-            <Feather name="star" size={14} color="#5eead4" />
+            <Feather name="star" size={16} color="#5eead4" />
             <Text style={styles.joinTitle}>Become a Glassnik videographer</Text>
           </View>
           <Text style={styles.joinBody}>
@@ -174,22 +167,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     paddingHorizontal: 10,
-    paddingVertical: 9,
+    paddingVertical: 10,
     borderRadius: 8,
   },
-  // Indented ~18px, per spec.
   navItemChild: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 10,
-    paddingVertical: 7,
-    marginLeft: 18,
+    paddingVertical: 8,
+    marginLeft: 26,
     borderRadius: 8,
   },
   navItemActive: { backgroundColor: '#fff' },
-  navItemText: { color: '#fff', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  navItemChildText: { color: 'rgba(255,255,255,0.75)', fontSize: 12, fontFamily: 'Inter_500Medium' },
+  // Menu text sizes bumped back up (13→16, 12→15) per Steve's request —
+  // "the text size of the menu's please come up to what they were before,
+  // they are back to small again".
+  navItemText: { color: '#fff', fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  navItemChildText: { color: 'rgba(255,255,255,0.75)', fontSize: 15, fontFamily: 'Inter_500Medium' },
   navItemTextActive: { color: '#000' },
 
   joinBox: {
@@ -202,21 +197,21 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   joinIconRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  joinTitle: { color: '#fff', fontSize: 13, fontFamily: 'Inter_700Bold' },
-  joinBody: { color: 'rgba(255,255,255,0.6)', fontSize: 11, fontFamily: 'Inter_400Regular', lineHeight: 15 },
+  joinTitle: { color: '#fff', fontSize: 15, fontFamily: 'Inter_700Bold' },
+  joinBody: { color: 'rgba(255,255,255,0.6)', fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 17 },
   signupBtn: {
     backgroundColor: '#fff',
     borderRadius: 8,
-    paddingVertical: 8,
+    paddingVertical: 9,
     alignItems: 'center',
     marginTop: 2,
   },
-  signupText: { color: '#000', fontSize: 12, fontFamily: 'Inter_700Bold' },
-  loginHint: { color: 'rgba(255,255,255,0.5)', fontSize: 10, fontFamily: 'Inter_400Regular' },
+  signupText: { color: '#000', fontSize: 14, fontFamily: 'Inter_700Bold' },
+  loginHint: { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontFamily: 'Inter_400Regular' },
   loginHintLink: { color: '#5eead4', fontFamily: 'Inter_600SemiBold' },
 
   footerGroup: { gap: 6, marginBottom: 16 },
   footerLink: { paddingVertical: 3 },
-  footerLinkText: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontFamily: 'Inter_400Regular' },
-  copyright: { color: 'rgba(255,255,255,0.25)', fontSize: 10, fontFamily: 'Inter_400Regular', marginTop: 4 },
+  footerLinkText: { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontFamily: 'Inter_400Regular' },
+  copyright: { color: 'rgba(255,255,255,0.25)', fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 4 },
 });
