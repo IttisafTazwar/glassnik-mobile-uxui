@@ -62,29 +62,91 @@ type DiscoveryTab = typeof DISCOVERY_TABS[number];
 function apiVideoToSample(v: VideoAsset): SampleVideo {
   const colors = ['#FF6B9D', '#FF4500', '#7C3AED', '#0EA5E9', '#F59E0B', '#10B981', '#EF4444', '#6366F1'];
   const name = v.owner?.displayName ?? 'Unknown';
+
+  // The live mobile feed currently exposes location as locationName
+  // (for example "Bangkok, Thailand") rather than separate city/country
+  // fields, so normalise it here for Explore.
+  const locationName = (v as any).locationName?.trim() ?? '';
+  const locationParts = locationName
+    .split(',')
+    .map((part: string) => part.trim())
+    .filter(Boolean);
+
+  const mappedCity =
+    v.city ??
+    (locationParts.length > 1 ? locationParts.slice(0, -1).join(', ') : locationParts[0]) ??
+    undefined;
+
+  const mappedCountry =
+    v.country ??
+    (locationParts.length > 1 ? locationParts[locationParts.length - 1] : undefined);
+
+  // The live feed exposes categories as an array.
+  // Keep support for the older singular category field as a fallback.
+  const mappedCategory =
+    v.category ??
+    (v as any).categories?.[0]?.name ??
+    undefined;
+
   return {
     id: String(v.id),
     uri: v.publicUrl ?? '',
     thumbnailUrl: v.thumbnailUrl ?? undefined,
     creatorId: v.owner?.id,
-    creator: { name, username: name.toLowerCase().replace(/\s+/g, ''), initial: name.charAt(0).toUpperCase(), color: colors[v.id % colors.length] ?? '#7C3AED', avatarUrl: v.owner?.avatarUrl ?? undefined },
+    creator: {
+      name,
+      username:
+        v.owner?.username ??
+        name.toLowerCase().replace(/\s+/g, ''),
+      initial: name.charAt(0).toUpperCase(),
+      color: colors[v.id % colors.length] ?? '#7C3AED',
+      avatarUrl: v.owner?.avatarUrl ?? undefined,
+    },
     description: v.description ?? v.title ?? '',
     hashtags: ['glassnik', 'pov'],
     music: 'Original Sound',
-    likes: 0, comments: 0, shares: 0,
-    place: v.place ?? undefined,
-    city: v.city ?? undefined,
-    country: v.country ?? undefined,
-    category: v.category ?? undefined,
+    likes: v.likes ?? 0,
+    comments: 0,
+    shares: v.shares ?? 0,
+    place: v.place ?? v.title ?? undefined,
+    city: mappedCity,
+    country: mappedCountry,
+    category: mappedCategory,
     createdAt: v.createdAt,
   };
 }
 
 export default function ExploreScreen() {
+  const categoryScrollRef = React.useRef<ScrollView>(null);
+  const categoryScrollX = React.useRef(0);
+  const destinationScrollRef = React.useRef<ScrollView>(null);
+  const destinationScrollX = React.useRef(0);
+
+  const scrollCategoriesRight = React.useCallback(() => {
+    categoryScrollX.current += 420;
+
+    categoryScrollRef.current?.scrollTo({
+      x: categoryScrollX.current,
+      animated: true,
+    });
+  }, []);
+
+  const scrollDestinationsRight = React.useCallback(() => {
+    destinationScrollX.current += 420;
+
+    destinationScrollRef.current?.scrollTo({
+      x: destinationScrollX.current,
+      animated: true,
+    });
+  }, []);
+
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const isMobile = width < MOBILE_BREAKPOINT;
-  const params = useLocalSearchParams<{ discovery?: string }>();
+  const params = useLocalSearchParams<{
+    discovery?: string;
+    category?: string;
+  }>();
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [activeDiscoveryTab, setActiveDiscoveryTab] = useState<DiscoveryTab>('Explore');
@@ -99,6 +161,25 @@ export default function ExploreScreen() {
       setActiveDiscoveryTab('Explore');
     }
   }, [params.discovery]);
+
+  useEffect(() => {
+    const categoryParam = Array.isArray(params.category)
+      ? params.category[0]
+      : params.category;
+
+    if (!categoryParam) return;
+
+    const matchingCategory = CATEGORIES.find(
+      (category) =>
+        category.toLowerCase() === categoryParam.toLowerCase()
+    );
+
+    if (matchingCategory) {
+      setActiveDiscoveryTab('Explore');
+      setQuery('');
+      setActiveCategory(matchingCategory);
+    }
+  }, [params.category]);
 
   const { data: apiVideos, isLoading } = useQuery<VideoAsset[]>({
     queryKey: ['explore'],
@@ -344,7 +425,7 @@ export default function ExploreScreen() {
 
               <View style={styles.bannerRow}>
                 <View style={styles.hero}>
-                  <Text style={styles.heroTitle} numberOfLines={1}>
+                  <Text style={styles.heroTitle}>
                     Don't scroll through the world. <Text style={styles.heroTitleAccent}>Experience</Text> it.
                   </Text>
                   <Text style={styles.heroSubtitle}>
@@ -406,9 +487,15 @@ export default function ExploreScreen() {
                 <View style={styles.labeledRow}>
                   <Text style={styles.rowLabel}>Categories:</Text>
                   <ScrollView
+                    ref={categoryScrollRef}
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.categoryRow}
+                    style={{ flex: 1 }}
+                    onScroll={(event) => {
+                      categoryScrollX.current = event.nativeEvent.contentOffset.x;
+                    }}
+                    scrollEventThrottle={16}
                   >
                     {CATEGORIES.map((cat) => {
                       const isActive = activeCategory === cat;
@@ -425,16 +512,29 @@ export default function ExploreScreen() {
                       );
                     })}
                   </ScrollView>
+
+                  <Pressable
+                    onPress={scrollCategoriesRight}
+                    hitSlop={8}
+                    style={styles.horizontalNavButton}
+                  >
+                    <Feather name="chevron-right" size={20} color="#111" />
+                  </Pressable>
                 </View>
 
                 {trendingDestinations.length > 0 && (
                   <View style={styles.labeledRow}>
                     <Text style={styles.rowLabel}>Trending Destinations:</Text>
                     <ScrollView
+                      ref={destinationScrollRef}
                       horizontal
                       showsHorizontalScrollIndicator={false}
                       contentContainerStyle={styles.categoryRow}
                       style={{ flex: 1 }}
+                      onScroll={(event) => {
+                        destinationScrollX.current = event.nativeEvent.contentOffset.x;
+                      }}
+                      scrollEventThrottle={16}
                     >
                       {trendingDestinations.map((d) => (
                         <Pressable key={d.label} style={styles.trendChipCompact} onPress={() => setQuery(d.label)}>
@@ -444,6 +544,15 @@ export default function ExploreScreen() {
                         </Pressable>
                       ))}
                     </ScrollView>
+
+                    <Pressable
+                      onPress={scrollDestinationsRight}
+                      hitSlop={8}
+                      style={styles.horizontalNavButton}
+                    >
+                      <Feather name="chevron-right" size={20} color="#111" />
+                    </Pressable>
+
                     <Pressable onPress={handleViewAllDestinations} hitSlop={8}>
                       <Text style={styles.viewAllText}>View all</Text>
                     </Pressable>
@@ -566,8 +675,17 @@ function DiscoveryTabs({
   );
 }
 
-function WebVideoThumb({ uri, isFirst }: { uri: string; isFirst: boolean }) {
+function WebVideoThumb({
+  uri,
+  isFirst,
+  hovered,
+}: {
+  uri: string;
+  isFirst: boolean;
+  hovered: boolean;
+}) {
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
+  const [clickedPlaying, setClickedPlaying] = React.useState(false);
 
   React.useEffect(() => {
     const el = videoRef.current;
@@ -576,7 +694,9 @@ function WebVideoThumb({ uri, isFirst }: { uri: string; isFirst: boolean }) {
     el.muted = true;
     el.defaultMuted = true;
 
-    if (isFirst) {
+    const shouldPlay = isFirst || hovered || clickedPlaying;
+
+    if (shouldPlay) {
       const startPlayback = () => {
         el.muted = true;
         el.defaultMuted = true;
@@ -596,26 +716,44 @@ function WebVideoThumb({ uri, isFirst }: { uri: string; isFirst: boolean }) {
       return () => {
         el.removeEventListener('canplay', startPlayback);
       };
+    }
+
+    el.pause();
+
+    try {
+      el.currentTime = 0.1;
+    } catch {}
+  }, [uri, isFirst, hovered, clickedPlaying]);
+
+  const handleClick = (event: React.MouseEvent<HTMLVideoElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const el = videoRef.current;
+    if (!el) return;
+
+    if (!el.paused) {
+      el.pause();
+      setClickedPlaying(false);
     } else {
-      const showFrame = () => {
-        try {
-          el.currentTime = 0.1;
-        } catch {}
-      };
-      if (el.readyState >= 1) {
-        showFrame();
-      } else {
-        el.addEventListener('loadedmetadata', showFrame, { once: true });
+      setClickedPlaying(true);
+
+      const playPromise = el.play();
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch(() => {});
       }
     }
-  }, [uri, isFirst]);
+  };
 
   return React.createElement('video', {
     ref: videoRef,
     src: uri,
     playsInline: true,
-    preload: 'metadata',
-    loop: isFirst,
+    muted: true,
+    autoPlay: isFirst,
+    preload: isFirst ? 'auto' : 'metadata',
+    loop: true,
+    onClick: handleClick,
     style: {
       position: 'absolute',
       top: 0,
@@ -624,6 +762,7 @@ function WebVideoThumb({ uri, isFirst }: { uri: string; isFirst: boolean }) {
       height: '100%',
       objectFit: 'cover',
       objectPosition: 'center',
+      cursor: 'pointer',
     },
   });
 }
@@ -659,8 +798,11 @@ export function VideoGridCell({
     !!video.uri;
 
   const thumbnailNode = shouldUseWebVideo ? (
-    <WebVideoThumb uri={video.uri} hovered={isHovered}
-          />
+    <WebVideoThumb
+      uri={video.uri}
+      isFirst={isFirst}
+      hovered={isHovered}
+    />
   ) : video.thumbnailUrl ? (
     <Image
       source={{ uri: video.thumbnailUrl }}
@@ -773,11 +915,24 @@ export function VideoGridCell({
 }
 
 const styles = StyleSheet.create({
+  horizontalNavButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    marginLeft: 8,
+    flexShrink: 0,
+  },
+
   screenRoot: { flex: 1, backgroundColor: '#000' },
   root: { flex: 1, backgroundColor: '#000' },
 
   banner: {
-    height: 118,
+    height: 104,
     paddingHorizontal: 20,
     backgroundColor: '#0a0f14',
     overflow: 'hidden',
@@ -789,10 +944,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 24,
   },
-  hero: { gap: 6, flexShrink: 1, maxWidth: '62%' },
-  heroTitle: { color: '#fff', fontSize: 26, fontFamily: 'Inter_700Bold', lineHeight: 31 },
+  hero: { gap: 5, flexShrink: 1, maxWidth: '64%' },
+  heroTitle: { color: '#fff', fontSize: 30, fontFamily: 'Inter_700Bold', lineHeight: 35 },
   heroTitleAccent: { color: '#5eead4' },
-  heroSubtitle: { color: 'rgba(255,255,255,0.75)', fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 19 },
+  heroSubtitle: { color: 'rgba(255,255,255,0.78)', fontSize: 15, fontFamily: 'Inter_400Regular', lineHeight: 20 },
 
   searchWrap: {
     flexDirection: 'row',

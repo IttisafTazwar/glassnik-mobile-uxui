@@ -496,9 +496,18 @@ export function FeedVideoItem({ video, isActive, itemWidth, itemHeight, onCommen
                 {metaLine}
               </Text>
               {video.category ? (
-                <View style={styles.categoryPill}>
+                <Pressable
+                  style={styles.categoryPill}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/(tabs)/explore',
+                      params: { category: video.category },
+                    } as any)
+                  }
+                  hitSlop={6}
+                >
                   <Text style={styles.categoryText}>{video.category.toUpperCase()}</Text>
-                </View>
+                </Pressable>
               ) : null}
             </View>
           ) : null}

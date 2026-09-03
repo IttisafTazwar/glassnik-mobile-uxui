@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Link } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
+import { TopNav } from '@/components/TopNav';
 
 const TIKTOK_RED = '#FE2C55';
 
@@ -44,6 +45,8 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.root}>
+      {Platform.OS === 'web' && <TopNav />}
+
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.flex}
@@ -51,7 +54,10 @@ export default function LoginScreen() {
         <View
           style={[
             styles.inner,
-            { paddingTop: insets.top + 60, paddingBottom: insets.bottom + 32 },
+            {
+              paddingTop: Platform.OS === 'web' ? 32 : insets.top + 60,
+              paddingBottom: insets.bottom + 32,
+            },
           ]}
         >
           {/* ── Logo ── */}

@@ -17,6 +17,7 @@ import { Link } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
+import { TopNav } from '@/components/TopNav';
 
 export default function RegisterScreen() {
   const colors = useColors();
@@ -56,6 +57,8 @@ export default function RegisterScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
+      {Platform.OS === 'web' && <TopNav />}
+
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.flex}
@@ -63,7 +66,10 @@ export default function RegisterScreen() {
         <ScrollView
           contentContainerStyle={[
             styles.scroll,
-            { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 24 },
+            {
+              paddingTop: Platform.OS === 'web' ? 28 : insets.top + 40,
+              paddingBottom: insets.bottom + 24,
+            },
           ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}

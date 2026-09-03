@@ -92,6 +92,17 @@ export function TopNav() {
     router.push(route as any);
   }
 
+  function openExternalSameTab(url: string) {
+    setMenuOpen(false);
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.location.assign(url);
+      return;
+    }
+
+    Linking.openURL(url);
+  }
+
   async function handleLogout() {
     setMenuOpen(false);
     await logout();
@@ -113,7 +124,7 @@ export function TopNav() {
 
           <View style={styles.linksRow}>
             {MARKETING_LINKS.map((link) => (
-              <Pressable key={link.label} onPress={() => Linking.openURL(link.url)}>
+              <Pressable key={link.label} onPress={() => openExternalSameTab(link.url)}>
                 <Text style={styles.linkText}>{link.label}</Text>
               </Pressable>
             ))}
@@ -192,10 +203,7 @@ export function TopNav() {
                 <Pressable
                   key={link.label}
                   style={styles.menuLinkRow}
-                  onPress={() => {
-                    setMenuOpen(false);
-                    Linking.openURL(link.url);
-                  }}
+                  onPress={() => openExternalSameTab(link.url)}
                 >
                   <Text style={styles.menuLinkText}>{link.label}</Text>
                 </Pressable>
@@ -240,10 +248,7 @@ export function TopNav() {
                 <Pressable
                   key={link.label}
                   style={styles.menuLinkRow}
-                  onPress={() => {
-                    setMenuOpen(false);
-                    Linking.openURL(link.url);
-                  }}
+                  onPress={() => openExternalSameTab(link.url)}
                 >
                   <Text style={styles.menuFooterLinkText}>{link.label}</Text>
                 </Pressable>
