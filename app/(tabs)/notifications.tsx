@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { DesktopAppShell } from '@/components/DesktopAppShell';
+import { TopNav } from '@/components/TopNav';
 import { notificationsApi } from '@/lib/api';
 import type { Notification } from '@/types';
 
@@ -140,6 +141,7 @@ export default function NotificationsScreen() {
   if (!user) {
     return (
       <DesktopAppShell>
+        {Platform.OS === 'web' && <TopNav />}
         <View style={[styles.root, styles.center]}>
           <Feather name="bell-off" size={36} color="rgba(255,255,255,0.2)" />
           <Text style={styles.emptyText}>Sign in to see notifications</Text>
@@ -150,6 +152,7 @@ export default function NotificationsScreen() {
 
   return (
     <DesktopAppShell>
+        {Platform.OS === 'web' && <TopNav />}
       <View style={styles.root}>
         {/* Header */}
       <View style={[styles.header, { paddingTop: topPad }]}>

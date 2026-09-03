@@ -23,6 +23,7 @@ import { useNavigation, useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
 import { DesktopAppShell } from '@/components/DesktopAppShell';
+import { TopNav } from '@/components/TopNav';
 import { mobileApi, userApi, videoApi } from '@/lib/api';
 import { useUploadGuard } from '@/context/UploadGuardContext';
 
@@ -124,7 +125,7 @@ export default function UploadScreen() {
     (c: any) => c.capability?.name === 'mobile.creator' && c.status === 'ACTIVE',
   );
 
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  const topPad = Platform.OS === 'web' ? 0 : insets.top;
   const isUploading = phase === 'uploading' || phase === 'processing';
 
 
@@ -564,6 +565,7 @@ export default function UploadScreen() {
   if (capsLoading) {
     return (
       <DesktopAppShell>
+        {Platform.OS === 'web' && <TopNav />}
         <View style={[styles.root, { backgroundColor: colors.background }]}>
           <View style={styles.centered}>
             <ActivityIndicator size="large" color={colors.primary} />
@@ -576,6 +578,7 @@ export default function UploadScreen() {
   if (!hasCreatorCap) {
     return (
       <DesktopAppShell>
+        {Platform.OS === 'web' && <TopNav />}
         <View style={[styles.root, { backgroundColor: colors.background }]}>
           <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
             <Text style={[styles.headerTitle, { color: colors.foreground }]}>Upload</Text>
@@ -599,6 +602,7 @@ export default function UploadScreen() {
 
   return (
     <DesktopAppShell>
+        {Platform.OS === 'web' && <TopNav />}
       <View style={[styles.root, { backgroundColor: colors.background }]}>
         <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Upload</Text>

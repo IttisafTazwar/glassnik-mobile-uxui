@@ -21,6 +21,7 @@ import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useAuth } from '@/context/AuthContext';
 import { DesktopAppShell } from '@/components/DesktopAppShell';
+import { TopNav } from '@/components/TopNav';
 import { userApi, videoApi } from '@/lib/api';
 import type { VideoItem } from '@/types';
 
@@ -211,6 +212,7 @@ const videos = allVideos.filter((v) => {
 
   return (
     <DesktopAppShell>
+        {Platform.OS === 'web' && <TopNav />}
       <View style={styles.root}>
         <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       <ScrollView

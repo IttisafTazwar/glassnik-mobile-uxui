@@ -61,7 +61,10 @@ export default function FeedScreen() {
   const insets = useSafeAreaInsets();
   const isMobile = width < 768;
   const desktopTopNavHeight = 64;
-  const feedHeight = isMobile ? height : Math.max(1, height - desktopTopNavHeight);
+  const showWebTopNav = Platform.OS === 'web';
+  const feedHeight = showWebTopNav
+    ? Math.max(1, height - desktopTopNavHeight)
+    : height;
   const desktopFeedWidth = Math.min(width, feedHeight * (9 / 16));
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<ActiveTab>('foryou');
@@ -118,7 +121,7 @@ export default function FeedScreen() {
     <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      {!isMobile && <TopNav />}
+      {(!isMobile || showWebTopNav) && <TopNav />}
 
       <View style={styles.pageRow}>
         {!isMobile && <Sidebar />}
