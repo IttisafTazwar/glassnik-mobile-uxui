@@ -333,17 +333,11 @@ export default function ExploreScreen() {
                   </ScrollView>
                 </View>
               )}
-              <View
-                style={[
-                  styles.sectionHeaderRow,
-                  !isMobile && styles.sectionHeaderRowDesktop,
-                ]}
-              >
-                {isMobile && (
+              {isMobile && (
+                <View style={styles.sectionHeaderRow}>
                   <Text style={styles.sectionTitle}>Trending Destinations</Text>
-                )}
-                <Text style={styles.sectionCount}>{filtered.length} experiences</Text>
-              </View>
+                </View>
+              )}
             </View>
           ) : null
         }
