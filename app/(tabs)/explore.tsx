@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
@@ -767,6 +768,41 @@ function WebVideoThumb({
   });
 }
 
+
+function MobileVideoThumb({
+  uri,
+  playing,
+}: {
+  uri: string;
+  playing: boolean;
+}) {
+  const player = useVideoPlayer(uri, (p) => {
+    p.loop = true;
+    p.muted = true;
+  });
+
+  useEffect(() => {
+    try {
+      player.muted = true;
+
+      if (playing) {
+        player.play();
+      } else {
+        player.pause();
+      }
+    } catch {}
+  }, [playing, player]);
+
+  return (
+    <VideoView
+      player={player}
+      style={StyleSheet.absoluteFill}
+      contentFit="cover"
+      nativeControls={false}
+    />
+  );
+}
+
 export function VideoGridCell({
   video,
   width,
@@ -781,6 +817,7 @@ export function VideoGridCell({
   isFirst?: boolean;
 }) {
   const [isHovered, setIsHovered] = React.useState(false);
+  const [isMobilePlaying, setIsMobilePlaying] = React.useState(false);
 
   const locationText = [video.place, video.city, video.country].filter(Boolean).join(', ');
   const placeTourTransport = video.description || null;
@@ -802,6 +839,11 @@ export function VideoGridCell({
       uri={video.uri}
       isFirst={isFirst}
       hovered={isHovered}
+    />
+  ) : isMobile && Platform.OS !== 'web' && !!video.uri && isMobilePlaying ? (
+    <MobileVideoThumb
+      uri={video.uri}
+      playing={isMobilePlaying}
     />
   ) : video.thumbnailUrl ? (
     <Image
@@ -825,6 +867,11 @@ export function VideoGridCell({
   return (
     <View style={{ width, marginBottom: 14 }}>
       <Pressable
+        onPress={() => {
+          if (isMobile && Platform.OS !== 'web' && video.uri) {
+            setIsMobilePlaying((current) => !current);
+          }
+        }}
         onHoverIn={() => {
           if (Platform.OS === 'web' && !isMobile) {
             setIsHovered(true);
