@@ -123,11 +123,29 @@ export default function ExploreScreen() {
   const destinationScrollRef = React.useRef<ScrollView>(null);
   const destinationScrollX = React.useRef(0);
 
+  const scrollCategoriesLeft = React.useCallback(() => {
+    categoryScrollX.current = Math.max(0, categoryScrollX.current - 420);
+
+    categoryScrollRef.current?.scrollTo({
+      x: categoryScrollX.current,
+      animated: true,
+    });
+  }, []);
+
   const scrollCategoriesRight = React.useCallback(() => {
     categoryScrollX.current += 420;
 
     categoryScrollRef.current?.scrollTo({
       x: categoryScrollX.current,
+      animated: true,
+    });
+  }, []);
+
+  const scrollDestinationsLeft = React.useCallback(() => {
+    destinationScrollX.current = Math.max(0, destinationScrollX.current - 420);
+
+    destinationScrollRef.current?.scrollTo({
+      x: destinationScrollX.current,
       animated: true,
     });
   }, []);
@@ -321,7 +339,9 @@ export default function ExploreScreen() {
                   !isMobile && styles.sectionHeaderRowDesktop,
                 ]}
               >
-                <Text style={styles.sectionTitle}>Trending Destinations</Text>
+                {isMobile && (
+                  <Text style={styles.sectionTitle}>Trending Destinations</Text>
+                )}
                 <Text style={styles.sectionCount}>{filtered.length} experiences</Text>
               </View>
             </View>
@@ -487,6 +507,15 @@ export default function ExploreScreen() {
               <>
                 <View style={styles.labeledRow}>
                   <Text style={styles.rowLabel}>Categories:</Text>
+
+                  <Pressable
+                    onPress={scrollCategoriesLeft}
+                    hitSlop={8}
+                    style={styles.horizontalNavButton}
+                  >
+                    <Feather name="chevron-left" size={20} color="#111" />
+                  </Pressable>
+
                   <ScrollView
                     ref={categoryScrollRef}
                     horizontal
@@ -526,6 +555,15 @@ export default function ExploreScreen() {
                 {trendingDestinations.length > 0 && (
                   <View style={styles.labeledRow}>
                     <Text style={styles.rowLabel}>Trending Destinations:</Text>
+
+                    <Pressable
+                      onPress={scrollDestinationsLeft}
+                      hitSlop={8}
+                      style={styles.horizontalNavButton}
+                    >
+                      <Feather name="chevron-left" size={20} color="#111" />
+                    </Pressable>
+
                     <ScrollView
                       ref={destinationScrollRef}
                       horizontal
