@@ -178,7 +178,7 @@ export default function NotificationsScreen() {
         <View style={styles.center}>
           <ActivityIndicator color="rgba(255,255,255,0.5)" />
         </View>
-      ) : isError ? (
+      ) : isError && !(Platform.OS === 'web' && isMobile) ? (
         <View style={styles.center}>
           <Feather name="alert-circle" size={32} color="rgba(255,255,255,0.25)" />
           <Text style={styles.emptyText}>Could not load notifications.</Text>

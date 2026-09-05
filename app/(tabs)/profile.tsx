@@ -315,16 +315,20 @@ const videos = allVideos.filter((v) => {
 
                 {/* Stats */}
                 <View style={styles.statsRow}>
-                  <View style={styles.statItem}>
-                    <Text style={styles.statNum}>{stats.following}</Text>
-                    <Text style={styles.statLabel}>Following</Text>
-                  </View>
-                  <View style={styles.statDivider} />
-                  <View style={styles.statItem}>
-                    <Text style={styles.statNum}>{stats.followers}</Text>
-                    <Text style={styles.statLabel}>Followers</Text>
-                  </View>
-                  <View style={styles.statDivider} />
+                  {!(Platform.OS === 'web' && isMobile) && (
+                    <>
+                      <View style={styles.statItem}>
+                        <Text style={styles.statNum}>{stats.following}</Text>
+                        <Text style={styles.statLabel}>Following</Text>
+                      </View>
+                      <View style={styles.statDivider} />
+                      <View style={styles.statItem}>
+                        <Text style={styles.statNum}>{stats.followers}</Text>
+                        <Text style={styles.statLabel}>Followers</Text>
+                      </View>
+                      <View style={styles.statDivider} />
+                    </>
+                  )}
                   <View style={styles.statItem}>
                     <Text style={styles.statNum}>{stats.likes}</Text>
                     <Text style={styles.statLabel}>Total Views</Text>
@@ -466,12 +470,14 @@ const videos = allVideos.filter((v) => {
           >
             <Feather name="grid" size={20} color={gridTab === 'videos' ? '#fff' : 'rgba(255,255,255,0.4)'} />
           </Pressable>
-          <Pressable
-            style={[styles.gridTab, gridTab === 'liked' && styles.gridTabActive]}
-            onPress={() => setGridTab('liked')}
-          >
-            <Feather name="heart" size={20} color={gridTab === 'liked' ? '#fff' : 'rgba(255,255,255,0.4)'} />
-          </Pressable>
+          {!(Platform.OS === 'web' && isMobile) && (
+            <Pressable
+              style={[styles.gridTab, gridTab === 'liked' && styles.gridTabActive]}
+              onPress={() => setGridTab('liked')}
+            >
+              <Feather name="heart" size={20} color={gridTab === 'liked' ? '#fff' : 'rgba(255,255,255,0.4)'} />
+            </Pressable>
+          )}
         </View>
 
         {/* ── Video grid ── */}
@@ -549,7 +555,7 @@ const videos = allVideos.filter((v) => {
           </>
         )}
 
-        {gridTab === 'liked' && (
+        {gridTab === 'liked' && !(Platform.OS === 'web' && isMobile) && (
           <View style={styles.gridEmpty}>
             <Feather name="heart" size={36} color="rgba(255,255,255,0.15)" />
             <Text style={styles.gridEmptyText}>Liked Experiences</Text>
