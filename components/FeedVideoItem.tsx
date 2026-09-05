@@ -26,6 +26,7 @@ import { useMute } from '@/context/MuteContext';
 interface Props {
   video: SampleVideo;
   isActive: boolean;
+  isFirstVideo?: boolean;
   itemWidth?: number;
   itemHeight?: number;
   /** Called when the comment button is pressed; receives the video's id. */
@@ -43,57 +44,125 @@ function WebFeedVideo({
   uri,
   isActive,
   isMuted,
+  isFirstVideo = false,
+  objectFit = 'cover',
   onAutoplayMuted,
 }: {
   uri: string;
   isActive: boolean;
   isMuted: boolean;
+  isFirstVideo?: boolean;
+  objectFit?: 'cover' | 'contain';
   onAutoplayMuted?: () => void;
 }) {
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
+  const previousActiveRef = React.useRef(false);
 
+  // Playback lifecycle.
+  // Only the active feed item is allowed to play.
   React.useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
 
-    // Always configure autoplay-safe properties before play().
+    let cancelled = false;
+
     el.playsInline = true;
     el.loop = true;
 
-    if (isActive) {
-      // Browsers reliably allow muted autoplay.
-      // Respect the user's mute preference where the browser permits it.
-      el.muted = isMuted;
+    const playActiveVideo = async () => {
+      if (cancelled || !isActive || videoRef.current !== el) return;
 
       try {
+        await el.play();
+      } catch {
+        if (cancelled || !isActive) return;
+
+        // Mobile Safari can reject autoplay with sound.
+        // Retry this element muted without changing the global preference.
+        el.muted = true;
+
+        try {
+          await el.play();
+        } catch {}
+      }
+    };
+
+    const handleCanPlay = () => {
+      if (isActive && el.paused) {
+        void playActiveVideo();
+      }
+    };
+
+    if (!isActive) {
+      previousActiveRef.current = false;
+
+      try {
+        el.pause();
         el.currentTime = 0;
       } catch {}
 
-      const playPromise = el.play();
+      return;
+    }
 
-      if (playPromise && typeof playPromise.catch === 'function') {
-        playPromise.catch(() => {
-          // If the browser blocks unmuted autoplay, retry muted.
-          if (el && !el.muted) {
-            el.muted = true;
-            onAutoplayMuted?.();
-            el.play().catch(() => {});
-          }
-        });
-      }
-    } else {
-      el.pause();
-
+    // Reset only when a new card becomes active.
+    if (!previousActiveRef.current) {
       try {
         el.currentTime = 0;
       } catch {}
     }
-  }, [isActive, isMuted, uri, onAutoplayMuted]);
+
+    previousActiveRef.current = true;
+
+    // The first visible video must begin muted so Safari permits autoplay.
+    // All later active videos use the user's current mute preference.
+    el.muted = isFirstVideo ? true : isMuted;
+
+    el.addEventListener('canplay', handleCanPlay);
+    el.addEventListener('loadeddata', handleCanPlay);
+
+    if (el.readyState >= 2) {
+      void playActiveVideo();
+    } else {
+      try {
+        el.load();
+      } catch {}
+    }
+
+    return () => {
+      cancelled = true;
+      el.removeEventListener('canplay', handleCanPlay);
+      el.removeEventListener('loadeddata', handleCanPlay);
+    };
+  }, [isActive, uri, isFirstVideo]);
+
+  // Sound changes must never seek, pause or restart playback.
+  React.useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+
+    // Follow the user's mute preference.
+    // MuteContext starts true, so the first video is eligible for autoplay.
+    el.muted = isMuted;
+
+    // If Safari happened to leave the ACTIVE video paused while changing
+    // sound state, recover playback without resetting currentTime.
+    if (isActive && el.paused) {
+      const result = el.play();
+
+      if (result && typeof result.catch === 'function') {
+        result.catch(() => {
+          el.muted = true;
+          el.play().catch(() => {});
+        });
+      }
+    }
+  }, [isMuted, isActive, isFirstVideo]);
 
   return React.createElement('video', {
     ref: videoRef,
     src: uri,
     playsInline: true,
+    // MuteContext starts true, so the initial video element is born muted.
     muted: isMuted,
     autoPlay: isActive,
     preload: 'auto',
@@ -104,15 +173,14 @@ function WebFeedVideo({
       left: 0,
       width: '100%',
       height: '100%',
-      // Show the complete original video without zooming/cropping.
-      objectFit: 'contain',
+      objectFit,
       objectPosition: 'center',
       backgroundColor: '#000',
     },
   });
 }
 
-export function FeedVideoItem({ video, isActive, itemWidth, itemHeight, onCommentPress }: Props) {
+export function FeedVideoItem({ video, isActive, isFirstVideo = false, itemWidth, itemHeight, onCommentPress }: Props) {
   const { isMuted, toggleMute, setMuted } = useMute();
   const onMuteToggle = toggleMute;
 
@@ -355,31 +423,54 @@ export function FeedVideoItem({ video, isActive, itemWidth, itemHeight, onCommen
             : StyleSheet.absoluteFill
         }
       >
-      {isActive ? (
-        Platform.OS === 'web' ? (
+      {isDesktopWeb ? (
+        isActive ? (
           <WebFeedVideo
             uri={video.uri}
             isActive={isActive}
             isMuted={isMuted}
+            isFirstVideo={isFirstVideo}
+            objectFit="contain"
             onAutoplayMuted={handleAutoplayMuted}
           />
-        ) : (
-          <VideoView
-            player={player}
+        ) : video.thumbnailUrl ? (
+          <Image
+            source={{ uri: video.thumbnailUrl }}
             style={StyleSheet.absoluteFill}
             contentFit="cover"
-            nativeControls={false}
+            transition={300}
           />
+        ) : (
+          <View style={[StyleSheet.absoluteFill, styles.videoPlaceholder]} />
         )
-      ) : video.thumbnailUrl ? (
-        <Image
-          source={{ uri: video.thumbnailUrl }}
-          style={StyleSheet.absoluteFill}
-          contentFit="cover"
-          transition={300}
-        />
       ) : (
-        <View style={[StyleSheet.absoluteFill, styles.videoPlaceholder]} />
+        <>
+          {Platform.OS === 'web' ? (
+            <WebFeedVideo
+              uri={video.uri}
+              isActive={isActive}
+              isMuted={isMuted}
+            isFirstVideo={isFirstVideo}
+              onAutoplayMuted={handleAutoplayMuted}
+            />
+          ) : (
+            <VideoView
+              player={player}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              nativeControls={false}
+            />
+          )}
+
+          {!isActive && video.thumbnailUrl ? (
+            <Image
+              source={{ uri: video.thumbnailUrl }}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              transition={150}
+            />
+          ) : null}
+        </>
       )}
       </View>
 
@@ -413,6 +504,22 @@ export function FeedVideoItem({ video, isActive, itemWidth, itemHeight, onCommen
       {/* No dark gradient over the video.
           Controls are displayed completely outside the video on desktop. */}
 
+      {/* Mobile-only sound control overlaid on the video.
+          Desktop keeps its existing sound control in the feed header. */}
+      {!isDesktopWeb && (
+        <Pressable
+          style={styles.mobileMuteButton}
+          onPress={onMuteToggle}
+          hitSlop={10}
+        >
+          <Feather
+            name={isMuted ? 'volume-x' : 'volume-2'}
+            size={20}
+            color="#fff"
+          />
+        </Pressable>
+      )}
+
       {/* ── Pause indicator — independent of controlsVisible; this is
           playback-state feedback, not a "control" to hide ── */}
       {paused && isActive && (
@@ -439,6 +546,10 @@ export function FeedVideoItem({ video, isActive, itemWidth, itemHeight, onCommen
         <View
           style={[
             styles.progressTrack,
+            !isDesktopWeb && {
+              bottom: 0,
+              zIndex: 30,
+            },
             isDesktopWeb && {
               bottom: desktopInfoHeight,
             },
@@ -452,6 +563,7 @@ export function FeedVideoItem({ video, isActive, itemWidth, itemHeight, onCommen
         <View
           style={[
             styles.bottomBox,
+            !isDesktopWeb && styles.mobileBottomOverlay,
             isDesktopWeb && {
               position: 'absolute',
               top: desktopVideoHeight,
@@ -468,10 +580,19 @@ export function FeedVideoItem({ video, isActive, itemWidth, itemHeight, onCommen
             },
           ]}
         >
-          {!isOwnVideo && (
+          {!isDesktopWeb && (
+            <View style={styles.mobileGradient} pointerEvents="none">
+              <View style={styles.mobileGradientLight} />
+              <View style={styles.mobileGradientMedium} />
+              <View style={styles.mobileGradientDark} />
+            </View>
+          )}
+
+          <View style={styles.mobileOverlayContent}>
+          {(!isDesktopWeb || !isOwnVideo) && (
             <View style={styles.creatorRow}>
               <Text style={styles.creatorName}>@{video.creator.username}</Text>
-              {video.creatorId && (
+              {isDesktopWeb && !isOwnVideo && video.creatorId && (
                 <Pressable
                   style={[styles.followTextBtn, following && styles.followTextBtnActive]}
                   onPress={handleFollow}
@@ -545,6 +666,7 @@ export function FeedVideoItem({ video, isActive, itemWidth, itemHeight, onCommen
               <Text style={styles.actionLabel}>Report</Text>
             </Pressable>
           </View>
+          </View>
         </View>
       )}
     </View>
@@ -586,6 +708,19 @@ const styles = StyleSheet.create({
   },
 
   // Heart double-tap
+  mobileMuteButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.38)',
+    zIndex: 20,
+  },
+
   heartOverlay: {
     position: 'absolute',
     top: '35%',
@@ -687,10 +822,34 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#000',
     paddingHorizontal: 14,
     paddingTop: 10,
     paddingBottom: 14,
+    gap: 8,
+  },
+  mobileBottomOverlay: {
+    backgroundColor: 'transparent',
+    paddingTop: 36,
+    paddingBottom: 8,
+    overflow: 'hidden',
+  },
+  mobileGradient: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-end',
+  },
+  mobileGradientLight: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.04)',
+  },
+  mobileGradientMedium: {
+    height: 48,
+    backgroundColor: 'rgba(0,0,0,0.18)',
+  },
+  mobileGradientDark: {
+    height: 72,
+    backgroundColor: 'rgba(0,0,0,0.42)',
+  },
+  mobileOverlayContent: {
     gap: 8,
   },
   creatorRow: {

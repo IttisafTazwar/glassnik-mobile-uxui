@@ -8,7 +8,7 @@ interface MuteContextValue {
 }
 
 const MuteContext = createContext<MuteContextValue>({
-  isMuted: false,
+  isMuted: true,
   toggleMute: () => {},
   setMuted: () => {},
 });
@@ -16,7 +16,7 @@ const MuteContext = createContext<MuteContextValue>({
 const STORAGE_KEY = '@glassnik/muted';
 
 export function MuteProvider({ children }: { children: React.ReactNode }) {
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
 
   // Restore preference on mount
   useEffect(() => {

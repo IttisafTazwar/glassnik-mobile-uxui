@@ -102,8 +102,9 @@ export default function FeedScreen() {
       <FeedVideoItem
         video={item}
         isActive={index === currentIndex}
+        isFirstVideo={index === 0}
         itemWidth={isMobile ? undefined : desktopFeedWidth}
-        itemHeight={isMobile ? undefined : feedHeight}
+        itemHeight={feedHeight}
         onCommentPress={(videoId) => setCommentsVideoId(videoId)}
       />
     ),
@@ -185,6 +186,56 @@ export default function FeedScreen() {
             </View>
           ))}
         </ScrollView>
+      ) : Platform.OS === 'web' ? (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          style={{
+            height: feedHeight,
+            width: '100%',
+          }}
+          contentContainerStyle={{
+            width: '100%',
+          }}
+          snapToInterval={feedHeight}
+          snapToAlignment="start"
+          decelerationRate="fast"
+          pagingEnabled
+          scrollEventThrottle={16}
+          onScroll={(event) => {
+            const y = event.nativeEvent.contentOffset?.y ?? 0;
+
+            const nextIndex = Math.max(
+              0,
+              Math.min(
+                allVideos.length - 1,
+                Math.round(y / feedHeight)
+              )
+            );
+
+            setCurrentIndex((previousIndex) =>
+              previousIndex === nextIndex ? previousIndex : nextIndex
+            );
+          }}
+        >
+          {allVideos.map((item, index) => (
+            <View
+              key={item.id}
+              style={{
+                width: '100%',
+                height: feedHeight,
+                scrollSnapAlign: 'start',
+              } as any}
+            >
+              <FeedVideoItem
+                video={item}
+                isActive={index === currentIndex}
+                isFirstVideo={index === 0}
+                itemHeight={feedHeight}
+                onCommentPress={(videoId) => setCommentsVideoId(videoId)}
+              />
+            </View>
+          ))}
+        </ScrollView>
       ) : (
         <FlatList
           data={allVideos}
@@ -198,6 +249,7 @@ export default function FeedScreen() {
           showsVerticalScrollIndicator={false}
           onViewableItemsChanged={onViewableItemsChanged.current}
           viewabilityConfig={viewabilityConfig.current}
+          scrollEventThrottle={16}
           removeClippedSubviews={false}
           maxToRenderPerBatch={3}
           windowSize={5}
@@ -206,30 +258,31 @@ export default function FeedScreen() {
       )}
 
 
-      <View style={[styles.topBar, { paddingTop: topInset + (Platform.OS === 'web' ? 8 : 12), pointerEvents: 'box-none' }]}>
-        {/* Tab switcher */}
-        <View style={styles.tabSwitcher}>
-          <Pressable onPress={() => setActiveTab('foryou')}>
-            <Text style={[styles.tabText, activeTab === 'foryou' && styles.tabTextActive]}>
-              For You
-            </Text>
-            {activeTab === 'foryou' && <View style={styles.tabUnderline} />}
-          </Pressable>
-          <Pressable onPress={() => setActiveTab('following')}>
-            <Text style={[styles.tabText, activeTab === 'following' && styles.tabTextActive]}>
-              Following
-            </Text>
-            {activeTab === 'following' && <View style={styles.tabUnderline} />}
-          </Pressable>
-        </View>
+      {!isMobile && (
+        <View style={[styles.topBar, { paddingTop: topInset + (Platform.OS === 'web' ? 8 : 12), pointerEvents: 'box-none' }]}>
+          {/* Desktop For You / Following navigation remains unchanged. */}
+          <View style={styles.tabSwitcher}>
+            <Pressable onPress={() => setActiveTab('foryou')}>
+              <Text style={[styles.tabText, activeTab === 'foryou' && styles.tabTextActive]}>
+                For You
+              </Text>
+              {activeTab === 'foryou' && <View style={styles.tabUnderline} />}
+            </Pressable>
+            <Pressable onPress={() => setActiveTab('following')}>
+              <Text style={[styles.tabText, activeTab === 'following' && styles.tabTextActive]}>
+                Following
+              </Text>
+              {activeTab === 'following' && <View style={styles.tabUnderline} />}
+            </Pressable>
+          </View>
 
-        {/* Right icons */}
-        <View style={styles.topRight}>
-          <Pressable onPress={toggleMute} hitSlop={8}>
-            <Feather name={isMuted ? 'volume-x' : 'volume-2'} size={22} color="#fff" />
-          </Pressable>
+          <View style={styles.topRight}>
+            <Pressable onPress={toggleMute} hitSlop={8}>
+              <Feather name={isMuted ? 'volume-x' : 'volume-2'} size={22} color="#fff" />
+            </Pressable>
+          </View>
         </View>
-      </View>
+      )}
 
       {/* ── Comments Sheet ── */}
       <CommentsSheet

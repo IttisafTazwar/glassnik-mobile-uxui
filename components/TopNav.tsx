@@ -43,14 +43,18 @@ const APP_NAV_ITEMS: {
   label: string;
   icon: React.ComponentProps<typeof Feather>['name'];
   route: string;
+  discovery?: string;
   loggedInOnly?: boolean;
   requiresCreatorCap?: boolean;
 }[] = [
   { label: 'Explore', icon: 'compass', route: '/(tabs)/explore' },
   { label: 'For You', icon: 'home', route: '/' },
+  { label: 'Trending', icon: 'trending-up', route: '/(tabs)/explore', discovery: 'Trending' },
+  { label: 'Nearby', icon: 'map-pin', route: '/(tabs)/explore', discovery: 'Nearby' },
+  { label: 'Global', icon: 'globe', route: '/(tabs)/explore', discovery: 'Global' },
+  { label: 'Profile', icon: 'user', route: '/(tabs)/profile' },
   { label: 'Upload', icon: 'plus-square', route: '/(tabs)/upload', loggedInOnly: true, requiresCreatorCap: true },
   { label: 'Activity', icon: 'bell', route: '/(tabs)/notifications', loggedInOnly: true },
-  { label: 'Profile', icon: 'user', route: '/(tabs)/profile' },
 ];
 
 const FOOTER_LINKS = [
@@ -82,13 +86,23 @@ export function TopNav() {
   const topPad = Platform.OS === 'web' ? 10 : insets.top + 6;
 
   const navItems = APP_NAV_ITEMS.filter((item) => {
+    if (isMobile && (item.label === 'Explore' || item.label === 'For You')) return false;
     if (item.requiresCreatorCap && !hasCreatorCap) return false;
     if (item.loggedInOnly && !user) return false;
     return true;
   });
 
-  function go(route: string) {
+  function go(route: string, discovery?: string) {
     setMenuOpen(false);
+
+    if (discovery) {
+      router.push({
+        pathname: route,
+        params: { discovery },
+      } as any);
+      return;
+    }
+
     router.push(route as any);
   }
 
@@ -153,7 +167,7 @@ export function TopNav() {
   return (
     <View style={[styles.wrap, { paddingTop: topPad }]}>
       <View style={styles.mobileRow}>
-        <Pressable style={styles.logoRow} onPress={() => router.push('/(tabs)/explore' as any)}>
+        <Pressable style={styles.logoRow} onPress={() => router.push('/' as any)}>
           <Image
             source={require('@/assets/images/logo.png')}
             style={styles.logoImage}
@@ -220,7 +234,7 @@ export function TopNav() {
                   <Pressable
                     key={item.label}
                     style={[styles.menuNavItemRow, isActive && styles.menuNavItemRowActive]}
-                    onPress={() => go(item.route)}
+                    onPress={() => go(item.route, item.discovery)}
                   >
                     <Feather name={item.icon} size={16} color={isActive ? '#5eead4' : '#fff'} />
                     <Text style={[styles.menuNavItemText, isActive && styles.menuNavItemTextActive]}>
@@ -240,20 +254,7 @@ export function TopNav() {
               )}
             </View>
 
-            <View style={styles.menuDivider} />
 
-            {/* Footer links */}
-            <View style={styles.menuSection}>
-              {FOOTER_LINKS.map((link) => (
-                <Pressable
-                  key={link.label}
-                  style={styles.menuLinkRow}
-                  onPress={() => openExternalSameTab(link.url)}
-                >
-                  <Text style={styles.menuFooterLinkText}>{link.label}</Text>
-                </Pressable>
-              ))}
-            </View>
           </ScrollView>
         </View>
       </Modal>
