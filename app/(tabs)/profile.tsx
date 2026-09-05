@@ -132,20 +132,42 @@ export default function ProfileScreen() {
     ? rawVideos
     : (rawVideos?.data ?? rawVideos?.videos ?? []);
 
-  // Split into processing (pending/inprogress), failed, and ready-to-view
+  // Split into processing, failed/abandoned, and ready-to-view.
   const normaliseStatus = (status?: string | null) =>
-  (status ?? '').toLowerCase().replace(/_/g, '');
+    (status ?? '').toLowerCase().replace(/_/g, '');
 
-const processingVideos = allVideos.filter((v) => {
-  const status = normaliseStatus(v.status);
-  return status === 'pending' ||
-         status === 'inprogress' ||
-         status === 'pendingupload';
-});
+  const isStalePendingUpload = (video: VideoItem) => {
+    if (normaliseStatus(video.status) !== 'pendingupload') return false;
 
-const errorVideos = allVideos.filter(
-  (v) => normaliseStatus(v.status) === 'error'
-);
+    const createdAt = (video as any).createdAt;
+    if (!createdAt) return false;
+
+    const createdTime = new Date(createdAt).getTime();
+    if (!Number.isFinite(createdTime)) return false;
+
+    const STALE_UPLOAD_MS = 24 * 60 * 60 * 1000;
+    return Date.now() - createdTime > STALE_UPLOAD_MS;
+  };
+
+  const processingVideos = allVideos.filter((v) => {
+    const status = normaliseStatus(v.status);
+
+    return (
+      status === 'pending' ||
+      status === 'inprogress' ||
+      (status === 'pendingupload' && !isStalePendingUpload(v))
+    );
+  });
+
+  const errorVideos = allVideos.filter((v) => {
+    const status = normaliseStatus(v.status);
+
+    return (
+      status === 'error' ||
+      status === 'failed' ||
+      isStalePendingUpload(v)
+    );
+  });
 
 const videos = allVideos.filter((v) => {
   const status = normaliseStatus(v.status);
