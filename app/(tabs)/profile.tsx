@@ -43,6 +43,7 @@ function formatMemberSince(iso?: string | null): string | null {
 export default function ProfileScreen() {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const isMobile = width < 768;
   const router = useRouter();
   const { user, logout, updateUser } = useAuth();
   const queryClient = useQueryClient();
@@ -212,7 +213,7 @@ const videos = allVideos.filter((v) => {
 
   return (
     <DesktopAppShell>
-        {Platform.OS === 'web' && <TopNav />}
+        {Platform.OS === 'web' && isMobile && <TopNav />}
       <View style={styles.root}>
         <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       <ScrollView

@@ -11,6 +11,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from 'react-native';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -61,6 +62,8 @@ type UploadPhase = 'idle' | 'uploading' | 'processing' | 'done' | 'error';
 export default function UploadScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -565,7 +568,7 @@ export default function UploadScreen() {
   if (capsLoading) {
     return (
       <DesktopAppShell>
-        {Platform.OS === 'web' && <TopNav />}
+        {Platform.OS === 'web' && isMobile && <TopNav />}
         <View style={[styles.root, { backgroundColor: colors.background }]}>
           <View style={styles.centered}>
             <ActivityIndicator size="large" color={colors.primary} />
@@ -578,7 +581,7 @@ export default function UploadScreen() {
   if (!hasCreatorCap) {
     return (
       <DesktopAppShell>
-        {Platform.OS === 'web' && <TopNav />}
+        {Platform.OS === 'web' && isMobile && <TopNav />}
         <View style={[styles.root, { backgroundColor: colors.background }]}>
           <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
             <Text style={[styles.headerTitle, { color: colors.foreground }]}>Upload</Text>
@@ -602,7 +605,7 @@ export default function UploadScreen() {
 
   return (
     <DesktopAppShell>
-        {Platform.OS === 'web' && <TopNav />}
+        {Platform.OS === 'web' && isMobile && <TopNav />}
       <View style={[styles.root, { backgroundColor: colors.background }]}>
         <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Upload</Text>

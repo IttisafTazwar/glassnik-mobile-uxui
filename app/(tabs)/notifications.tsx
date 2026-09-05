@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -52,6 +53,8 @@ function Avatar({ name, size = 40 }: { name: string; size?: number }) {
 
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [markingAll, setMarkingAll] = useState(false);
@@ -141,7 +144,7 @@ export default function NotificationsScreen() {
   if (!user) {
     return (
       <DesktopAppShell>
-        {Platform.OS === 'web' && <TopNav />}
+        {Platform.OS === 'web' && isMobile && <TopNav />}
         <View style={[styles.root, styles.center]}>
           <Feather name="bell-off" size={36} color="rgba(255,255,255,0.2)" />
           <Text style={styles.emptyText}>Sign in to see notifications</Text>
@@ -152,7 +155,7 @@ export default function NotificationsScreen() {
 
   return (
     <DesktopAppShell>
-        {Platform.OS === 'web' && <TopNav />}
+        {Platform.OS === 'web' && isMobile && <TopNav />}
       <View style={styles.root}>
         {/* Header */}
       <View style={[styles.header, { paddingTop: topPad }]}>
