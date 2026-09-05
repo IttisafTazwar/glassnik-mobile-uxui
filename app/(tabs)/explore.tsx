@@ -308,64 +308,100 @@ export default function ExploreScreen() {
       />
     );
   } else {
-    discoveryContent = (
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => item.id}
-        numColumns={COLS}
-        scrollEnabled={false}
-        ListHeaderComponent={
-          !query ? (
-            <View>
-              {isMobile && trendingDestinations.length > 0 && (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Trending Destinations</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tagsRow}>
-                    {trendingDestinations.map((d) => (
-                      <Pressable key={d.label} style={styles.trendChip} onPress={() => setQuery(d.label)}>
-                        <Feather name="map-pin" size={12} color="#FE2C55" />
-                        <Text style={styles.trendChipTag}>{d.label}</Text>
-                        <Text style={styles.trendChipCount}>
-                          {d.count} {d.count === 1 ? 'experience' : 'experiences'}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
-              {isMobile && (
-                <View style={styles.sectionHeaderRow}>
-                  <Text style={styles.sectionTitle}>Trending Destinations</Text>
-                </View>
-              )}
-            </View>
-          ) : null
-        }
-        columnWrapperStyle={styles.columnWrapper}
-        contentContainerStyle={{ paddingHorizontal: GRID_PADDING }}
-        renderItem={({ item, index }) => (
-          <VideoGridCell
-            video={item}
-            width={cellWidth}
-            height={cellHeight}
-            isMobile={isMobile}
-            isFirst={index === 0}
-          />
-        )}
-        ListEmptyComponent={
-          isLoading ? (
-            <View style={styles.centered}>
-              <ActivityIndicator size="large" color="#FE2C55" />
-            </View>
-          ) : (
-            <View style={styles.centered}>
-              <Feather name="search" size={40} color="rgba(255,255,255,0.2)" />
-              <Text style={styles.emptyText}>No results{query ? ` for "${query}"` : ''}</Text>
-            </View>
-          )
-        }
-      />
-    );
+    const exploreHeader = !query && isMobile && trendingDestinations.length > 0 ? (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Trending Destinations</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tagsRow}
+        >
+          {trendingDestinations.map((d) => (
+            <Pressable key={d.label} style={styles.trendChip} onPress={() => setQuery(d.label)}>
+              <Feather name="map-pin" size={12} color="#FE2C55" />
+              <Text style={styles.trendChipTag}>{d.label}</Text>
+              <Text style={styles.trendChipCount}>
+                {d.count} {d.count === 1 ? 'experience' : 'experiences'}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
+    ) : null;
+
+    if (Platform.OS === 'web' && isMobile) {
+      discoveryContent = (
+        <View>
+          {exploreHeader}
+
+          <View
+            style={{
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              gap: 6,
+              paddingHorizontal: GRID_PADDING,
+            }}
+          >
+            {filtered.map((item, index) => (
+              <VideoGridCell
+                key={item.id}
+                video={item}
+                width={cellWidth}
+                height={cellHeight}
+                isMobile={isMobile}
+                isFirst={index === 0}
+              />
+            ))}
+          </View>
+
+          {filtered.length === 0 && (
+            isLoading ? (
+              <View style={styles.centered}>
+                <ActivityIndicator size="large" color="#FE2C55" />
+              </View>
+            ) : (
+              <View style={styles.centered}>
+                <Feather name="search" size={40} color="rgba(255,255,255,0.2)" />
+                <Text style={styles.emptyText}>No results{query ? ` for "${query}"` : ''}</Text>
+              </View>
+            )
+          )}
+        </View>
+      );
+    } else {
+      discoveryContent = (
+        <FlatList
+          data={filtered}
+          keyExtractor={(item) => item.id}
+          numColumns={COLS}
+          scrollEnabled={false}
+          ListHeaderComponent={exploreHeader}
+          columnWrapperStyle={styles.columnWrapper}
+          contentContainerStyle={{ paddingHorizontal: GRID_PADDING }}
+          renderItem={({ item, index }) => (
+            <VideoGridCell
+              video={item}
+              width={cellWidth}
+              height={cellHeight}
+              isMobile={isMobile}
+              isFirst={index === 0}
+            />
+          )}
+          ListEmptyComponent={
+            isLoading ? (
+              <View style={styles.centered}>
+                <ActivityIndicator size="large" color="#FE2C55" />
+              </View>
+            ) : (
+              <View style={styles.centered}>
+                <Feather name="search" size={40} color="rgba(255,255,255,0.2)" />
+                <Text style={styles.emptyText}>No results{query ? ` for "${query}"` : ''}</Text>
+              </View>
+            )
+          }
+        />
+      );
+    }
   }
 
   return (
