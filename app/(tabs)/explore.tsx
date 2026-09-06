@@ -16,7 +16,7 @@ import { Image } from 'expo-image';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Feather } from '@expo/vector-icons';
 import { mobileApi } from '@/lib/api';
@@ -162,10 +162,26 @@ export default function ExploreScreen() {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const isMobile = width < MOBILE_BREAKPOINT;
+  const router = useRouter();
   const params = useLocalSearchParams<{
     discovery?: string;
     category?: string;
   }>();
+
+  // Mobile Home is the full-screen Experience feed.
+  // Plain /explore is desktop-only; mobile discovery routes with
+  // discovery/category params remain available.
+  useEffect(() => {
+    if (
+      Platform.OS === 'web' &&
+      isMobile &&
+      !params.discovery &&
+      !params.category
+    ) {
+      router.replace('/');
+    }
+  }, [isMobile, params.discovery, params.category, router]);
+
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [activeDiscoveryTab, setActiveDiscoveryTab] = useState<DiscoveryTab>('Explore');
