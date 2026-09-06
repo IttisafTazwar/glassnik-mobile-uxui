@@ -59,7 +59,7 @@ export function TrendingSection({
       .slice(0, 10);
   }, [videos]);
 
-  const DEST_COLS = isMobile ? 2 : 5;
+  const DEST_COLS = isMobile ? 1 : 5;
   const DEST_GAP = 10;
   const DEST_PADDING = 14;
   const destCardWidth = (contentWidth - DEST_PADDING * 2 - DEST_GAP * (DEST_COLS - 1)) / DEST_COLS;
@@ -133,11 +133,15 @@ export function TrendingSection({
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Most Watched</Text>
         {mostWatched.length > 0 ? (
-          <View style={[styles.videoGrid, { paddingHorizontal: DEST_PADDING }]}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.horizontalRow}
+          >
             {mostWatched.map((v) => (
               <View key={v.id}>{renderVideoCard(v)}</View>
             ))}
-          </View>
+          </ScrollView>
         ) : (
           <Text style={styles.emptyText}>No more Experiences to show yet.</Text>
         )}

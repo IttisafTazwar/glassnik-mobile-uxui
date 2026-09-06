@@ -29,7 +29,7 @@ export function GlobalSection({ videos, isMobile, contentWidth, onDestinationPre
     return Array.from(counts.values()).sort((a, b) => b.count - a.count);
   }, [videos]);
 
-  const COLS = isMobile ? 2 : 5;
+  const COLS = isMobile ? 1 : 5;
   const GAP = 10;
   const PADDING = 14;
   const cardWidth = (contentWidth - PADDING * 2 - GAP * (COLS - 1)) / COLS;

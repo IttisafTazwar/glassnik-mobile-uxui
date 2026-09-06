@@ -291,6 +291,12 @@ export default function ExploreScreen() {
     setActiveDiscoveryTab('Trending');
   }
 
+  const isMobileDiscoveryPage =
+    isMobile &&
+    (activeDiscoveryTab === 'Trending' ||
+      activeDiscoveryTab === 'Nearby' ||
+      activeDiscoveryTab === 'Global');
+
   let discoveryContent: React.ReactNode;
 
   if (activeDiscoveryTab === 'Trending') {
@@ -435,7 +441,7 @@ export default function ExploreScreen() {
           showsVerticalScrollIndicator={false}
         >
           {isMobile ? (
-            <View style={styles.bannerMobile}>
+            <View style={[styles.bannerMobile, isMobileDiscoveryPage && styles.mobileDiscoveryHidden]}>
               <Image
                 source={require('@/assets/images/home-banner.png')}
                 style={StyleSheet.absoluteFill}
@@ -523,7 +529,7 @@ export default function ExploreScreen() {
             </View>
           )}
 
-          <View style={[styles.header, !isMobile && styles.headerDesktop]}>
+          <View style={[styles.header, !isMobile && styles.headerDesktop, isMobileDiscoveryPage && styles.mobileDiscoveryHidden]}>
             {isMobile && (
               <DiscoveryTabs active={activeDiscoveryTab} onChange={setActiveDiscoveryTab} />
             )}
@@ -649,7 +655,7 @@ export default function ExploreScreen() {
 
           {discoveryContent}
 
-          <View style={styles.footer}>
+          <View style={[styles.footer, isMobileDiscoveryPage && styles.mobileDiscoveryHidden]}>
             <View style={styles.footerColumnsRow}>
               {FOOTER_COLUMNS.map((col) => (
                 <View key={col.heading} style={styles.footerColumn}>
@@ -1128,6 +1134,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     gap: 12,
   },
+  mobileDiscoveryHidden: { display: 'none' },
   headerDesktop: {
     paddingTop: 10,
     paddingBottom: 10,

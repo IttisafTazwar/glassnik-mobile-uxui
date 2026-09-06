@@ -506,6 +506,13 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, itemWidth
 
       {/* Mobile-only sound control overlaid on the video.
           Desktop keeps its existing sound control in the feed header. */}
+      {/* Mobile videographer attribution — upper-left of video. */}
+      {!isDesktopWeb && controlsVisible && (
+        <View style={styles.mobileCreatorAttribution} pointerEvents="none">
+          <Text style={styles.creatorName}>@{video.creator.username}</Text>
+        </View>
+      )}
+
       {!isDesktopWeb && (
         <Pressable
           style={styles.mobileMuteButton}
@@ -589,10 +596,10 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, itemWidth
           )}
 
           <View style={styles.mobileOverlayContent}>
-          {(!isDesktopWeb || !isOwnVideo) && (
+          {isDesktopWeb && !isOwnVideo && (
             <View style={styles.creatorRow}>
               <Text style={styles.creatorName}>@{video.creator.username}</Text>
-              {isDesktopWeb && !isOwnVideo && video.creatorId && (
+              {video.creatorId && (
                 <Pressable
                   style={[styles.followTextBtn, following && styles.followTextBtnActive]}
                   onPress={handleFollow}
@@ -611,27 +618,64 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, itemWidth
             </View>
           )}
 
-          {metaLine ? (
-            <View style={styles.metaRow}>
-              <Text style={styles.metaText} numberOfLines={1}>
-                {metaLine}
-              </Text>
-              {video.category ? (
-                <Pressable
-                  style={styles.categoryPill}
-                  onPress={() =>
-                    router.push({
-                      pathname: '/(tabs)/explore',
-                      params: { category: video.category },
-                    } as any)
-                  }
-                  hitSlop={6}
-                >
-                  <Text style={styles.categoryText}>{video.category.toUpperCase()}</Text>
-                </Pressable>
+          {isDesktopWeb ? (
+            metaLine ? (
+              <View style={styles.metaRow}>
+                <Text style={styles.metaText} numberOfLines={1}>
+                  {metaLine}
+                </Text>
+                {video.category ? (
+                  <Pressable
+                    style={styles.categoryPill}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/(tabs)/explore',
+                        params: { category: video.category },
+                      } as any)
+                    }
+                    hitSlop={6}
+                  >
+                    <Text style={styles.categoryText}>
+                      {video.category.toUpperCase()}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : null
+          ) : (
+            <View style={styles.mobileDiscoveryBlock}>
+              {placeTourTransport ? (
+                <Text style={styles.mobilePlaceText} numberOfLines={1}>
+                  {placeTourTransport}
+                </Text>
               ) : null}
+
+              <View style={styles.mobileDestinationRow}>
+                {locationText ? (
+                  <Text style={styles.mobileDestinationText} numberOfLines={1}>
+                    {locationText}
+                  </Text>
+                ) : null}
+
+                {video.category ? (
+                  <Pressable
+                    style={styles.categoryPill}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/(tabs)/explore',
+                        params: { category: video.category },
+                      } as any)
+                    }
+                    hitSlop={6}
+                  >
+                    <Text style={styles.categoryText}>
+                      {video.category.toUpperCase()}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
             </View>
-          ) : null}
+          )}
 
           <View style={styles.divider} />
 
@@ -885,6 +929,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+  },
+  mobileCreatorAttribution: {
+    position: 'absolute',
+    top: 18,
+    left: 18,
+    zIndex: 35,
+  },
+  mobileDiscoveryBlock: {
+    gap: 4,
+  },
+  mobilePlaceText: {
+    color: '#fff',
+    fontSize: 14,
+    fontFamily: 'Inter_600SemiBold',
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  mobileDestinationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  mobileDestinationText: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 13,
+    fontFamily: 'Inter_400Regular',
+    flexShrink: 1,
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   metaRow: {
     flexDirection: 'row',

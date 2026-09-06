@@ -40,6 +40,35 @@ function formatMemberSince(iso?: string | null): string | null {
   return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 }
 
+function ProfileVideoPreview({ uri }: { uri: string }) {
+  if (Platform.OS !== 'web') return null;
+
+  return React.createElement('video', {
+    src: uri,
+    muted: true,
+    playsInline: true,
+    preload: 'metadata',
+    onLoadedMetadata: (event: any) => {
+      const el = event.currentTarget;
+      try {
+        if (el.duration && el.duration > 0.2) {
+          el.currentTime = Math.min(0.2, el.duration / 2);
+        }
+      } catch {}
+    },
+    style: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      width: '100%',
+      height: '100%',
+      objectFit: 'cover',
+      objectPosition: 'center',
+      pointerEvents: 'none',
+    },
+  });
+}
+
 export default function ProfileScreen() {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -542,13 +571,15 @@ const videos = allVideos.filter((v) => {
                         idx % 3 !== 2 ? { marginRight: 1.5 } : {},
                       ]}
                     >
-                      {(video as any).thumbnailUrl ? (
+                      {video.thumbnailUrl ? (
                         <Image
-                          source={{ uri: (video as any).thumbnailUrl }}
+                          source={{ uri: video.thumbnailUrl }}
                           style={StyleSheet.absoluteFill}
                           contentFit="cover"
                           transition={200}
                         />
+                      ) : Platform.OS === 'web' && video.publicUrl ? (
+                        <ProfileVideoPreview uri={video.publicUrl} />
                       ) : (
                         <>
                           <View style={[StyleSheet.absoluteFill, { backgroundColor: color, opacity: 0.25 }]} />

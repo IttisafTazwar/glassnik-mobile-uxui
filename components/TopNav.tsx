@@ -197,14 +197,20 @@ export function TopNav() {
       <Modal visible={menuOpen} animationType="slide" transparent onRequestClose={() => setMenuOpen(false)}>
         <View style={styles.menuOverlay}>
           <View style={[styles.menuHeader, { paddingTop: topPad }]}>
-            <View style={styles.logoRow}>
+            <Pressable
+              style={styles.logoRow}
+              onPress={() => {
+                setMenuOpen(false);
+                router.push('/' as any);
+              }}
+            >
               <Image
                 source={require('@/assets/images/logo.png')}
                 style={styles.logoImage}
                 resizeMode="contain"
               />
               <Text style={styles.logoText}>Glassnik</Text>
-            </View>
+            </Pressable>
             <Pressable hitSlop={8} onPress={() => setMenuOpen(false)}>
               <Feather name="x" size={24} color="#fff" />
             </Pressable>
