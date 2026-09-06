@@ -120,6 +120,7 @@ export function TopNav() {
   async function handleLogout() {
     setMenuOpen(false);
     await logout();
+    router.replace('/auth/login' as any);
   }
 
   // ── Desktop — unchanged from the existing implementation ─────────────────

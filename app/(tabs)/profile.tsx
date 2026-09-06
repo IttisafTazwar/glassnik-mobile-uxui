@@ -74,7 +74,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const isMobile = width < 768;
   const router = useRouter();
-  const { user, logout, updateUser } = useAuth();
+  const { user, logout, updateUser, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const [gridTab, setGridTab] = useState<GridTab>('videos');
 
@@ -204,8 +204,27 @@ const videos = allVideos.filter((v) => {
 });
 
   const topPad = Platform.OS === 'web' ? 8 : insets.top + 12;
-  const displayName = user?.displayName ?? user?.username ?? user?.email ?? 'User';
-  const username = user?.username ?? (user?.email?.split('@')[0]) ?? 'user';
+
+  if (authLoading) {
+    return (
+      <View style={styles.root}>
+        <ActivityIndicator color="#fff" />
+      </View>
+    );
+  }
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace('/auth/login' as any);
+    }
+  }, [authLoading, user, router]);
+
+  if (!user) {
+    return null;
+  }
+
+  const displayName = user.displayName ?? user.username ?? user.email;
+  const username = user.username ?? user.email?.split('@')[0] ?? '';
 
   const stats = {
     following: profileStats?.followingCount != null ? formatCount(profileStats.followingCount) : '—',
