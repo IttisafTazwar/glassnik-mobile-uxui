@@ -291,11 +291,15 @@ export default function ExploreScreen() {
     setActiveDiscoveryTab('Trending');
   }
 
+  const discoveryParam = Array.isArray(params.discovery)
+    ? params.discovery[0]
+    : params.discovery;
+
   const isMobileDiscoveryPage =
     isMobile &&
-    (activeDiscoveryTab === 'Trending' ||
-      activeDiscoveryTab === 'Nearby' ||
-      activeDiscoveryTab === 'Global');
+    (discoveryParam === 'Trending' ||
+      discoveryParam === 'Nearby' ||
+      discoveryParam === 'Global');
 
   let discoveryContent: React.ReactNode;
 
