@@ -81,7 +81,7 @@ export function WhatIsGlassnikModal() {
             accessibilityRole="button"
             accessibilityLabel="Close"
           >
-            <Feather name="x" size={isMobile ? 30 : 34} color="#FFFFFF" />
+            <Feather name="x" size={isMobile ? 16 : 20} color="#FFFFFF" />
           </Pressable>
 
           <View
@@ -221,8 +221,8 @@ const styles = StyleSheet.create({
 
   closeButton: {
     position: 'absolute',
-    right: 22,
-    top: 20,
+    right: 0,
+    top: 0,
     zIndex: 5,
     width: 44,
     height: 44,
