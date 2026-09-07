@@ -237,6 +237,7 @@ export default function FeedScreen() {
                 video={item}
                 isActive={index === currentIndex}
                 isFirstVideo={index === 0}
+                shouldPreload={index === currentIndex || index === currentIndex + 1}
                 itemHeight={feedHeight}
                 onCommentPress={(videoId) => setCommentsVideoId(videoId)}
               />

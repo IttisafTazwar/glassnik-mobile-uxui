@@ -13,6 +13,7 @@ import {
 
 const useNativeDriver = Platform.OS !== 'web';
 import { VideoView, useVideoPlayer } from 'expo-video';
+import { useEvent } from 'expo';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
@@ -27,6 +28,7 @@ interface Props {
   video: SampleVideo;
   isActive: boolean;
   isFirstVideo?: boolean;
+  shouldPreload?: boolean;
   itemWidth?: number;
   itemHeight?: number;
   /** Called when the comment button is pressed; receives the video's id. */
@@ -47,6 +49,7 @@ function WebFeedVideo({
   isFirstVideo = false,
   objectFit = 'cover',
   onAutoplayMuted,
+  onPlaying,
 }: {
   uri: string;
   isActive: boolean;
@@ -54,6 +57,7 @@ function WebFeedVideo({
   isFirstVideo?: boolean;
   objectFit?: 'cover' | 'contain';
   onAutoplayMuted?: () => void;
+  onPlaying?: () => void;
 }) {
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
   const previousActiveRef = React.useRef(false);
@@ -167,6 +171,7 @@ function WebFeedVideo({
     autoPlay: isActive,
     preload: 'auto',
     loop: true,
+    onPlaying,
     style: {
       position: 'absolute',
       top: 0,
@@ -180,7 +185,7 @@ function WebFeedVideo({
   });
 }
 
-export function FeedVideoItem({ video, isActive, isFirstVideo = false, itemWidth, itemHeight, onCommentPress }: Props) {
+export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPreload = true, itemWidth, itemHeight, onCommentPress }: Props) {
   const { isMuted, toggleMute, setMuted } = useMute();
   const onMuteToggle = toggleMute;
 
@@ -196,6 +201,13 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, itemWidth
   // pause toggle (no separate gesture was specified).
   const [controlsVisible, setControlsVisible] = useState(true);
   const [progress, setProgress] = useState(0);
+  const [videoStarted, setVideoStarted] = useState(false);
+
+  // Keep the thumbnail visible until the active video actually starts.
+  useEffect(() => {
+    if (!isActive) setVideoStarted(false);
+  }, [isActive, video.id]);
+
   const [following, setFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const lastTap = useRef(0);
@@ -217,38 +229,30 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, itemWidth
     p.loop = true;
   }, []));
 
-  // Automatically play the video that becomes active in the feed.
-  // Leaving a video pauses and resets it so every scroll starts fresh.
+  // Track whether the native player has loaded enough to play reliably.
+  const { status: playerStatus } = useEvent(player, 'statusChange', {
+    status: player.status,
+  });
+
+  // Keep playback controlled from one place. This avoids competing play()
+  // calls while a newly-visible video is still loading.
   useEffect(() => {
     try {
       player.muted = isMuted;
 
-      if (isActive) {
+      if (!isActive) {
+        player.pause();
         setPaused(false);
-        player.currentTime = 0;
+        return;
+      }
+
+      if (playerStatus === 'readyToPlay' && !paused) {
         player.play();
-      } else {
+      } else if (paused) {
         player.pause();
-        player.currentTime = 0;
       }
     } catch {}
-  }, [isActive, player]);
-
-  // Keep mute changes and manual pause/play controls in sync without
-  // restarting the active video.
-  useEffect(() => {
-    try {
-      player.muted = isMuted;
-
-      if (!isActive) return;
-
-      if (paused) {
-        player.pause();
-      } else {
-        player.play();
-      }
-    } catch {}
-  }, [paused, isMuted, isActive, player]);
+  }, [isActive, paused, isMuted, playerStatus, player]);
 
   // Progress tracking
   useEffect(() => {
@@ -422,35 +426,43 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, itemWidth
         }
       >
       {isDesktopWeb ? (
-        isActive ? (
-          <WebFeedVideo
-            uri={video.uri}
-            isActive={isActive}
-            isMuted={isMuted}
-            isFirstVideo={isFirstVideo}
-            objectFit="cover"
-            onAutoplayMuted={handleAutoplayMuted}
-          />
-        ) : video.thumbnailUrl ? (
-          <Image
-            source={{ uri: video.thumbnailUrl }}
-            style={StyleSheet.absoluteFill}
-            contentFit="cover"
-            transition={300}
-          />
-        ) : (
-          <View style={[StyleSheet.absoluteFill, styles.videoPlaceholder]} />
-        )
-      ) : (
         <>
-          {Platform.OS === 'web' ? (
+          {shouldPreload ? (
             <WebFeedVideo
               uri={video.uri}
               isActive={isActive}
               isMuted={isMuted}
-            isFirstVideo={isFirstVideo}
+              isFirstVideo={isFirstVideo}
+              objectFit="cover"
               onAutoplayMuted={handleAutoplayMuted}
+              onPlaying={() => setVideoStarted(true)}
             />
+          ) : null}
+
+          {(!isActive || !videoStarted) && video.thumbnailUrl ? (
+            <Image
+              source={{ uri: video.thumbnailUrl }}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              transition={150}
+            />
+          ) : !isActive ? (
+            <View style={[StyleSheet.absoluteFill, styles.videoPlaceholder]} />
+          ) : null}
+        </>
+      ) : (
+        <>
+          {Platform.OS === 'web' ? (
+            shouldPreload ? (
+              <WebFeedVideo
+                uri={video.uri}
+                isActive={isActive}
+                isMuted={isMuted}
+                isFirstVideo={isFirstVideo}
+                onAutoplayMuted={handleAutoplayMuted}
+                onPlaying={() => setVideoStarted(true)}
+              />
+            ) : null
           ) : (
             <VideoView
               player={player}
@@ -460,7 +472,7 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, itemWidth
             />
           )}
 
-          {!isActive && video.thumbnailUrl ? (
+          {(!isActive || !videoStarted) && video.thumbnailUrl ? (
             <Image
               source={{ uri: video.thumbnailUrl }}
               style={StyleSheet.absoluteFill}
