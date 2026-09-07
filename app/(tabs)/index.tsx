@@ -65,7 +65,11 @@ export default function FeedScreen() {
   const feedHeight = showWebTopNav
     ? Math.max(1, height - desktopTopNavHeight)
     : height;
-  const desktopFeedWidth = Math.min(width, feedHeight * (9 / 16));
+  // Desktop feed: wider immersive card while retaining a portrait-style layout.
+  // The video itself uses objectFit="cover", so it fills this entire area.
+  const desktopFeedWidth = isMobile
+    ? width
+    : Math.min(width * 0.58, feedHeight * 0.82);
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<ActiveTab>('foryou');
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -260,22 +264,6 @@ export default function FeedScreen() {
 
       {!isMobile && (
         <View style={[styles.topBar, { paddingTop: topInset + (Platform.OS === 'web' ? 8 : 12), pointerEvents: 'box-none' }]}>
-          {/* Desktop For You / Following navigation remains unchanged. */}
-          <View style={styles.tabSwitcher}>
-            <Pressable onPress={() => setActiveTab('foryou')}>
-              <Text style={[styles.tabText, activeTab === 'foryou' && styles.tabTextActive]}>
-                For You
-              </Text>
-              {activeTab === 'foryou' && <View style={styles.tabUnderline} />}
-            </Pressable>
-            <Pressable onPress={() => setActiveTab('following')}>
-              <Text style={[styles.tabText, activeTab === 'following' && styles.tabTextActive]}>
-                Following
-              </Text>
-              {activeTab === 'following' && <View style={styles.tabUnderline} />}
-            </Pressable>
-          </View>
-
           <View style={styles.topRight}>
             <Pressable onPress={toggleMute} hitSlop={8}>
               <Feather name={isMuted ? 'volume-x' : 'volume-2'} size={22} color="#fff" />

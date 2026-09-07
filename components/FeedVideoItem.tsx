@@ -394,9 +394,7 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, itemWidth
   // Reserve the bottom portion INSIDE that card for creator,
   // metadata and reaction controls.
   const desktopInfoHeight = isDesktopWeb ? 118 : 0;
-  const desktopVideoHeight = isDesktopWeb
-    ? Math.max(1, ITEM_HEIGHT - desktopInfoHeight)
-    : ITEM_HEIGHT;
+  const desktopVideoHeight = ITEM_HEIGHT;
 
   // Place/Tour/Transport • Location — single line, per the mockup.
   const placeTourTransport = video.description || null;
@@ -430,7 +428,7 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, itemWidth
             isActive={isActive}
             isMuted={isMuted}
             isFirstVideo={isFirstVideo}
-            objectFit="contain"
+            objectFit="cover"
             onAutoplayMuted={handleAutoplayMuted}
           />
         ) : video.thumbnailUrl ? (
@@ -507,9 +505,28 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, itemWidth
       {/* Mobile-only sound control overlaid on the video.
           Desktop keeps its existing sound control in the feed header. */}
       {/* Mobile videographer attribution — upper-left of video. */}
-      {!isDesktopWeb && controlsVisible && (
-        <View style={styles.mobileCreatorAttribution} pointerEvents="none">
-          <Text style={styles.creatorName}>@{video.creator.username}</Text>
+      {controlsVisible && (
+        <View style={styles.mobileCreatorAttribution}>
+          <View style={styles.creatorRow}>
+            <Text style={styles.creatorName}>@{video.creator.username}</Text>
+
+            {isDesktopWeb && !isOwnVideo && video.creatorId && (
+              <Pressable
+                style={[styles.followTextBtn, following && styles.followTextBtnActive]}
+                onPress={handleFollow}
+                disabled={followLoading}
+              >
+                {following ? (
+                  <View style={styles.followingRow}>
+                    <Feather name="check" size={11} color="#fff" />
+                    <Text style={styles.followTextBtnLabel}>Following</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.followTextBtnLabel}>Follow</Text>
+                )}
+              </Pressable>
+            )}
+          </View>
         </View>
       )}
 
@@ -558,7 +575,8 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, itemWidth
               zIndex: 30,
             },
             isDesktopWeb && {
-              bottom: desktopInfoHeight,
+              bottom: 0,
+              zIndex: 30,
             },
           ]}
         >
@@ -573,17 +591,17 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, itemWidth
             !isDesktopWeb && styles.mobileBottomOverlay,
             isDesktopWeb && {
               position: 'absolute',
-              top: desktopVideoHeight,
               left: 0,
               right: 0,
               bottom: 0,
               height: desktopInfoHeight,
-              backgroundColor: '#000',
+              backgroundColor: 'transparent',
               paddingHorizontal: 14,
               paddingTop: 10,
               paddingBottom: 8,
               justifyContent: 'center',
               gap: 7,
+              zIndex: 20,
             },
           ]}
         >
@@ -596,28 +614,6 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, itemWidth
           )}
 
           <View style={styles.mobileOverlayContent}>
-          {isDesktopWeb && !isOwnVideo && (
-            <View style={styles.creatorRow}>
-              <Text style={styles.creatorName}>@{video.creator.username}</Text>
-              {video.creatorId && (
-                <Pressable
-                  style={[styles.followTextBtn, following && styles.followTextBtnActive]}
-                  onPress={handleFollow}
-                  disabled={followLoading}
-                >
-                  {following ? (
-                    <View style={styles.followingRow}>
-                      <Feather name="check" size={11} color="#fff" />
-                      <Text style={styles.followTextBtnLabel}>Following</Text>
-                    </View>
-                  ) : (
-                    <Text style={styles.followTextBtnLabel}>Follow</Text>
-                  )}
-                </Pressable>
-              )}
-            </View>
-          )}
-
           {isDesktopWeb ? (
             metaLine ? (
               <View style={styles.metaRow}>
