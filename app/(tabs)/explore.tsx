@@ -218,7 +218,7 @@ export default function ExploreScreen() {
 
   const { data: apiVideos, isLoading } = useQuery<VideoAsset[]>({
     queryKey: ['explore'],
-    queryFn: () => mobileApi.getFeed(1, 50),
+    queryFn: () => mobileApi.getFeed(1, 200),
     retry: false,
   });
 
@@ -396,24 +396,30 @@ export default function ExploreScreen() {
       );
     } else {
       discoveryContent = (
-        <FlatList
-          data={filtered}
-          keyExtractor={(item) => item.id}
-          numColumns={COLS}
-          scrollEnabled={false}
-          ListHeaderComponent={exploreHeader}
-          columnWrapperStyle={styles.columnWrapper}
-          contentContainerStyle={{ paddingHorizontal: GRID_PADDING }}
-          renderItem={({ item, index }) => (
-            <VideoGridCell
-              video={item}
-              width={cellWidth}
-              height={cellHeight}
-              isMobile={isMobile}
-              isFirst={index === 0}
-            />
-          )}
-          ListEmptyComponent={
+        <View>
+          {exploreHeader}
+
+          <View
+            style={{
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              gap: 6,
+              paddingHorizontal: GRID_PADDING,
+            }}
+          >
+            {filtered.map((item, index) => (
+              <VideoGridCell
+                key={item.id}
+                video={item}
+                width={cellWidth}
+                height={cellHeight}
+                isMobile={isMobile}
+                isFirst={index === 0}
+              />
+            ))}
+          </View>
+
+          {filtered.length === 0 && (
             isLoading ? (
               <View style={styles.centered}>
                 <ActivityIndicator size="large" color="#FE2C55" />
@@ -424,8 +430,8 @@ export default function ExploreScreen() {
                 <Text style={styles.emptyText}>No results{query ? ` for "${query}"` : ''}</Text>
               </View>
             )
-          }
-        />
+          )}
+        </View>
       );
     }
   }
