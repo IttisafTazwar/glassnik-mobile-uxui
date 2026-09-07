@@ -16,7 +16,6 @@ import { Feather } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { MuteProvider } from '@/context/MuteContext';
-import { WhatIsGlassnikModal } from '@/components/WhatIsGlassnikModal';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -84,7 +83,6 @@ export default function RootLayout() {
               <AuthProvider>
                 <MuteProvider>
                   <AuthGate />
-                  <WhatIsGlassnikModal />
                 </MuteProvider>
               </AuthProvider>
             </KeyboardProvider>

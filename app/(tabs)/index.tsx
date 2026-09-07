@@ -56,6 +56,8 @@ function apiVideoToSample(v: VideoAsset): SampleVideo {
   };
 }
 
+import { WhatIsGlassnikModal } from '@/components/WhatIsGlassnikModal';
+
 export default function FeedScreen() {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -124,6 +126,7 @@ export default function FeedScreen() {
 
   return (
     <View style={styles.root}>
+      <WhatIsGlassnikModal />
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
       {(!isMobile || showWebTopNav) && <TopNav />}

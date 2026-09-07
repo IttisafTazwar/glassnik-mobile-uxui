@@ -60,7 +60,12 @@ export function WhatIsGlassnikModal() {
       animationType="fade"
       onRequestClose={dismiss}
     >
-      <View style={styles.backdrop}>
+      <View
+        style={[
+          styles.backdrop,
+          isMobile && styles.mobileBackdrop,
+        ]}
+      >
         <View
           style={[
             styles.card,
@@ -90,6 +95,16 @@ export function WhatIsGlassnikModal() {
 
           <Text style={[styles.title, isMobile && styles.mobileTitle]}>
             What is Glassnik?
+          </Text>
+
+          <Text
+            style={[
+              styles.body,
+              styles.introBody,
+              isMobile && styles.mobileBody,
+            ]}
+          >
+            Glassnik is a new way to explore and share videos.
           </Text>
 
           <Text style={[styles.body, isMobile && styles.mobileBody]}>
@@ -141,6 +156,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
+  },
+
+  mobileBackdrop: {
+    backgroundColor: 'rgba(0, 0, 0, 0.38)',
+  },
+
+  introBody: {
+    marginBottom: 16,
   },
 
   card: {
