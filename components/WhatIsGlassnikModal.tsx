@@ -71,7 +71,7 @@ export function WhatIsGlassnikModal() {
             styles.card,
             isMobile ? styles.mobileCard : styles.desktopCard,
             {
-              maxHeight: Math.max(520, height - (isMobile ? 32 : 64)),
+              maxHeight: height - (isMobile ? 24 : 64),
             },
           ]}
         >
@@ -84,65 +84,74 @@ export function WhatIsGlassnikModal() {
             <Feather name="x" size={isMobile ? 30 : 34} color="#FFFFFF" />
           </Pressable>
 
-          <Image
-            source={require('../assets/images/logo.png')}
+          <View
             style={[
-              styles.logo,
-              isMobile && styles.mobileLogo,
-            ]}
-            resizeMode="contain"
-          />
-
-          <Text style={[styles.title, isMobile && styles.mobileTitle]}>
-            What is Glassnik?
-          </Text>
-
-          <Text
-            style={[
-              styles.body,
-              styles.introBody,
-              isMobile && styles.mobileBody,
+              styles.contentContainer,
+              isMobile && styles.mobileContentContainer,
             ]}
           >
-            Glassnik is a new way to explore and share videos.
-          </Text>
+            <Image
+              source={require('../assets/images/logo.png')}
+              style={[
+                styles.logo,
+                isMobile && styles.mobileLogo,
+              ]}
+              resizeMode="contain"
+            />
 
-          <Text style={[styles.body, isMobile && styles.mobileBody]}>
-            Glassnik only shows videos recorded from the tiny cameras in
-            smart-glasses frames because seeing the world through someone
-            else’s eyes, and experiencing the places they go, and the things
-            they do, is extraordinary.
-          </Text>
-
-          <View style={styles.divider} />
-
-          <Text style={[styles.exploreTitle, isMobile && styles.mobileExploreTitle]}>
-            Explore <Text style={styles.cyanText}>your way</Text>
-          </Text>
-
-          <Text style={[styles.body, isMobile && styles.mobileBody]}>
-            Swipe up to watch the next video. Or at any time, tap the place,
-            destination or category links below each video to explore similar
-            experiences.
-          </Text>
-
-          <Pressable
-            onPress={dismiss}
-            style={({ pressed }) => [
-              styles.gotItButton,
-              pressed && styles.pressed,
-            ]}
-            accessibilityRole="button"
-          >
-            <Text style={[styles.gotItText, isMobile && styles.mobileGotItText]}>
-              Got it!
+            <Text style={[styles.title, isMobile && styles.mobileTitle]}>
+              What is Glassnik?
             </Text>
-          </Pressable>
 
-          <Text style={[styles.tagline, isMobile && styles.mobileTagline]}>
-            REAL PLACES. REAL PEOPLE.{' '}
-            <Text style={styles.cyanText}>REAL EXPERIENCES.</Text>
-          </Text>
+            <Text
+              style={[
+                styles.body,
+                styles.introBody,
+                isMobile && styles.mobileIntroBody,
+                isMobile && styles.mobileBody,
+              ]}
+            >
+              Glassnik is a new way to explore and share videos.
+            </Text>
+
+            <Text style={[styles.body, isMobile && styles.mobileBody]}>
+              Glassnik only shows videos recorded from the tiny cameras in
+              smart-glasses frames because seeing the world through someone
+              else’s eyes, and experiencing the places they go, and the things
+              they do, is extraordinary.
+            </Text>
+
+            <View style={[styles.divider, isMobile && styles.mobileDivider]} />
+
+            <Text style={[styles.exploreTitle, isMobile && styles.mobileExploreTitle]}>
+              Explore <Text style={styles.cyanText}>your way</Text>
+            </Text>
+
+            <Text style={[styles.body, isMobile && styles.mobileBody]}>
+              Swipe up to watch the next video. Or at any time, tap the place,
+              destination or category links below each video to explore similar
+              experiences.
+            </Text>
+
+            <Pressable
+              onPress={dismiss}
+              style={({ pressed }) => [
+                styles.gotItButton,
+              isMobile && styles.mobileGotItButton,
+                pressed && styles.pressed,
+              ]}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.gotItText, isMobile && styles.mobileGotItText]}>
+                Got it!
+              </Text>
+            </Pressable>
+
+            <Text style={[styles.tagline, isMobile && styles.mobileTagline]}>
+              REAL PLACES. REAL PEOPLE.{' '}
+              <Text style={styles.cyanText}>REAL EXPERIENCES.</Text>
+            </Text>
+          </View>
         </View>
       </View>
     </Modal>
@@ -152,18 +161,23 @@ export function WhatIsGlassnikModal() {
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.76)',
+    backgroundColor: 'rgba(0, 0, 0, 0.16)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
   },
 
   mobileBackdrop: {
-    backgroundColor: 'rgba(0, 0, 0, 0.38)',
+    backgroundColor: 'rgba(0, 0, 0, 0.16)',
+    padding: 12,
   },
 
   introBody: {
     marginBottom: 16,
+  },
+
+  mobileIntroBody: {
+    marginBottom: 7,
   },
 
   card: {
@@ -172,10 +186,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#12DCE5',
     borderRadius: 28,
-    alignItems: 'center',
-    paddingHorizontal: 36,
-    paddingTop: 24,
-    paddingBottom: 22,
+    overflow: 'hidden',
 
     ...Platform.select({
       web: {
@@ -192,9 +203,20 @@ const styles = StyleSheet.create({
   mobileCard: {
     maxWidth: 520,
     borderRadius: 24,
-    paddingHorizontal: 22,
-    paddingTop: 28,
-    paddingBottom: 24,
+  },
+
+  contentContainer: {
+    width: '100%',
+    alignItems: 'center',
+    paddingHorizontal: 36,
+    paddingTop: 24,
+    paddingBottom: 22,
+  },
+
+  mobileContentContainer: {
+    paddingHorizontal: 18,
+    paddingTop: 6,
+    paddingBottom: 6,
   },
 
   closeButton: {
@@ -215,9 +237,9 @@ const styles = StyleSheet.create({
   },
 
   mobileLogo: {
-    width: 82,
-    height: 82,
-    marginBottom: 8,
+    width: 58,
+    height: 58,
+    marginBottom: 4,
   },
 
   title: {
@@ -230,9 +252,9 @@ const styles = StyleSheet.create({
   },
 
   mobileTitle: {
-    fontSize: 32,
-    lineHeight: 38,
-    marginBottom: 16,
+    fontSize: 27,
+    lineHeight: 31,
+    marginBottom: 7,
   },
 
   body: {
@@ -245,8 +267,8 @@ const styles = StyleSheet.create({
   },
 
   mobileBody: {
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 14,
+    lineHeight: 19,
   },
 
   divider: {
@@ -254,6 +276,10 @@ const styles = StyleSheet.create({
     width: '100%',
     backgroundColor: '#12DCE5',
     marginVertical: 20,
+  },
+
+  mobileDivider: {
+    marginVertical: 9,
   },
 
   exploreTitle: {
@@ -266,9 +292,9 @@ const styles = StyleSheet.create({
   },
 
   mobileExploreTitle: {
-    fontSize: 27,
-    lineHeight: 34,
-    marginBottom: 14,
+    fontSize: 23,
+    lineHeight: 27,
+    marginBottom: 6,
   },
 
   cyanText: {
@@ -290,6 +316,12 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
 
+  mobileGotItButton: {
+    minHeight: 46,
+    marginTop: 9,
+    marginBottom: 6,
+  },
+
   gotItText: {
     color: '#041719',
     fontFamily: 'Inter_700Bold',
@@ -297,7 +329,7 @@ const styles = StyleSheet.create({
   },
 
   mobileGotItText: {
-    fontSize: 25,
+    fontSize: 21,
   },
 
   tagline: {
@@ -309,7 +341,8 @@ const styles = StyleSheet.create({
   },
 
   mobileTagline: {
-    fontSize: 10,
-    letterSpacing: 1.4,
+    fontSize: 9,
+    lineHeight: 11,
+    letterSpacing: 1,
   },
 });
