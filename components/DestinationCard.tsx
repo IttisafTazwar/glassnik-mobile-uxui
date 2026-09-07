@@ -15,8 +15,8 @@ export function DestinationCard({ city, country, count, width, onPress }: Props)
       style={({ pressed }) => [styles.card, { width, opacity: pressed ? 0.85 : 1 }]}
       onPress={onPress}
     >
-      <Text style={styles.city} numberOfLines={1}>{city}</Text>
-      {country ? <Text style={styles.country} numberOfLines={1}>{country}</Text> : null}
+      <Text style={styles.city}>{city}</Text>
+      {country ? <Text style={styles.country}>{country}</Text> : null}
       <Text style={styles.count}>
         {count} {count === 1 ? 'Eye-POV Experience' : 'Eye-POV Experiences'}
       </Text>
