@@ -223,6 +223,20 @@ export default function ExploreScreen() {
       ? discoveryParam as DiscoveryTab
       : 'Explore';
 
+  const setActiveDiscoveryTab = React.useCallback(
+    (tab: DiscoveryTab) => {
+      if (tab === 'Explore') {
+        router.replace('/(tabs)/explore' as any);
+      } else {
+        router.replace({
+          pathname: '/(tabs)/explore',
+          params: { discovery: tab },
+        } as any);
+      }
+    },
+    [router],
+  );
+
   useEffect(() => {
     const categoryParam = Array.isArray(params.category)
       ? params.category[0]
@@ -373,14 +387,13 @@ export default function ExploreScreen() {
 
   const isMobileDiscoveryPage =
     isMobile &&
-    (discoveryParam === 'Categories' ||
-      discoveryParam === 'Trending' ||
+    (discoveryParam === 'Trending' ||
       discoveryParam === 'Nearby' ||
       discoveryParam === 'Global');
 
   let discoveryContent: React.ReactNode;
 
-  if (activeDiscoveryTab === 'Categories') {
+  if (activeDiscoveryTab === 'Categories' && !isMobile) {
     const categoryVideos =
       activeCategory === 'All' ? allVideos : filtered;
 
