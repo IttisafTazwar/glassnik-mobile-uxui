@@ -250,7 +250,6 @@ export default function ExploreScreen() {
     );
 
     if (matchingCategory) {
-      setActiveDiscoveryTab('Explore');
       setQuery('');
       setActiveCategory(matchingCategory);
     }
