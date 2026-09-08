@@ -122,6 +122,7 @@ function apiVideoToSample(v: VideoAsset): SampleVideo {
 export default function ExploreScreen() {
   const categoryScrollRef = React.useRef<ScrollView>(null);
   const categoryScrollX = React.useRef(0);
+  const categoryPillOffsets = React.useRef<Record<string, number>>({});
   const categoryFeedPillScrollRef = React.useRef<ScrollView>(null);
   const categoryFeedScrollRef = React.useRef<ScrollView>(null);
   const destinationScrollRef = React.useRef<ScrollView>(null);
@@ -245,6 +246,23 @@ export default function ExploreScreen() {
   useEffect(() => {
     setCategoryControlsVisible(true);
   }, [categoryFeedIndex]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || isMobile) return;
+
+    const x = categoryPillOffsets.current[activeCategory];
+
+    if (typeof x !== 'number' || !categoryScrollRef.current) return;
+
+    const timer = setTimeout(() => {
+      categoryScrollRef.current?.scrollTo({
+        x: Math.max(0, x - 8),
+        animated: true,
+      });
+    }, 50);
+
+    return () => clearTimeout(timer);
+  }, [activeCategory, isMobile]);
 
   const { data: apiVideos, isLoading } = useQuery<VideoAsset[]>({
     queryKey: ['explore'],
@@ -771,6 +789,10 @@ export default function ExploreScreen() {
                       return (
                         <Pressable
                           key={cat}
+                          onLayout={(event) => {
+                            categoryPillOffsets.current[cat] =
+                              event.nativeEvent.layout.x;
+                          }}
                           onPress={() => setActiveCategory(cat)}
                           style={[styles.categoryPill, isActive && styles.categoryPillActive]}
                         >
