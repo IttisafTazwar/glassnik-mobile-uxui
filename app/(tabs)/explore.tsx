@@ -250,7 +250,12 @@ export default function ExploreScreen() {
     );
 
     if (matchingCategory) {
-      setActiveDiscoveryTab('Explore');
+      // Mobile category pages are driven by the category URL parameter.
+      // Do not clear the parameter by navigating to plain Explore.
+      if (!isMobile) {
+        setActiveDiscoveryTab('Explore');
+      }
+
       setQuery('');
       setActiveCategory(matchingCategory);
     }

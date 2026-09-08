@@ -752,13 +752,20 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
                 {video.category ? (
                   <Pressable
                     style={styles.categoryPill}
-                    onPress={() =>
-                      router.push({
-                        pathname: '/(tabs)/explore',
-                        params: { category: video.category },
-                      } as any)
-                    }
-                    hitSlop={6}
+                    onPress={() => {
+                      if (categoryMode || !isDesktopWeb) {
+                        router.replace({
+                          pathname: '/(tabs)/explore',
+                          params: { category: video.category },
+                        } as any);
+                      } else {
+                        router.push({
+                          pathname: '/(tabs)/explore',
+                          params: { category: video.category },
+                        } as any);
+                      }
+                    }}
+                    hitSlop={10}
                   >
                     <Text style={styles.categoryText}>
                       {video.category.toUpperCase()}
@@ -785,13 +792,20 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
                 {video.category ? (
                   <Pressable
                     style={styles.categoryPill}
-                    onPress={() =>
-                      router.push({
-                        pathname: '/(tabs)/explore',
-                        params: { category: video.category },
-                      } as any)
-                    }
-                    hitSlop={6}
+                    onPress={() => {
+                      if (categoryMode || !isDesktopWeb) {
+                        router.replace({
+                          pathname: '/(tabs)/explore',
+                          params: { category: video.category },
+                        } as any);
+                      } else {
+                        router.push({
+                          pathname: '/(tabs)/explore',
+                          params: { category: video.category },
+                        } as any);
+                      }
+                    }}
+                    hitSlop={10}
                   >
                     <Text style={styles.categoryText}>
                       {video.category.toUpperCase()}
