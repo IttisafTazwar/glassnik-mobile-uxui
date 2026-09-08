@@ -65,12 +65,20 @@ export function Sidebar() {
   const onExplorePage =
     pathname === '/(tabs)/explore' || pathname === '/explore';
 
-  const activeExploreChild =
-    pathname === '/'
-      ? 'Featured'
-      : onExplorePage && params.discovery
-        ? params.discovery
-        : null;
+  const [activeExploreChild, setActiveExploreChild] =
+    React.useState<string | null>(() => {
+      if (pathname === '/') return 'Featured';
+      if (onExplorePage && params.discovery) return params.discovery;
+      return null;
+    });
+
+  React.useEffect(() => {
+    if (pathname === '/') {
+      setActiveExploreChild('Featured');
+    } else if (!onExplorePage) {
+      setActiveExploreChild(null);
+    }
+  }, [pathname, onExplorePage]);
 
   // expo-router returns public URL paths on web, e.g. /profile rather
   // than /(tabs)/profile. Support both forms so active states work
@@ -94,6 +102,9 @@ export function Sidebar() {
 
   function goExploreChild(child: Leaf) {
     if (child.deadLink) return;
+
+    // The clicked child controls the white active state.
+    setActiveExploreChild(child.label);
 
     if (child.route === '/') {
       router.push('/' as any);
