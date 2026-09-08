@@ -62,8 +62,6 @@ function WebFeedVideo({
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
   const previousActiveRef = React.useRef(false);
 
-  // Playback lifecycle.
-  // Only the active feed item is allowed to play.
   React.useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
@@ -73,16 +71,48 @@ function WebFeedVideo({
     el.playsInline = true;
     el.loop = true;
 
+    const getBufferedAhead = () => {
+      if (!Number.isFinite(el.currentTime) || !el.buffered.length) {
+        return 0;
+      }
+
+      for (let i = 0; i < el.buffered.length; i++) {
+        if (
+          el.currentTime >= el.buffered.start(i) &&
+          el.currentTime <= el.buffered.end(i)
+        ) {
+          return Math.max(
+            0,
+            el.buffered.end(i) - el.currentTime,
+          );
+        }
+      }
+
+      return 0;
+    };
+
     const playActiveVideo = async () => {
-      if (cancelled || !isActive || videoRef.current !== el) return;
+      if (
+        cancelled ||
+        !isActive ||
+        videoRef.current !== el
+      ) {
+        return;
+      }
+
+      // Wait for a small safety buffer before starting.
+      // This prevents immediate playback from consuming the
+      // first few seconds faster than they can be downloaded.
+      if (getBufferedAhead() < 3 && !el.ended) {
+        return;
+      }
 
       try {
         await el.play();
       } catch {
         if (cancelled || !isActive) return;
 
-        // Mobile Safari can reject autoplay with sound.
-        // Retry this element muted without changing the global preference.
+        // Retry muted if autoplay with sound is rejected.
         el.muted = true;
 
         try {
@@ -97,6 +127,26 @@ function WebFeedVideo({
       }
     };
 
+    const handleProgress = () => {
+      if (
+        isActive &&
+        el.paused &&
+        getBufferedAhead() >= 3
+      ) {
+        void playActiveVideo();
+      }
+    };
+
+    const handleWaiting = () => {
+      if (!isActive || cancelled) return;
+
+      // Let the browser refill instead of repeatedly
+      // calling play() while the network is behind.
+      try {
+        el.pause();
+      } catch {}
+    };
+
     if (!isActive) {
       previousActiveRef.current = false;
 
@@ -108,7 +158,7 @@ function WebFeedVideo({
       return;
     }
 
-    // Reset only when a new card becomes active.
+    // Reset only when this video becomes active.
     if (!previousActiveRef.current) {
       try {
         el.currentTime = 0;
@@ -117,37 +167,40 @@ function WebFeedVideo({
 
     previousActiveRef.current = true;
 
-    // The first visible video must begin muted so Safari permits autoplay.
-    // All later active videos use the user's current mute preference.
+    // First video starts muted for autoplay compatibility.
+    // Other videos follow the user's mute preference.
     el.muted = isFirstVideo ? true : isMuted;
 
     el.addEventListener('canplay', handleCanPlay);
     el.addEventListener('loadeddata', handleCanPlay);
+    el.addEventListener('progress', handleProgress);
+    el.addEventListener('waiting', handleWaiting);
 
-    if (el.readyState >= 2) {
+    if (
+      el.readyState >= 2 &&
+      getBufferedAhead() >= 3
+    ) {
       void playActiveVideo();
     }
-    // If the video is still loading, leave the existing preload alone.
-    // canplay/loadeddata will start playback as soon as it is ready.
 
     return () => {
       cancelled = true;
+
       el.removeEventListener('canplay', handleCanPlay);
       el.removeEventListener('loadeddata', handleCanPlay);
+      el.removeEventListener('progress', handleProgress);
+      el.removeEventListener('waiting', handleWaiting);
     };
   }, [isActive, uri, isFirstVideo]);
 
-  // Sound changes must never seek, pause or restart playback.
+  // Keep the user's mute preference without
+  // restarting or seeking the video.
   React.useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
 
-    // Follow the user's mute preference.
-    // MuteContext starts true, so the first video is eligible for autoplay.
     el.muted = isMuted;
 
-    // If Safari happened to leave the ACTIVE video paused while changing
-    // sound state, recover playback without resetting currentTime.
     if (isActive && el.paused) {
       const result = el.play();
 
@@ -164,11 +217,19 @@ function WebFeedVideo({
     ref: videoRef,
     src: uri,
     playsInline: true,
-    // MuteContext starts true, so the initial video element is born muted.
-    muted: isMuted,
+
+    // Active video gets aggressive loading.
+    // Preloaded next video stays lighter so it doesn't
+    // compete with the active video's bandwidth.
+    preload: isActive ? 'auto' : 'metadata',
+
+    // Give the active video network priority.
+    fetchPriority: isActive ? 'high' : 'low',
+
     autoPlay: isActive,
-    preload: 'auto',
+    muted: isMuted,
     loop: true,
+
     onPlaying,
     style: {
       position: 'absolute',
@@ -178,7 +239,6 @@ function WebFeedVideo({
       height: '100%',
       objectFit,
       objectPosition: 'center',
-      backgroundColor: '#000',
     },
   });
 }

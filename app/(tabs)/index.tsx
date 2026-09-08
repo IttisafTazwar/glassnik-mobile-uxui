@@ -147,53 +147,59 @@ export default function FeedScreen() {
           >
       {/* ── Video feed ── */}
       {Platform.OS === 'web' && !isMobile ? (
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          style={{
-            height: feedHeight,
-            width: desktopFeedWidth,
-          }}
-          contentContainerStyle={{
-            width: desktopFeedWidth,
-          }}
-          snapToInterval={feedHeight}
-          snapToAlignment="start"
-          decelerationRate="fast"
-          onScroll={(event) => {
-            const y = event.nativeEvent.contentOffset?.y ?? 0;
-            const nextIndex = Math.max(
-              0,
-              Math.min(
-                allVideos.length - 1,
-                Math.round(y / feedHeight)
-              )
-            );
-
-            if (nextIndex !== currentIndex) {
-              setCurrentIndex(nextIndex);
-            }
-          }}
-          scrollEventThrottle={16}
-        >
-          {allVideos.map((item, index) => (
+        <FlatList
+          data={allVideos}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item, index }) => (
             <View
-              key={item.id}
               style={{
                 width: desktopFeedWidth,
                 height: feedHeight,
-                scrollSnapAlign: 'start',
-              } as any}
+              }}
             >
               <FeedVideoItem
                 video={item}
                 isActive={index === currentIndex}
+                isFirstVideo={index === 0}
+                shouldPreload={
+                  index === currentIndex ||
+                  index === currentIndex + 1
+                }
                 itemWidth={desktopFeedWidth}
                 itemHeight={feedHeight}
-                onCommentPress={(videoId) => setCommentsVideoId(videoId)}
+                onCommentPress={(videoId) =>
+                  setCommentsVideoId(videoId)
+                }
               />
             </View>
-          ))}
-        </ScrollView>
+          )}
+          getItemLayout={(_, index) => ({
+            length: feedHeight,
+            offset: feedHeight * index,
+            index,
+          })}
+          snapToInterval={feedHeight}
+          snapToAlignment="start"
+          decelerationRate="fast"
+          showsVerticalScrollIndicator={false}
+          onViewableItemsChanged={({ viewableItems }) => {
+            const first = viewableItems.find(
+              (item) => item.isViewable
+            );
+
+            if (first?.index != null) {
+              setCurrentIndex(first.index);
+            }
+          }}
+          viewabilityConfig={{
+            itemVisiblePercentThreshold: 60,
+          }}
+          removeClippedSubviews={false}
+          maxToRenderPerBatch={3}
+          windowSize={5}
+          initialNumToRender={2}
+          scrollEventThrottle={16}
+        />
       ) : Platform.OS === 'web' ? (
         <ScrollView
           showsVerticalScrollIndicator={false}
