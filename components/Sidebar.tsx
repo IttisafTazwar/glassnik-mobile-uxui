@@ -27,7 +27,7 @@ const EXPLORE_CHILDREN: Leaf[] = [
   { label: 'Featured', icon: 'home', route: '/' },
   { label: 'Places', icon: 'map', route: '', deadLink: true },
   { label: 'Destinations', icon: 'map-pin', route: '', deadLink: true },
-  { label: 'Categories', icon: 'grid', route: '/(tabs)/explore', discovery: 'Categories' },
+  { label: 'Categories', icon: 'grid', route: '', deadLink: true },
   { label: 'Trending', icon: 'trending-up', route: '/(tabs)/explore', discovery: 'Trending' },
   { label: 'Nearby', icon: 'map-pin', route: '/(tabs)/explore', discovery: 'Nearby' },
   { label: 'Global', icon: 'globe', route: '/(tabs)/explore', discovery: 'Global' },
@@ -65,6 +65,22 @@ export function Sidebar() {
   const onExplorePage = pathname === '/(tabs)/explore' || pathname === '/explore';
   const currentDiscovery = onExplorePage ? (params.discovery ?? 'Explore') : null;
 
+  const [activeExploreChild, setActiveExploreChild] = React.useState<string | null>(() => {
+    if (pathname === '/') return 'Featured';
+    if (onExplorePage && params.discovery) return params.discovery;
+    return null;
+  });
+
+  React.useEffect(() => {
+    if (pathname === '/') {
+      setActiveExploreChild('Featured');
+    } else if (onExplorePage && params.discovery) {
+      setActiveExploreChild(params.discovery);
+    } else if (!onExplorePage) {
+      setActiveExploreChild(null);
+    }
+  }, [pathname, onExplorePage, params.discovery]);
+
   // expo-router returns public URL paths on web, e.g. /profile rather
   // than /(tabs)/profile. Support both forms so active states work
   // consistently across web and native navigation.
@@ -86,6 +102,8 @@ export function Sidebar() {
   }
 
   function goExploreChild(child: Leaf) {
+    setActiveExploreChild(child.label);
+
     if (child.deadLink) return;
 
     if (child.route === '/') {
@@ -106,40 +124,21 @@ export function Sidebar() {
       <View style={styles.navGroup}>
         {/* Explore Experiences + indented sub-items */}
         <Pressable
-          style={[
-            styles.navItem,
-            onExplorePage &&
-              currentDiscovery === 'Explore' &&
-              styles.navItemActive,
-          ]}
+          style={styles.navItem}
           onPress={() => {}}
         >
           <Feather
             name="compass"
             size={16}
-            color={
-              onExplorePage && currentDiscovery === 'Explore'
-                ? '#000'
-                : '#fff'
-            }
+            color="#fff"
           />
-          <Text
-            style={[
-              styles.navItemText,
-              onExplorePage &&
-                currentDiscovery === 'Explore' &&
-                styles.navItemTextActive,
-            ]}
-          >
+          <Text style={styles.navItemText}>
             Explore Experiences
           </Text>
         </Pressable>
 
         {EXPLORE_CHILDREN.map((child) => {
-          const isActive =
-            child.label === 'Featured'
-              ? pathname === '/'
-              : onExplorePage && currentDiscovery === child.discovery;
+          const isActive = activeExploreChild === child.label;
 
           return (
             <Pressable
