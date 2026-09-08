@@ -80,7 +80,7 @@ export default function FeedScreen() {
 
   const { data: apiVideos } = useQuery<VideoAsset[]>({
     queryKey: ['feed'],
-    queryFn: () => mobileApi.getFeed(1, 50),
+    queryFn: () => mobileApi.getFeed(1, 200),
     retry: false,
   });
 
