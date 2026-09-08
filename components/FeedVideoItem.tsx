@@ -126,11 +126,9 @@ function WebFeedVideo({
 
     if (el.readyState >= 2) {
       void playActiveVideo();
-    } else {
-      try {
-        el.load();
-      } catch {}
     }
+    // If the video is still loading, leave the existing preload alone.
+    // canplay/loadeddata will start playback as soon as it is ready.
 
     return () => {
       cancelled = true;
