@@ -594,24 +594,28 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
           top of the scrollable feed blocks mobile-browser scroll entirely —
           this is the fix for the "scroll not working over the videos on
           mobile" report. */}
-      <Pressable
-        style={
-          isDesktopWeb
-            ? ({
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                height: desktopVideoHeight,
-                touchAction: 'pan-y',
-              } as any)
-            : [
-                StyleSheet.absoluteFill,
-                Platform.OS === 'web' ? ({ touchAction: 'pan-y' } as any) : null,
-              ]
-        }
-        onPress={handleTap}
-      />
+      {!categoryMode && (
+        <Pressable
+          style={
+            isDesktopWeb
+              ? ({
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: desktopVideoHeight,
+                  touchAction: 'pan-y',
+                } as any)
+              : [
+                  StyleSheet.absoluteFill,
+                  Platform.OS === 'web'
+                    ? ({ touchAction: 'pan-y' } as any)
+                    : null,
+                ]
+          }
+          onPress={handleTap}
+        />
+      )}
 
       {/* No dark gradient over the video.
           Controls are displayed completely outside the video on desktop. */}
@@ -752,12 +756,13 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
                 {video.category ? (
                   <Pressable
                     style={styles.categoryPill}
-                    onPress={() =>
+                    onPress={() => {
+                      console.log("🔥 CATEGORY PILL CLICKED:", video.category);
                       router.push({
                         pathname: '/(tabs)/explore',
                         params: { category: video.category },
-                      } as any)
-                    }
+                      } as any);
+                    }}
                     hitSlop={6}
                   >
                     <Text style={styles.categoryText}>
@@ -785,12 +790,13 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
                 {video.category ? (
                   <Pressable
                     style={styles.categoryPill}
-                    onPress={() =>
+                    onPress={() => {
+                      console.log("🔥 CATEGORY PILL CLICKED:", video.category);
                       router.push({
                         pathname: '/(tabs)/explore',
                         params: { category: video.category },
-                      } as any)
-                    }
+                      } as any);
+                    }}
                     hitSlop={6}
                   >
                     <Text style={styles.categoryText}>
@@ -1013,6 +1019,7 @@ const styles = StyleSheet.create({
     paddingTop: 36,
     paddingBottom: 8,
     overflow: 'hidden',
+    zIndex: 40,
   },
   mobileGradient: {
     ...StyleSheet.absoluteFillObject,
