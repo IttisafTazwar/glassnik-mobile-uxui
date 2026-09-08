@@ -65,12 +65,14 @@ export function Sidebar() {
   const onExplorePage =
     pathname === '/(tabs)/explore' || pathname === '/explore';
 
-  const [activeExploreChild, setActiveExploreChild] =
-    React.useState<string | null>(() => {
-      if (pathname === '/') return 'Featured';
-      if (onExplorePage && params.discovery) return params.discovery;
-      return null;
-    });
+  const activeExploreChild =
+    pathname === '/'
+      ? 'Featured'
+      : onExplorePage
+        ? (Array.isArray(params.discovery)
+            ? params.discovery[0]
+            : params.discovery) ?? null
+        : null;
 
   // expo-router returns public URL paths on web, e.g. /profile rather
   // than /(tabs)/profile. Support both forms so active states work
@@ -94,9 +96,6 @@ export function Sidebar() {
 
   function goExploreChild(child: Leaf) {
     if (child.deadLink) return;
-
-    setActiveExploreChild(child.label);
-
 
     if (child.route === '/') {
       router.push('/' as any);
