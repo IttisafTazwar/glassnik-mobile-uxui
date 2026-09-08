@@ -11,6 +11,7 @@ type Leaf = {
   icon: React.ComponentProps<typeof Feather>['name'];
   route: string;
   discovery?: string; // query param value for Explore sub-items
+  deadLink?: boolean;
 };
 
 const FOOTER_LINKS = [
@@ -23,6 +24,10 @@ const FOOTER_LINKS = [
 // Explore's sub-items — navigate to the same Explore route with a
 // `discovery` query param; explore.tsx reads this to set its active tab.
 const EXPLORE_CHILDREN: Leaf[] = [
+  { label: 'Featured', icon: 'home', route: '/' },
+  { label: 'Places', icon: 'map', route: '', deadLink: true },
+  { label: 'Destinations', icon: 'map-pin', route: '', deadLink: true },
+  { label: 'Categories', icon: 'grid', route: '', deadLink: true },
   { label: 'Trending', icon: 'trending-up', route: '/(tabs)/explore', discovery: 'Trending' },
   { label: 'Nearby', icon: 'map-pin', route: '/(tabs)/explore', discovery: 'Nearby' },
   { label: 'Global', icon: 'globe', route: '/(tabs)/explore', discovery: 'Global' },
@@ -46,7 +51,7 @@ export function Sidebar() {
   const router = useRouter();
   const pathname = usePathname();
   const params = useLocalSearchParams<{ discovery?: string }>();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
   const { data: capabilities } = useQuery({
     queryKey: ['my-capabilities'],
@@ -80,79 +85,202 @@ export function Sidebar() {
     }
   }
 
+  function goExploreChild(child: Leaf) {
+    if (child.deadLink) return;
+
+    if (child.route === '/') {
+      router.push('/' as any);
+      return;
+    }
+
+    if (child.discovery) {
+      goExplore(child.discovery);
+      return;
+    }
+
+    router.push(child.route as any);
+  }
+
   return (
     <View style={styles.wrap}>
       <View style={styles.navGroup}>
-        {/* Explore + indented sub-items */}
+        {/* Explore Experiences + indented sub-items */}
         <Pressable
-          style={[styles.navItem, onExplorePage && currentDiscovery === 'Explore' && styles.navItemActive]}
-          onPress={() => goExplore()}
+          style={[
+            styles.navItem,
+            onExplorePage &&
+              currentDiscovery === 'Explore' &&
+              styles.navItemActive,
+          ]}
+          onPress={() => router.push('/' as any)}
         >
-          <Feather name="compass" size={16} color={onExplorePage && currentDiscovery === 'Explore' ? '#000' : '#fff'} />
-          <Text style={[styles.navItemText, onExplorePage && currentDiscovery === 'Explore' && styles.navItemTextActive]}>
-            Explore
+          <Feather
+            name="compass"
+            size={16}
+            color={
+              onExplorePage && currentDiscovery === 'Explore'
+                ? '#000'
+                : '#fff'
+            }
+          />
+          <Text
+            style={[
+              styles.navItemText,
+              onExplorePage &&
+                currentDiscovery === 'Explore' &&
+                styles.navItemTextActive,
+            ]}
+          >
+            Explore Experiences
           </Text>
         </Pressable>
 
         {EXPLORE_CHILDREN.map((child) => {
-          const isActive = onExplorePage && currentDiscovery === child.discovery;
+          const isActive =
+            child.label === 'Featured'
+              ? pathname === '/'
+              : onExplorePage && currentDiscovery === child.discovery;
+
           return (
             <Pressable
               key={child.label}
-              style={[styles.navItemChild, isActive && styles.navItemActive]}
-              onPress={() => goExplore(child.discovery)}
+              style={[
+                styles.navItemChild,
+                isActive && styles.navItemActive,
+              ]}
+              onPress={() => goExploreChild(child)}
             >
-              <Feather name={child.icon} size={14} color={isActive ? '#000' : 'rgba(255,255,255,0.75)'} />
-              <Text style={[styles.navItemChildText, isActive && styles.navItemTextActive]}>{child.label}</Text>
+              <Feather
+                name={child.icon}
+                size={14}
+                color={
+                  isActive
+                    ? '#000'
+                    : 'rgba(255,255,255,0.75)'
+                }
+              />
+              <Text
+                style={[
+                  styles.navItemChildText,
+                  isActive && styles.navItemTextActive,
+                ]}
+              >
+                {child.label}
+              </Text>
             </Pressable>
           );
         })}
 
-        {/* For You */}
+        {/* Profile + indented sub-items */}
         <Pressable
-          style={[styles.navItem, pathname === '/' && styles.navItemActive]}
-          onPress={() => router.push('/' as any)}
+          style={[
+            styles.navItem,
+            onProfilePage && styles.navItemActive,
+          ]}
+          onPress={() =>
+            router.push('/(tabs)/profile' as any)
+          }
         >
-          <Feather name="home" size={16} color={pathname === '/' ? '#000' : '#fff'} />
-          <Text style={[styles.navItemText, pathname === '/' && styles.navItemTextActive]}>For You</Text>
-        </Pressable>
-
-        {/* Profile + indented sub-items (logged-in videographers only) */}
-        <Pressable
-          style={[styles.navItem, onProfilePage && styles.navItemActive]}
-          onPress={() => router.push('/(tabs)/profile' as any)}
-        >
-          <Feather name="user" size={16} color={onProfilePage ? '#000' : '#fff'} />
-          <Text style={[styles.navItemText, onProfilePage && styles.navItemTextActive]}>
+          <Feather
+            name="user"
+            size={16}
+            color={onProfilePage ? '#000' : '#fff'}
+          />
+          <Text
+            style={[
+              styles.navItemText,
+              onProfilePage && styles.navItemTextActive,
+            ]}
+          >
             Profile
           </Text>
         </Pressable>
 
         {user && hasCreatorCap && (() => {
           const isActive = onUploadPage;
+
           return (
             <Pressable
-              style={[styles.navItemChild, isActive && styles.navItemActive]}
-              onPress={() => router.push(UPLOAD_ITEM.route as any)}
+              style={[
+                styles.navItemChild,
+                isActive && styles.navItemActive,
+              ]}
+              onPress={() =>
+                router.push(UPLOAD_ITEM.route as any)
+              }
             >
-              <Feather name={UPLOAD_ITEM.icon} size={14} color={isActive ? '#000' : 'rgba(255,255,255,0.75)'} />
-              <Text style={[styles.navItemChildText, isActive && styles.navItemTextActive]}>Upload</Text>
+              <Feather
+                name={UPLOAD_ITEM.icon}
+                size={14}
+                color={
+                  isActive
+                    ? '#000'
+                    : 'rgba(255,255,255,0.75)'
+                }
+              />
+              <Text
+                style={[
+                  styles.navItemChildText,
+                  isActive && styles.navItemTextActive,
+                ]}
+              >
+                Upload
+              </Text>
             </Pressable>
           );
         })()}
 
         {user && (() => {
           const isActive = onActivityPage;
+
           return (
             <Pressable
-              style={[styles.navItemChild, isActive && styles.navItemActive]}
-              onPress={() => router.push(ACTIVITY_ITEM.route as any)}
+              style={[
+                styles.navItemChild,
+                isActive && styles.navItemActive,
+              ]}
+              onPress={() =>
+                router.push(ACTIVITY_ITEM.route as any)
+              }
             >
-              <Feather name={ACTIVITY_ITEM.icon} size={14} color={isActive ? '#000' : 'rgba(255,255,255,0.75)'} />
-              <Text style={[styles.navItemChildText, isActive && styles.navItemTextActive]}>Activity</Text>
+              <Feather
+                name={ACTIVITY_ITEM.icon}
+                size={14}
+                color={
+                  isActive
+                    ? '#000'
+                    : 'rgba(255,255,255,0.75)'
+                }
+              />
+              <Text
+                style={[
+                  styles.navItemChildText,
+                  isActive && styles.navItemTextActive,
+                ]}
+              >
+                Activity
+              </Text>
             </Pressable>
           );
         })()}
+
+        {user && (
+          <Pressable
+            style={styles.navItemChild}
+            onPress={async () => {
+              await logout();
+            }}
+          >
+            <Feather
+              name="log-out"
+              size={14}
+              color="rgba(255,255,255,0.75)"
+            />
+            <Text style={styles.navItemChildText}>
+              Log Out
+            </Text>
+          </Pressable>
+        )}
       </View>
 
       <View style={styles.joinBox}>
