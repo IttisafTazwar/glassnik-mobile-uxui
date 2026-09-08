@@ -182,18 +182,8 @@ export default function FeedScreen() {
           snapToAlignment="start"
           decelerationRate="fast"
           showsVerticalScrollIndicator={false}
-          onViewableItemsChanged={({ viewableItems }) => {
-            const first = viewableItems.find(
-              (item) => item.isViewable
-            );
-
-            if (first?.index != null) {
-              setCurrentIndex(first.index);
-            }
-          }}
-          viewabilityConfig={{
-            itemVisiblePercentThreshold: 60,
-          }}
+          onViewableItemsChanged={onViewableItemsChanged.current}
+          viewabilityConfig={viewabilityConfig.current}
           removeClippedSubviews={false}
           maxToRenderPerBatch={3}
           windowSize={5}
