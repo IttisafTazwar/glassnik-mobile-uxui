@@ -1224,7 +1224,7 @@ export function VideoGridCell({
             <View style={styles.cellBottomBox}>
               {placeTourTransport ? (
                 <Text
-                  style={[styles.mobilePlaceText, { color: '#fff' }]}
+                  style={[styles.mobilePlaceText, styles.desktopPlaceText, { color: '#fff' }]}
                   numberOfLines={1}
                 >
                   {placeTourTransport}
@@ -1234,7 +1234,7 @@ export function VideoGridCell({
               <View style={styles.mobileDestinationRow}>
                 {locationText ? (
                   <Text
-                    style={[styles.mobileDestinationText, { color: '#fff' }]}
+                    style={[styles.mobileDestinationText, styles.desktopLocationText, { color: '#fff' }]}
                     numberOfLines={1}
                   >
                     {locationText}
@@ -1242,11 +1242,23 @@ export function VideoGridCell({
                 ) : null}
 
                 {video.category ? (
-                  <View style={styles.cellCategoryPill}>
-                    <Text style={styles.cellCategoryText} numberOfLines={1}>
+                  <Pressable
+                    style={[styles.cellCategoryPill, styles.desktopCategoryPill]}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/(tabs)/explore',
+                        params: { category: video.category },
+                      } as any)
+                    }
+                    hitSlop={6}
+                  >
+                    <Text
+                      style={[styles.cellCategoryText, styles.desktopCategoryText]}
+                      numberOfLines={1}
+                    >
                       {video.category.toUpperCase()}
                     </Text>
-                  </View>
+                  </Pressable>
                 ) : null}
               </View>
             </View>
@@ -1542,6 +1554,24 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)', flexShrink: 0, maxWidth: '45%',
   },
   cellCategoryText: { color: 'rgba(255,255,255,0.9)', fontSize: 6, fontFamily: 'Inter_700Bold', letterSpacing: 0.3 },
+  desktopPlaceText: {
+    fontSize: 11,
+    fontFamily: 'Inter_600SemiBold',
+  },
+  desktopLocationText: {
+    fontSize: 10,
+    fontFamily: 'Inter_400Regular',
+  },
+  desktopCategoryPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 5,
+    maxWidth: '45%',
+  },
+  desktopCategoryText: {
+    fontSize: 8,
+    letterSpacing: 0.4,
+  },
 
   cellTopRowDesktop: {
     position: 'absolute', top: 6, left: 6, right: 6,

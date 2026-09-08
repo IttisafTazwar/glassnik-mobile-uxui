@@ -721,11 +721,34 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
 
           <View style={styles.mobileOverlayContent}>
           {isDesktopWeb ? (
-            metaLine ? (
-              <View style={styles.metaRow}>
-                <Text style={styles.metaText} numberOfLines={1}>
-                  {metaLine}
-                </Text>
+            <View style={styles.desktopMetaBlock}>
+              {placeTourTransport ? (
+                <View style={styles.desktopMetaTopRow}>
+                  <Text style={styles.desktopPlaceText} numberOfLines={1}>
+                    {placeTourTransport}
+                  </Text>
+
+                  <Pressable
+                    style={styles.desktopMuteButton}
+                    onPress={onMuteToggle}
+                    hitSlop={10}
+                  >
+                    <Feather
+                      name={isMuted ? 'volume-x' : 'volume-2'}
+                      size={14}
+                      color="#fff"
+                    />
+                  </Pressable>
+                </View>
+              ) : null}
+
+              <View style={styles.desktopMetaBottomRow}>
+                {locationText ? (
+                  <Text style={styles.desktopLocationText} numberOfLines={1}>
+                    {locationText}
+                  </Text>
+                ) : null}
+
                 {video.category ? (
                   <Pressable
                     style={styles.categoryPill}
@@ -743,7 +766,7 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
                   </Pressable>
                 ) : null}
               </View>
-            ) : null
+            </View>
           ) : (
             <View style={styles.mobileDiscoveryBlock}>
               {placeTourTransport ? (
@@ -1074,6 +1097,47 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
+  },
+  desktopMetaBlock: {
+    width: '100%',
+    gap: 3,
+  },
+  desktopMetaTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  desktopMetaBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  desktopPlaceText: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 13,
+    fontFamily: 'Inter_600SemiBold',
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  desktopLocationText: {
+    flex: 1,
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 11,
+    fontFamily: 'Inter_400Regular',
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  desktopMuteButton: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    padding: 0,
   },
   metaRow: {
     flexDirection: 'row',
