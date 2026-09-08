@@ -212,18 +212,16 @@ export default function ExploreScreen() {
   const [categoryFeedIndex, setCategoryFeedIndex] = useState(0);
   const [categoryControlsVisible, setCategoryControlsVisible] = useState(true);
   const [commentsVideoId, setCommentsVideoId] = useState<string | null>(null);
-  const [activeDiscoveryTab, setActiveDiscoveryTab] = useState<DiscoveryTab>('Explore');
 
-  useEffect(() => {
-    const fromParam = params.discovery;
-    if (fromParam && (DISCOVERY_TABS as readonly string[]).includes(fromParam)) {
-      if (fromParam !== activeDiscoveryTab) {
-        setActiveDiscoveryTab(fromParam as DiscoveryTab);
-      }
-    } else if (!fromParam && activeDiscoveryTab !== 'Explore') {
-      setActiveDiscoveryTab('Explore');
-    }
-  }, [params.discovery]);
+  const discoveryParam = Array.isArray(params.discovery)
+    ? params.discovery[0]
+    : params.discovery;
+
+  const activeDiscoveryTab: DiscoveryTab =
+    discoveryParam &&
+    (DISCOVERY_TABS as readonly string[]).includes(discoveryParam)
+      ? discoveryParam as DiscoveryTab
+      : 'Explore';
 
   useEffect(() => {
     const categoryParam = Array.isArray(params.category)
@@ -355,10 +353,6 @@ export default function ExploreScreen() {
     setActiveDiscoveryTab('Trending');
   }
 
-  const discoveryParam = Array.isArray(params.discovery)
-    ? params.discovery[0]
-    : params.discovery;
-
   const categoryParam = Array.isArray(params.category)
     ? params.category[0]
     : params.category;
@@ -387,44 +381,47 @@ export default function ExploreScreen() {
   let discoveryContent: React.ReactNode;
 
   if (activeDiscoveryTab === 'Categories') {
-    discoveryContent = (
-      <View>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Categories</Text>
+    const categoryVideos =
+      activeCategory === 'All' ? allVideos : filtered;
 
+    discoveryContent = (
+      <View style={styles.section}>
+        {categoryVideos.length > 0 ? (
           <View
             style={{
               flexDirection: 'row',
               flexWrap: 'wrap',
-              gap: 8,
+              gap: CELL_GAP,
               paddingHorizontal: GRID_PADDING,
             }}
           >
-            {CATEGORIES.filter((category) => category !== 'All').map((category) => (
-              <Pressable
-                key={category}
-                onPress={() => {
-                  setActiveCategory(category);
-                  setActiveDiscoveryTab('Explore');
-                }}
-                style={styles.trendChip}
-              >
-                <Feather
-                  name="grid"
-                  size={12}
-                  color="#FE2C55"
-                />
-
-                <Text style={styles.trendChipTag}>
-                  {category}
-                </Text>
-              </Pressable>
+            {categoryVideos.map((video) => (
+              <VideoGridCell
+                key={video.id}
+                video={video}
+                width={cellWidth}
+                height={cellHeight}
+                isMobile={isMobile}
+              />
             ))}
           </View>
-        </View>
+        ) : (
+          <View style={styles.centered}>
+            <Feather
+              name="search"
+              size={40}
+              color="rgba(255,255,255,0.2)"
+            />
+
+            <Text style={styles.emptyText}>
+              No videos in {activeCategory}
+            </Text>
+          </View>
+        )}
       </View>
     );
   } else if (activeDiscoveryTab === 'Trending') {
+
     discoveryContent = (
       <TrendingSection
         videos={allVideos}
