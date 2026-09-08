@@ -59,7 +59,7 @@ const CATEGORIES = [
   'After Dark',
 ];
 
-const DISCOVERY_TABS = ['Explore', 'Trending', 'Nearby', 'Global'] as const;
+const DISCOVERY_TABS = ['Explore', 'Categories', 'Trending', 'Nearby', 'Global'] as const;
 type DiscoveryTab = typeof DISCOVERY_TABS[number];
 
 function apiVideoToSample(v: VideoAsset): SampleVideo {
@@ -379,13 +379,52 @@ export default function ExploreScreen() {
 
   const isMobileDiscoveryPage =
     isMobile &&
-    (discoveryParam === 'Trending' ||
+    (discoveryParam === 'Categories' ||
+      discoveryParam === 'Trending' ||
       discoveryParam === 'Nearby' ||
       discoveryParam === 'Global');
 
   let discoveryContent: React.ReactNode;
 
-  if (activeDiscoveryTab === 'Trending') {
+  if (activeDiscoveryTab === 'Categories') {
+    discoveryContent = (
+      <View>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Categories</Text>
+
+          <View
+            style={{
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              gap: 8,
+              paddingHorizontal: GRID_PADDING,
+            }}
+          >
+            {CATEGORIES.filter((category) => category !== 'All').map((category) => (
+              <Pressable
+                key={category}
+                onPress={() => {
+                  setActiveCategory(category);
+                  setActiveDiscoveryTab('Explore');
+                }}
+                style={styles.trendChip}
+              >
+                <Feather
+                  name="grid"
+                  size={12}
+                  color="#FE2C55"
+                />
+
+                <Text style={styles.trendChipTag}>
+                  {category}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      </View>
+    );
+  } else if (activeDiscoveryTab === 'Trending') {
     discoveryContent = (
       <TrendingSection
         videos={allVideos}
