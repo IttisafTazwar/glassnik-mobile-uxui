@@ -1303,20 +1303,11 @@ export function VideoGridCell({
                 ) : null}
 
                 {video.category ? (
-                  <Pressable
-                    style={styles.cellCategoryPill}
-                    onPress={() =>
-                      router.push({
-                        pathname: '/(tabs)/explore',
-                        params: { category: video.category },
-                      } as any)
-                    }
-                    hitSlop={6}
-                  >
+                  <View style={styles.cellCategoryPill}>
                     <Text style={styles.cellCategoryText} numberOfLines={1}>
                       {video.category.toUpperCase()}
                     </Text>
-                  </Pressable>
+                  </View>
                 ) : null}
               </View>
             </View>
