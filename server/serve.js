@@ -43,10 +43,16 @@ function sendFile(filePath, res) {
   const ext = path.extname(filePath).toLowerCase();
   const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
+  // During active development/deployment, never cache the web
+  // HTML or JavaScript bundle. Expo generates hashed JS filenames,
+  // but aggressive browser caching can otherwise keep an old bundle
+  // alive after a deployment.
   res.writeHead(200, {
     'content-type': contentType,
     'cache-control':
-      ext === '.html' ? 'no-cache' : 'public, max-age=31536000, immutable',
+      ext === '.html' || ext === '.js'
+        ? 'no-store, no-cache, must-revalidate, proxy-revalidate'
+        : 'public, max-age=31536000, immutable',
   });
 
   fs.createReadStream(filePath).pipe(res);
