@@ -27,7 +27,7 @@ const EXPLORE_CHILDREN: Leaf[] = [
   { label: 'Featured', icon: 'home', route: '/' },
   { label: 'Places', icon: 'map', route: '', deadLink: true },
   { label: 'Destinations', icon: 'map-pin', route: '', deadLink: true },
-  { label: 'Categories', icon: 'grid', route: '', deadLink: true },
+  { label: 'Categories', icon: 'grid', route: '/(tabs)/explore', discovery: 'Categories' },
   { label: 'Trending', icon: 'trending-up', route: '/(tabs)/explore', discovery: 'Trending' },
   { label: 'Nearby', icon: 'map-pin', route: '/(tabs)/explore', discovery: 'Nearby' },
   { label: 'Global', icon: 'globe', route: '/(tabs)/explore', discovery: 'Global' },
