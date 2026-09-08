@@ -160,7 +160,7 @@ export function Sidebar() {
             <Text style={styles.joinTitle}>Become a Glassnik videographer</Text>
           </View>
           <Text style={styles.joinBody}>
-            Start exploring real Eye-POV experiences from around the world.
+            Start uploading your smart-glasses Eye-POV videos and start earning.
           </Text>
           {!user && (
             <>

@@ -27,6 +27,8 @@ import { Sidebar, SIDEBAR_WIDTH } from '@/components/Sidebar';
 import { TrendingSection } from '@/components/TrendingSection';
 import { NearbySection } from '@/components/NearbySection';
 import { GlobalSection } from '@/components/GlobalSection';
+import { FeedVideoItem } from '@/components/FeedVideoItem';
+import { CommentsSheet } from '@/components/CommentsSheet';
 
 const MOBILE_BREAKPOINT = 768;
 
@@ -120,6 +122,8 @@ function apiVideoToSample(v: VideoAsset): SampleVideo {
 export default function ExploreScreen() {
   const categoryScrollRef = React.useRef<ScrollView>(null);
   const categoryScrollX = React.useRef(0);
+  const categoryFeedPillScrollRef = React.useRef<ScrollView>(null);
+  const categoryFeedScrollRef = React.useRef<ScrollView>(null);
   const destinationScrollRef = React.useRef<ScrollView>(null);
   const destinationScrollX = React.useRef(0);
 
@@ -159,9 +163,13 @@ export default function ExploreScreen() {
     });
   }, []);
 
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const isMobile = width < MOBILE_BREAKPOINT;
+  const categoryFeedHeight =
+    Platform.OS === 'web'
+      ? Math.max(1, height - 64)
+      : height;
   const router = useRouter();
   const params = useLocalSearchParams<{
     discovery?: string;
@@ -184,6 +192,9 @@ export default function ExploreScreen() {
 
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
+  const [categoryFeedIndex, setCategoryFeedIndex] = useState(0);
+  const [categoryControlsVisible, setCategoryControlsVisible] = useState(true);
+  const [commentsVideoId, setCommentsVideoId] = useState<string | null>(null);
   const [activeDiscoveryTab, setActiveDiscoveryTab] = useState<DiscoveryTab>('Explore');
 
   useEffect(() => {
@@ -215,6 +226,25 @@ export default function ExploreScreen() {
       setActiveCategory(matchingCategory);
     }
   }, [params.category]);
+
+  useEffect(() => {
+    setCategoryFeedIndex(0);
+    setCategoryControlsVisible(true);
+
+    categoryFeedScrollRef.current?.scrollTo({
+      y: 0,
+      animated: false,
+    });
+
+    categoryFeedPillScrollRef.current?.scrollTo({
+      x: 0,
+      animated: false,
+    });
+  }, [activeCategory]);
+
+  useEffect(() => {
+    setCategoryControlsVisible(true);
+  }, [categoryFeedIndex]);
 
   const { data: apiVideos, isLoading } = useQuery<VideoAsset[]>({
     queryKey: ['explore'],
@@ -295,6 +325,24 @@ export default function ExploreScreen() {
     ? params.discovery[0]
     : params.discovery;
 
+  const categoryParam = Array.isArray(params.category)
+    ? params.category[0]
+    : params.category;
+
+  const isMobileCategoryFeed =
+    isMobile &&
+    !!categoryParam &&
+    activeCategory !== 'All';
+
+  const orderedCategoryPills = useMemo(() => {
+    const categoryPills = CATEGORIES.filter((category) => category !== 'All');
+
+    return [
+      activeCategory,
+      ...categoryPills.filter((category) => category !== activeCategory),
+    ].filter((category) => category !== 'All');
+  }, [activeCategory]);
+
   const isMobileDiscoveryPage =
     isMobile &&
     (discoveryParam === 'Trending' ||
@@ -355,7 +403,115 @@ export default function ExploreScreen() {
       </View>
     ) : null;
 
-    if (Platform.OS === 'web' && isMobile) {
+    if (isMobileCategoryFeed) {
+      discoveryContent = (
+        <View style={{ height: categoryFeedHeight, width: '100%' }}>
+          <ScrollView
+            ref={categoryFeedScrollRef}
+            showsVerticalScrollIndicator={false}
+            style={{ height: categoryFeedHeight, width: '100%' }}
+            contentContainerStyle={{ width: '100%' }}
+            snapToInterval={categoryFeedHeight}
+            snapToAlignment="start"
+            decelerationRate="fast"
+            pagingEnabled
+            scrollEventThrottle={16}
+            onScroll={(event) => {
+              const y = event.nativeEvent.contentOffset?.y ?? 0;
+              const nextIndex = Math.max(
+                0,
+                Math.min(
+                  filtered.length - 1,
+                  Math.round(y / categoryFeedHeight)
+                )
+              );
+
+              setCategoryFeedIndex((previousIndex) =>
+                previousIndex === nextIndex ? previousIndex : nextIndex
+              );
+            }}
+          >
+            {filtered.map((item, index) => (
+              <View
+                key={item.id}
+                style={{
+                  width: '100%',
+                  height: categoryFeedHeight,
+                }}
+              >
+                <FeedVideoItem
+                  video={item}
+                  isActive={index === categoryFeedIndex}
+                  isFirstVideo={index === 0}
+                  shouldPreload={
+                    index === categoryFeedIndex ||
+                    index === categoryFeedIndex + 1
+                  }
+                  itemHeight={categoryFeedHeight}
+                  categoryMode
+                  onControlsVisibilityChange={setCategoryControlsVisible}
+                  onCommentPress={(videoId) => setCommentsVideoId(videoId)}
+                />
+              </View>
+            ))}
+          </ScrollView>
+
+          {categoryControlsVisible && filtered.length > 0 && (
+            <View style={styles.categoryFeedPillOverlay}>
+              <ScrollView
+                ref={categoryFeedPillScrollRef}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.categoryFeedPillRow}
+              >
+                {orderedCategoryPills.map((cat) => {
+                  const isActive = activeCategory === cat;
+
+                  return (
+                    <Pressable
+                      key={cat}
+                      onPress={() => {
+                        if (cat === 'All') {
+                          setActiveCategory('All');
+                          router.replace('/(tabs)/explore' as any);
+                        } else {
+                          setActiveCategory(cat);
+                        }
+                      }}
+                      style={[
+                        styles.categoryFeedPill,
+                        isActive && styles.categoryFeedPillActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.categoryFeedPillText,
+                          isActive && styles.categoryFeedPillTextActive,
+                        ]}
+                      >
+                        {cat}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
+          {filtered.length === 0 && (
+            <View style={styles.centered}>
+              {isLoading ? (
+                <ActivityIndicator size="large" color="#FE2C55" />
+              ) : (
+                <Text style={styles.emptyText}>
+                  No videos in this category yet
+                </Text>
+              )}
+            </View>
+          )}
+        </View>
+      );
+    } else if (Platform.OS === 'web' && isMobile) {
       discoveryContent = (
         <View>
           {exploreHeader}
@@ -434,6 +590,27 @@ export default function ExploreScreen() {
         </View>
       );
     }
+  }
+
+  if (isMobileCategoryFeed) {
+    return (
+      <View style={styles.screenRoot}>
+        {Platform.OS === 'web' && (
+          <View style={{ paddingTop: topPad }}>
+            <TopNav />
+          </View>
+        )}
+
+        <View style={{ flex: 1 }}>
+          {discoveryContent}
+        </View>
+
+        <CommentsSheet
+          videoId={commentsVideoId}
+          onClose={() => setCommentsVideoId(null)}
+        />
+      </View>
+    );
   }
 
   return (
@@ -919,9 +1096,23 @@ export function VideoGridCell({
   const [isHovered, setIsHovered] = React.useState(false);
   const [isMobilePlaying, setIsMobilePlaying] = React.useState(false);
 
-  const locationText = [video.place, video.city, video.country].filter(Boolean).join(', ');
-  const placeTourTransport = video.description || null;
-  const metaLine = [placeTourTransport, locationText].filter(Boolean).join(' • ');
+  // Explore overlay:
+  // First line = place/title.
+  // Second line = city + country only.
+  // Never repeat the place/title in the location line.
+  const placeTourTransport = video.description || video.place || null;
+
+  const cleanCity = video.city && placeTourTransport
+    ? video.city.replace(`${placeTourTransport}, `, '').replace(placeTourTransport, '').trim()
+    : video.city;
+
+  const locationText = [cleanCity, video.country]
+    .filter(Boolean)
+    .join(', ');
+
+  const metaLine = [placeTourTransport, locationText]
+    .filter(Boolean)
+    .join(' • ');
 
   function formatCount(n: number): string {
     if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -996,46 +1187,69 @@ export function VideoGridCell({
               <Text style={styles.cellUsername} numberOfLines={1}>@{video.creator.username}</Text>
             </View>
             <View style={styles.cellBottomBox}>
-              {metaLine ? (
-                <View style={styles.cellMetaRow}>
-                  <Text style={styles.cellMetaText} numberOfLines={1}>
-                    {metaLine}
-                  </Text>
-                  {video.category ? (
-                    <View style={styles.cellCategoryPill}>
-                      <Text style={styles.cellCategoryText} numberOfLines={1}>
-                        {video.category.toUpperCase()}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
+              {placeTourTransport ? (
+                <Text
+                  style={[styles.mobilePlaceText, { color: '#fff' }]}
+                  numberOfLines={1}
+                >
+                  {placeTourTransport}
+                </Text>
               ) : null}
+
+              <View style={styles.mobileDestinationRow}>
+                {locationText ? (
+                  <Text
+                    style={[styles.mobileDestinationText, { color: '#fff' }]}
+                    numberOfLines={1}
+                  >
+                    {locationText}
+                  </Text>
+                ) : null}
+
+                {video.category ? (
+                  <View style={styles.cellCategoryPill}>
+                    <Text style={styles.cellCategoryText} numberOfLines={1}>
+                      {video.category.toUpperCase()}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
             </View>
           </>
         ) : (
           <>
             <View style={styles.cellTopRowDesktop}>
               <Text style={styles.cellUsername} numberOfLines={1}>@{video.creator.username}</Text>
-              <View style={styles.cellMiniTabs}>
-                <Text style={styles.cellMiniTabActive}>For You</Text>
-                <Text style={styles.cellMiniTab}>Following</Text>
+            </View>
+            <View style={styles.cellBottomBox}>
+              {placeTourTransport ? (
+                <Text
+                  style={[styles.mobilePlaceText, { color: '#fff' }]}
+                  numberOfLines={1}
+                >
+                  {placeTourTransport}
+                </Text>
+              ) : null}
+
+              <View style={styles.mobileDestinationRow}>
+                {locationText ? (
+                  <Text
+                    style={[styles.mobileDestinationText, { color: '#fff' }]}
+                    numberOfLines={1}
+                  >
+                    {locationText}
+                  </Text>
+                ) : null}
+
+                {video.category ? (
+                  <View style={styles.cellCategoryPill}>
+                    <Text style={styles.cellCategoryText} numberOfLines={1}>
+                      {video.category.toUpperCase()}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
             </View>
-            {video.category ? (
-              <View style={styles.cellTagDesktop}>
-                <Text style={styles.cellTagTextDesktop} numberOfLines={1}>
-                  {video.category.toUpperCase()}
-                </Text>
-              </View>
-            ) : null}
-            {locationText ? (
-              <View style={styles.cellLocationDesktop}>
-                <Feather name="map-pin" size={8} color="rgba(255,255,255,0.85)" />
-                <Text style={styles.cellLocationTextDesktop} numberOfLines={1}>
-                  {locationText}
-                </Text>
-              </View>
-            ) : null}
           </>
         )}
       </Pressable>
@@ -1234,6 +1448,39 @@ const styles = StyleSheet.create({
   categoryPillText: { color: 'rgba(255,255,255,0.75)', fontSize: 16, fontFamily: 'Inter_500Medium' },
   categoryPillTextActive: { color: '#000', fontFamily: 'Inter_600SemiBold' },
 
+  categoryFeedPillOverlay: {
+    position: 'absolute',
+    top: 12,
+    left: 0,
+    right: 0,
+    zIndex: 20,
+  },
+  categoryFeedPillRow: {
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+  categoryFeedPill: {
+    backgroundColor: 'rgba(0,0,0,0.58)',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+  categoryFeedPillActive: {
+    backgroundColor: 'rgba(0,0,0,0.68)',
+    borderColor: '#25D9C7',
+  },
+  categoryFeedPillText: {
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: 14,
+    fontFamily: 'Inter_500Medium',
+  },
+  categoryFeedPillTextActive: {
+    color: '#25D9C7',
+    fontFamily: 'Inter_700Bold',
+  },
+
   section: { paddingTop: 18, paddingBottom: 10 },
   sectionTitle: { color: 'rgba(255,255,255,0.75)', fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   sectionHeaderRow: {
@@ -1269,7 +1516,10 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   cellInitial: { fontSize: 14, fontFamily: 'Inter_700Bold' },
-  cellScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.2)' },
+  cellScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'transparent',
+  },
 
   cellTopRow: { position: 'absolute', top: 6, left: 6, right: 6 },
   cellUsername: {
@@ -1277,8 +1527,13 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
   cellBottomBox: {
-    position: 'absolute', left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 6, paddingVertical: 5,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.42)',
+    paddingHorizontal: 6,
+    paddingVertical: 7,
   },
   cellMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   cellMetaText: { flex: 1, color: 'rgba(255,255,255,0.9)', fontSize: 7, fontFamily: 'Inter_500Medium' },

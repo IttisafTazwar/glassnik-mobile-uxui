@@ -33,6 +33,10 @@ interface Props {
   itemHeight?: number;
   /** Called when the comment button is pressed; receives the video's id. */
   onCommentPress?: (videoId: string) => void;
+  /** Optional callback for overlays that should follow tap-to-hide controls. */
+  onControlsVisibilityChange?: (visible: boolean) => void;
+  /** Category-feed presentation without creator attribution and with compact mute placement. */
+  categoryMode?: boolean;
 }
 
 function formatCount(n: number): string {
@@ -100,23 +104,29 @@ function WebFeedVideo({
         return;
       }
 
-      // Wait for a small safety buffer before starting.
-      // This prevents immediate playback from consuming the
-      // first few seconds faster than they can be downloaded.
-      if (getBufferedAhead() < 3 && !el.ended) {
-        return;
-      }
-
       try {
+        // Active feed videos should autoplay muted.
+        // Do not wait for an arbitrary buffer amount; let the browser
+        // start as soon as enough data is available.
+        if (isFirstVideo) {
+          el.muted = true;
+        } else {
+          el.muted = isMuted;
+        }
+
         await el.play();
+        onPlaying?.();
       } catch {
         if (cancelled || !isActive) return;
 
-        // Retry muted if autoplay with sound is rejected.
+        // Browser autoplay policies may reject playback with sound.
+        // Fall back to muted playback so the feed can still autoplay.
         el.muted = true;
 
         try {
           await el.play();
+          onAutoplayMuted?.();
+          onPlaying?.();
         } catch {}
       }
     };
@@ -128,11 +138,7 @@ function WebFeedVideo({
     };
 
     const handleProgress = () => {
-      if (
-        isActive &&
-        el.paused &&
-        getBufferedAhead() >= 3
-      ) {
+      if (isActive && el.paused) {
         void playActiveVideo();
       }
     };
@@ -176,10 +182,7 @@ function WebFeedVideo({
     el.addEventListener('progress', handleProgress);
     el.addEventListener('waiting', handleWaiting);
 
-    if (
-      el.readyState >= 2 &&
-      getBufferedAhead() >= 3
-    ) {
+    if (el.readyState >= 2) {
       void playActiveVideo();
     }
 
@@ -243,7 +246,7 @@ function WebFeedVideo({
   });
 }
 
-export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPreload = true, itemWidth, itemHeight, onCommentPress }: Props) {
+export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPreload = true, itemWidth, itemHeight, onCommentPress, onControlsVisibilityChange, categoryMode = false }: Props) {
   const { isMuted, toggleMute, setMuted } = useMute();
   const onMuteToggle = toggleMute;
 
@@ -310,25 +313,42 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
     }
   }, [isActive, nativeIsPlaying]);
 
-  // Keep playback controlled from one place. This avoids competing play()
-  // calls while a newly-visible video is still loading.
+  // Keep playback controlled from one place.
+  // Explicitly request playback whenever a previously viewed video
+  // becomes active again.
   useEffect(() => {
-    try {
-      player.muted = isMuted;
+    let cancelled = false;
 
-      if (!isActive) {
-        player.pause();
-        setPaused(false);
-        return;
-      }
+    const syncPlayback = async () => {
+      try {
+        player.muted = isMuted;
 
-      if (playerStatus === 'readyToPlay' && !paused) {
-        player.play();
-      } else if (paused) {
-        player.pause();
-      }
-    } catch {}
-  }, [isActive, paused, isMuted, playerStatus, player]);
+        if (!isActive) {
+          player.pause();
+          setPaused(false);
+          return;
+        }
+
+        if (paused) {
+          player.pause();
+          return;
+        }
+
+        // Give the player a moment to transition back to the active item.
+        await new Promise<void>((resolve) => setTimeout(resolve, 50));
+
+        if (!cancelled && isActive && !paused) {
+          player.play();
+        }
+      } catch {}
+    };
+
+    void syncPlayback();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isActive, paused, isMuted, player]);
 
   // Progress tracking
   useEffect(() => {
@@ -406,7 +426,11 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
       triggerHeartAnim();
     } else {
       setPaused((p) => !p);
-      setControlsVisible((v) => !v);
+      setControlsVisible((v) => {
+        const next = !v;
+        onControlsVisibilityChange?.(next);
+        return next;
+      });
     }
     lastTap.current = now;
   }
@@ -478,7 +502,9 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
 
   // Place/Tour/Transport • Location — single line, per the mockup.
   const placeTourTransport = video.description || null;
-  const locationText = [video.place, video.city, video.country].filter(Boolean).join(', ') || null;
+  // Place/title is already shown on the first line.
+  // Second line should only show city + country.
+  const locationText = [video.city, video.country].filter(Boolean).join(', ') || null;
   const metaLine = [placeTourTransport, locationText].filter(Boolean).join(' • ');
 
   return (
@@ -593,7 +619,7 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
       {/* Mobile-only sound control overlaid on the video.
           Desktop keeps its existing sound control in the feed header. */}
       {/* Mobile videographer attribution — upper-left of video. */}
-      {controlsVisible && (
+      {controlsVisible && !categoryMode && (
         <View style={styles.mobileCreatorAttribution}>
           <View style={styles.creatorRow}>
             <Text style={styles.creatorName}>@{video.creator.username}</Text>
@@ -620,7 +646,11 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
 
       {!isDesktopWeb && (
         <Pressable
-          style={styles.mobileMuteButton}
+          style={
+            categoryMode
+              ? styles.categoryFeedMuteButton
+              : styles.mobileMuteButton
+          }
           onPress={onMuteToggle}
           hitSlop={10}
         >
@@ -630,16 +660,6 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
             color="#fff"
           />
         </Pressable>
-      )}
-
-      {/* ── Pause indicator — independent of controlsVisible; this is
-          playback-state feedback, not a "control" to hide ── */}
-      {paused && isActive && (
-        <View style={[styles.pauseOverlay, { pointerEvents: 'none' }]}>
-          <View style={styles.pauseIcon}>
-            <Feather name="pause" size={44} color="rgba(255,255,255,0.85)" />
-          </View>
-        </View>
       )}
 
       {/* ── Double-tap heart ── */}
@@ -695,9 +715,7 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
         >
           {!isDesktopWeb && (
             <View style={styles.mobileGradient} pointerEvents="none">
-              <View style={styles.mobileGradientLight} />
-              <View style={styles.mobileGradientMedium} />
-              <View style={styles.mobileGradientDark} />
+
             </View>
           )}
 
@@ -838,8 +856,8 @@ const styles = StyleSheet.create({
   // Heart double-tap
   mobileMuteButton: {
     position: 'absolute',
-    top: 16,
-    right: 16,
+    bottom: 142,
+    right: 14,
     width: 38,
     height: 38,
     borderRadius: 19,
@@ -847,6 +865,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.38)',
     zIndex: 20,
+  },
+  categoryFeedMuteButton: {
+    position: 'absolute',
+    bottom: 142,
+    right: 14,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.38)',
+    zIndex: 35,
   },
 
   heartOverlay: {
@@ -967,15 +997,15 @@ const styles = StyleSheet.create({
   },
   mobileGradientLight: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.04)',
+    backgroundColor: 'transparent',
   },
   mobileGradientMedium: {
     height: 48,
-    backgroundColor: 'rgba(0,0,0,0.18)',
+    backgroundColor: 'transparent',
   },
   mobileGradientDark: {
     height: 72,
-    backgroundColor: 'rgba(0,0,0,0.42)',
+    backgroundColor: 'transparent',
   },
   mobileOverlayContent: {
     gap: 8,
