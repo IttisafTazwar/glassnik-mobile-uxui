@@ -1,5 +1,5 @@
 import React from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, usePathname, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -17,6 +17,7 @@ const FOOTER_LINKS = [
   { label: 'Company', url: 'https://www.glassnik.com/about-us' },
   { label: 'Terms and Policies', url: 'https://www.glassnik.com/terms-of-service' },
   { label: 'Support', url: 'https://www.glassnik.com/reviews' },
+  { label: 'Recording & Privacy', url: 'https://www.glassnik.com/recording-privacy' },
 ];
 
 // Explore's sub-items — navigate to the same Explore route with a
@@ -177,7 +178,7 @@ export function Sidebar() {
         </View>
 
       <View style={styles.footerGroup}>
-        {FOOTER_LINKS.map((link) => (
+        {FOOTER_LINKS.filter((link) => Platform.OS === 'web' || link.label !== 'Recording & Privacy').map((link) => (
           <Pressable key={link.label} onPress={() => Linking.openURL(link.url)} style={styles.footerLink}>
             <Text style={styles.footerLinkText}>{link.label}</Text>
           </Pressable>
