@@ -129,21 +129,37 @@ export default function ExploreScreen() {
   const destinationScrollX = React.useRef(0);
 
   const scrollCategoriesLeft = React.useCallback(() => {
-    categoryScrollX.current = Math.max(0, categoryScrollX.current - 420);
+    const currentX = categoryScrollX.current;
+
+    const positions = Object.values(categoryPillOffsets.current)
+      .filter((x) => typeof x === 'number')
+      .sort((a, b) => a - b);
+
+    const previous = [...positions]
+      .reverse()
+      .find((x) => x < currentX - 10);
 
     categoryScrollRef.current?.scrollTo({
-      x: categoryScrollX.current,
+      x: Math.max(0, previous ?? 0),
       animated: true,
     });
   }, []);
 
   const scrollCategoriesRight = React.useCallback(() => {
-    categoryScrollX.current += 420;
+    const currentX = categoryScrollX.current;
 
-    categoryScrollRef.current?.scrollTo({
-      x: categoryScrollX.current,
-      animated: true,
-    });
+    const positions = Object.values(categoryPillOffsets.current)
+      .filter((x) => typeof x === 'number')
+      .sort((a, b) => a - b);
+
+    const next = positions.find((x) => x > currentX + 10);
+
+    if (next !== undefined) {
+      categoryScrollRef.current?.scrollTo({
+        x: next,
+        animated: true,
+      });
+    }
   }, []);
 
   const scrollDestinationsLeft = React.useCallback(() => {
