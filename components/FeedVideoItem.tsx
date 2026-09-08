@@ -227,12 +227,30 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
   // ── Video player ──
   const player = useVideoPlayer(video.uri, useCallback((p: import('expo-video').VideoPlayer) => {
     p.loop = true;
+
+    if (Platform.OS !== 'web') {
+      p.bufferOptions = {
+        preferredForwardBufferDuration: 8,
+        minBufferForPlayback: 1,
+        prioritizeTimeOverSizeThreshold: true,
+      };
+    }
   }, []));
 
   // Track whether the native player has loaded enough to play reliably.
   const { status: playerStatus } = useEvent(player, 'statusChange', {
     status: player.status,
   });
+
+  const { isPlaying: nativeIsPlaying } = useEvent(player, 'playingChange', {
+    isPlaying: player.playing,
+  });
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' && isActive && nativeIsPlaying) {
+      setVideoStarted(true);
+    }
+  }, [isActive, nativeIsPlaying]);
 
   // Keep playback controlled from one place. This avoids competing play()
   // calls while a newly-visible video is still loading.
