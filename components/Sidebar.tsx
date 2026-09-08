@@ -124,7 +124,7 @@ export function Sidebar() {
       <View style={styles.navGroup}>
         {/* Explore Experiences + indented sub-items */}
         <Pressable
-          style={styles.navItem}
+          style={[styles.navItem, { backgroundColor: 'transparent' }]}
           onPress={() => {}}
         >
           <Feather
@@ -132,7 +132,7 @@ export function Sidebar() {
             size={16}
             color="#fff"
           />
-          <Text style={styles.navItemText}>
+          <Text style={[styles.navItemText, { color: '#fff' }]}>
             Explore Experiences
           </Text>
         </Pressable>
@@ -145,6 +145,7 @@ export function Sidebar() {
               key={child.label}
               style={[
                 styles.navItemChild,
+                { backgroundColor: isActive ? '#fff' : 'transparent' },
                 isActive && styles.navItemActive,
               ]}
               onPress={() => goExploreChild(child)}
