@@ -815,7 +815,16 @@ export default function ExploreScreen() {
                   return (
                     <Pressable
                       key={cat}
-                      onPress={() => setActiveCategory(cat)}
+                      onPress={() => {
+                        if (isMobile) {
+                          router.replace({
+                            pathname: '/(tabs)/explore',
+                            params: { category: cat },
+                          } as any);
+                        } else {
+                          setActiveCategory(cat);
+                        }
+                      }}
                       style={[styles.categoryPill, isActive && styles.categoryPillActive]}
                     >
                       <Text style={[styles.categoryPillText, isActive && styles.categoryPillTextActive]}>
