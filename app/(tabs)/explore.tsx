@@ -274,22 +274,26 @@ export default function ExploreScreen() {
     setCategoryControlsVisible(true);
   }, [categoryFeedIndex]);
 
-  useEffect(() => {
+  const scrollActiveCategoryToLeft = React.useCallback((category: string) => {
     if (Platform.OS !== 'web' || isMobile) return;
 
-    const x = categoryPillOffsets.current[activeCategory];
+    const x = categoryPillOffsets.current[category];
 
     if (typeof x !== 'number' || !categoryScrollRef.current) return;
 
-    const timer = setTimeout(() => {
-      categoryScrollRef.current?.scrollTo({
-        x: Math.max(0, x - 8),
-        animated: true,
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        categoryScrollRef.current?.scrollTo({
+          x: Math.max(0, x),
+          animated: true,
+        });
       });
-    }, 50);
+    });
+  }, [isMobile]);
 
-    return () => clearTimeout(timer);
-  }, [activeCategory, isMobile]);
+  useEffect(() => {
+    scrollActiveCategoryToLeft(activeCategory);
+  }, [activeCategory, scrollActiveCategoryToLeft]);
 
   const { data: apiVideos, isLoading } = useQuery<VideoAsset[]>({
     queryKey: ['explore'],
@@ -862,6 +866,10 @@ export default function ExploreScreen() {
                           onLayout={(event) => {
                             categoryPillOffsets.current[cat] =
                               event.nativeEvent.layout.x;
+
+                            if (cat === activeCategory) {
+                              scrollActiveCategoryToLeft(cat);
+                            }
                           }}
                           onPress={() => setActiveCategory(cat)}
                           style={[styles.categoryPill, isActive && styles.categoryPillActive]}
