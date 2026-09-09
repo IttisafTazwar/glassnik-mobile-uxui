@@ -205,6 +205,12 @@ const videos = allVideos.filter((v) => {
 
   const topPad = Platform.OS === 'web' ? 8 : insets.top + 12;
 
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace('/auth/login' as any);
+    }
+  }, [authLoading, user, router]);
+
   if (authLoading) {
     return (
       <View style={styles.root}>
@@ -212,12 +218,6 @@ const videos = allVideos.filter((v) => {
       </View>
     );
   }
-
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.replace('/auth/login' as any);
-    }
-  }, [authLoading, user, router]);
 
   if (!user) {
     return null;

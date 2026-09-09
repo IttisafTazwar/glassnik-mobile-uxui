@@ -757,10 +757,11 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
                   <Pressable
                     style={styles.categoryPill}
                     onPress={() => {
-                      console.log("🔥 CATEGORY PILL CLICKED:", video.category);
-                      router.push({
+                      router.replace({
                         pathname: '/(tabs)/explore',
-                        params: { category: video.category },
+                        params: {
+                          category: video.category,
+                        },
                       } as any);
                     }}
                     hitSlop={6}
@@ -791,10 +792,11 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
                   <Pressable
                     style={styles.categoryPill}
                     onPress={() => {
-                      console.log("🔥 CATEGORY PILL CLICKED:", video.category);
-                      router.push({
+                      router.replace({
                         pathname: '/(tabs)/explore',
-                        params: { category: video.category },
+                        params: {
+                          category: video.category,
+                        },
                       } as any);
                     }}
                     hitSlop={6}
