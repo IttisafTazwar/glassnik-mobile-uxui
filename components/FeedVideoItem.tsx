@@ -889,7 +889,7 @@ const styles = StyleSheet.create({
     height: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 35,
+    zIndex: 50,
   },
 
   heartOverlay: {
