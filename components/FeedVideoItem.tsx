@@ -52,7 +52,6 @@ function WebFeedVideo({
   isMuted,
   isFirstVideo = false,
   objectFit = 'cover',
-  onAutoplayMuted,
   onPlaying,
 }: {
   uri: string;
@@ -60,7 +59,6 @@ function WebFeedVideo({
   isMuted: boolean;
   isFirstVideo?: boolean;
   objectFit?: 'cover' | 'contain';
-  onAutoplayMuted?: () => void;
   onPlaying?: () => void;
 }) {
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
@@ -125,7 +123,6 @@ function WebFeedVideo({
 
         try {
           await el.play();
-          onAutoplayMuted?.();
           onPlaying?.();
         } catch {}
       }
@@ -247,12 +244,8 @@ function WebFeedVideo({
 }
 
 export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPreload = true, itemWidth, itemHeight, onCommentPress, onControlsVisibilityChange, categoryMode = false }: Props) {
-  const { isMuted, toggleMute, setMuted } = useMute();
+  const { isMuted, toggleMute } = useMute();
   const onMuteToggle = toggleMute;
-
-  const handleAutoplayMuted = React.useCallback(() => {
-    setMuted(true);
-  }, [setMuted]);
   const { width, height } = useWindowDimensions();
   const resolvedWidth = itemWidth ?? width;
   const [liked, setLiked] = useState(false);
@@ -536,7 +529,6 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
               isMuted={isMuted}
               isFirstVideo={isFirstVideo}
               objectFit="cover"
-              onAutoplayMuted={handleAutoplayMuted}
               onPlaying={() => setVideoStarted(true)}
             />
           ) : null}
@@ -561,7 +553,6 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
                 isActive={isActive}
                 isMuted={isMuted}
                 isFirstVideo={isFirstVideo}
-                onAutoplayMuted={handleAutoplayMuted}
                 onPlaying={() => setVideoStarted(true)}
               />
             ) : null
