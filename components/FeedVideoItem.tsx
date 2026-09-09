@@ -650,17 +650,13 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
 
       {!isDesktopWeb && (
         <Pressable
-          style={
-            categoryMode
-              ? styles.categoryFeedMuteButton
-              : styles.mobileMuteButton
-          }
+          style={styles.mobileMuteButton}
           onPress={onMuteToggle}
           hitSlop={10}
         >
           <Feather
             name={isMuted ? 'volume-x' : 'volume-2'}
-            size={20}
+            size={16}
             color="#fff"
           />
         </Pressable>
@@ -887,26 +883,12 @@ const styles = StyleSheet.create({
   // Heart double-tap
   mobileMuteButton: {
     position: 'absolute',
-    bottom: 142,
+    bottom: 82,
     right: 14,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 24,
+    height: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.38)',
-    zIndex: 20,
-  },
-  categoryFeedMuteButton: {
-    position: 'absolute',
-    bottom: 142,
-    right: 14,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.38)',
     zIndex: 35,
   },
 
