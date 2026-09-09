@@ -100,7 +100,7 @@ export default function FeedScreen() {
         video={item}
         isActive={index === currentIndex}
         isFirstVideo={index === 0}
-        shouldPreload={index === currentIndex || index === currentIndex + 1}
+        shouldPreload={Math.abs(index - currentIndex) <= 1}
         itemWidth={isMobile ? undefined : desktopFeedWidth}
         itemHeight={feedHeight}
         onCommentPress={(videoId) => setCommentsVideoId(videoId)}
@@ -180,10 +180,7 @@ export default function FeedScreen() {
                 video={item}
                 isActive={index === currentIndex}
                 isFirstVideo={index === 0}
-                shouldPreload={
-                  index === currentIndex ||
-                  index === currentIndex + 1
-                }
+                shouldPreload={Math.abs(index - currentIndex) <= 1}
                 itemWidth={desktopFeedWidth}
                 itemHeight={feedHeight}
                 onCommentPress={(videoId) =>
@@ -237,7 +234,7 @@ export default function FeedScreen() {
                 video={item}
                 isActive={index === currentIndex}
                 isFirstVideo={index === 0}
-                shouldPreload={index === currentIndex || index === currentIndex + 1}
+                shouldPreload={Math.abs(index - currentIndex) <= 1}
                 itemHeight={feedHeight}
                 onCommentPress={(videoId) => setCommentsVideoId(videoId)}
               />
@@ -287,10 +284,7 @@ export default function FeedScreen() {
                 video={item}
                 isActive={index === currentIndex}
                 isFirstVideo={index === 0}
-                shouldPreload={
-                  index === currentIndex ||
-                  index === currentIndex + 1
-                }
+                shouldPreload={Math.abs(index - currentIndex) <= 1}
                 itemHeight={feedHeight}
                 onCommentPress={(videoId) =>
                   setCommentsVideoId(videoId)

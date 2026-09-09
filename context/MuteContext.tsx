@@ -21,7 +21,13 @@ export function MuteProvider({ children }: { children: React.ReactNode }) {
   // Restore preference on mount
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
-      .then((val) => { if (val === 'true') setIsMuted(true); })
+      .then((val) => {
+        if (val === 'true') {
+          setIsMuted(true);
+        } else if (val === 'false') {
+          setIsMuted(false);
+        }
+      })
       .catch(() => {});
   }, []);
 

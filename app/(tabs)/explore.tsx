@@ -525,10 +525,7 @@ export default function ExploreScreen() {
                   video={item}
                   isActive={index === categoryFeedIndex}
                   isFirstVideo={index === 0}
-                  shouldPreload={
-                    index === categoryFeedIndex ||
-                    index === categoryFeedIndex + 1
-                  }
+                  shouldPreload={Math.abs(index - categoryFeedIndex) <= 1}
                   itemHeight={categoryFeedHeight}
                   categoryMode
                   onControlsVisibilityChange={setCategoryControlsVisible}

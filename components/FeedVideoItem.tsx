@@ -51,6 +51,7 @@ function WebFeedVideo({
   isActive,
   isMuted,
   isFirstVideo = false,
+  shouldPreload = false,
   objectFit = 'cover',
   onPlaying,
 }: {
@@ -58,6 +59,7 @@ function WebFeedVideo({
   isActive: boolean;
   isMuted: boolean;
   isFirstVideo?: boolean;
+  shouldPreload?: boolean;
   objectFit?: 'cover' | 'contain';
   onPlaying?: () => void;
 }) {
@@ -140,16 +142,6 @@ function WebFeedVideo({
       }
     };
 
-    const handleWaiting = () => {
-      if (!isActive || cancelled) return;
-
-      // Let the browser refill instead of repeatedly
-      // calling play() while the network is behind.
-      try {
-        el.pause();
-      } catch {}
-    };
-
     if (!isActive) {
       previousActiveRef.current = false;
 
@@ -177,7 +169,6 @@ function WebFeedVideo({
     el.addEventListener('canplay', handleCanPlay);
     el.addEventListener('loadeddata', handleCanPlay);
     el.addEventListener('progress', handleProgress);
-    el.addEventListener('waiting', handleWaiting);
 
     if (el.readyState >= 2) {
       void playActiveVideo();
@@ -189,7 +180,6 @@ function WebFeedVideo({
       el.removeEventListener('canplay', handleCanPlay);
       el.removeEventListener('loadeddata', handleCanPlay);
       el.removeEventListener('progress', handleProgress);
-      el.removeEventListener('waiting', handleWaiting);
     };
   }, [isActive, uri, isFirstVideo]);
 
@@ -221,7 +211,7 @@ function WebFeedVideo({
     // Active video gets aggressive loading.
     // Preloaded next video stays lighter so it doesn't
     // compete with the active video's bandwidth.
-    preload: isActive ? 'auto' : 'metadata',
+    preload: isActive || shouldPreload ? 'auto' : 'metadata',
 
     // Give the active video network priority.
     fetchPriority: isActive ? 'high' : 'low',
@@ -241,6 +231,98 @@ function WebFeedVideo({
       objectPosition: 'center',
     },
   });
+}
+
+
+function NativeFeedVideo({
+  uri,
+  isActive,
+  isMuted,
+  paused,
+  onPlaying,
+  onProgress,
+}: {
+  uri: string;
+  isActive: boolean;
+  isMuted: boolean;
+  paused: boolean;
+  onPlaying?: () => void;
+  onProgress?: (progress: number) => void;
+}) {
+  const player = useVideoPlayer(
+    {
+      uri,
+      useCaching: true,
+    },
+    useCallback((p: import('expo-video').VideoPlayer) => {
+      p.loop = true;
+
+      if (Platform.OS !== 'web') {
+        p.bufferOptions = {
+          preferredForwardBufferDuration: 8,
+          minBufferForPlayback: 1,
+          prioritizeTimeOverSizeThreshold: true,
+        };
+      }
+    }, [])
+  );
+
+  const { isPlaying } = useEvent(player, 'playingChange', {
+    isPlaying: player.playing,
+  });
+
+  // Tell the parent when the active video actually starts.
+  useEffect(() => {
+    if (isActive && isPlaying) {
+      onPlaying?.();
+    }
+  }, [isActive, isPlaying, onPlaying]);
+
+  // Keep mute and playback state synchronized.
+  useEffect(() => {
+    try {
+      player.muted = isMuted;
+
+      if (!isActive || paused) {
+        player.pause();
+        return;
+      }
+
+      player.play();
+    } catch {}
+  }, [isActive, paused, isMuted, player]);
+
+  // Keep the existing progress bar working.
+  useEffect(() => {
+    if (!isActive) {
+      onProgress?.(0);
+      return;
+    }
+
+    const id = setInterval(() => {
+      try {
+        const duration = player.duration;
+        const currentTime = player.currentTime;
+
+        if (duration > 0) {
+          onProgress?.(
+            Math.max(0, Math.min(1, currentTime / duration))
+          );
+        }
+      } catch {}
+    }, 250);
+
+    return () => clearInterval(id);
+  }, [isActive, player, onProgress]);
+
+  return (
+    <VideoView
+      player={player}
+      style={StyleSheet.absoluteFill}
+      contentFit="cover"
+      nativeControls={false}
+    />
+  );
 }
 
 export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPreload = true, itemWidth, itemHeight, onCommentPress, onControlsVisibilityChange, categoryMode = false }: Props) {
@@ -278,83 +360,10 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
   const discRotation = useRef(new Animated.Value(0)).current;
   const discAnim = useRef<Animated.CompositeAnimation | null>(null);
 
-  // ── Video player ──
-  const player = useVideoPlayer(video.uri, useCallback((p: import('expo-video').VideoPlayer) => {
-    p.loop = true;
+  // Native playback is handled by NativeFeedVideo.
+  // Only the current item and adjacent preload items create
+  // native VideoPlayer instances.
 
-    if (Platform.OS !== 'web') {
-      p.bufferOptions = {
-        preferredForwardBufferDuration: 8,
-        minBufferForPlayback: 1,
-        prioritizeTimeOverSizeThreshold: true,
-      };
-    }
-  }, []));
-
-  // Track whether the native player has loaded enough to play reliably.
-  const { status: playerStatus } = useEvent(player, 'statusChange', {
-    status: player.status,
-  });
-
-  const { isPlaying: nativeIsPlaying } = useEvent(player, 'playingChange', {
-    isPlaying: player.playing,
-  });
-
-  useEffect(() => {
-    if (Platform.OS !== 'web' && isActive && nativeIsPlaying) {
-      setVideoStarted(true);
-    }
-  }, [isActive, nativeIsPlaying]);
-
-  // Keep playback controlled from one place.
-  // Explicitly request playback whenever a previously viewed video
-  // becomes active again.
-  useEffect(() => {
-    let cancelled = false;
-
-    const syncPlayback = async () => {
-      try {
-        player.muted = isMuted;
-
-        if (!isActive) {
-          player.pause();
-          setPaused(false);
-          return;
-        }
-
-        if (paused) {
-          player.pause();
-          return;
-        }
-
-        // Give the player a moment to transition back to the active item.
-        await new Promise<void>((resolve) => setTimeout(resolve, 50));
-
-        if (!cancelled && isActive && !paused) {
-          player.play();
-        }
-      } catch {}
-    };
-
-    void syncPlayback();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isActive, paused, isMuted, player]);
-
-  // Progress tracking
-  useEffect(() => {
-    if (!isActive) { setProgress(0); return; }
-    const id = setInterval(() => {
-      try {
-        const d = player.duration;
-        const t = player.currentTime;
-        if (d > 0) setProgress(t / d);
-      } catch {}
-    }, 500);
-    return () => clearInterval(id);
-  }, [isActive, player]);
 
   // Disc spin
   useEffect(() => {
@@ -528,6 +537,7 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
               isActive={isActive}
               isMuted={isMuted}
               isFirstVideo={isFirstVideo}
+              shouldPreload={shouldPreload}
               objectFit="cover"
               onPlaying={() => setVideoStarted(true)}
             />
@@ -553,16 +563,21 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
                 isActive={isActive}
                 isMuted={isMuted}
                 isFirstVideo={isFirstVideo}
+                shouldPreload={shouldPreload}
                 onPlaying={() => setVideoStarted(true)}
               />
             ) : null
           ) : (
-            <VideoView
-              player={player}
-              style={StyleSheet.absoluteFill}
-              contentFit="cover"
-              nativeControls={false}
-            />
+            shouldPreload ? (
+              <NativeFeedVideo
+                uri={video.uri}
+                isActive={isActive}
+                isMuted={isMuted}
+                paused={paused}
+                onPlaying={() => setVideoStarted(true)}
+                onProgress={setProgress}
+              />
+            ) : null
           )}
 
           {(!isActive || !videoStarted) && video.thumbnailUrl ? (
