@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   Platform,
@@ -10,11 +10,13 @@ import {
   View,
   ViewToken,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { Feather } from '@expo/vector-icons';
 import { FeedVideoItem } from '@/components/FeedVideoItem';
 import { CommentsSheet } from '@/components/CommentsSheet';
+import { FirstTimeViewerPopup } from '@/components/FirstTimeViewerPopup';
 import { SAMPLE_VIDEOS, type SampleVideo } from '@/constants/sampleVideos';
 import { mobileApi } from '@/lib/api';
 import { useMute } from '@/context/MuteContext';
@@ -22,6 +24,8 @@ import { useAuth } from '@/context/AuthContext';
 import type { VideoAsset } from '@/types';
 
 type ActiveTab = 'foryou' | 'following';
+
+const FIRST_TIME_INTRO_KEY = 'glassnik:seenForYouIntro';
 
 function apiVideoToSample(v: VideoAsset): SampleVideo {
   const colors = ['#FF6B9D', '#FF4500', '#7C3AED', '#0EA5E9', '#F59E0B', '#10B981', '#EF4444', '#6366F1'];
@@ -61,20 +65,38 @@ export default function FeedScreen() {
   const [commentsVideoId, setCommentsVideoId] = useState<string | null>(null);
   const { isMuted, toggleMute } = useMute();
 
+  // First-time-viewer explainer — shown once, ever, per device. Explains
+  // that Place/Destination/Category under each video are tap targets, not
+  // just labels. Checked on mount; dismissing (X or "Got it!") persists
+  // the flag so it never shows again.
+  const [showIntro, setShowIntro] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem(FIRST_TIME_INTRO_KEY)
+      .then((v) => {
+        if (!v) setShowIntro(true);
+      })
+      .catch(() => {});
+  }, []);
+
+  function dismissIntro() {
+    setShowIntro(false);
+    AsyncStorage.setItem(FIRST_TIME_INTRO_KEY, 'true').catch(() => {});
+  }
+
   const { data: apiVideos } = useQuery<VideoAsset[]>({
     queryKey: ['feed'],
     queryFn: () => mobileApi.getFeed(1, 20),
     retry: false,
   });
 
-  // Merge: sample videos first, then any API videos with URLs
   // Merge: real API videos first, then sample/demo videos
-const allVideos: SampleVideo[] = [
-  ...(apiVideos ?? [])
-    .filter((v) => !!v.publicUrl)
-    .map(apiVideoToSample),
-  ...SAMPLE_VIDEOS,
-];
+  const allVideos: SampleVideo[] = [
+    ...(apiVideos ?? [])
+      .filter((v) => !!v.publicUrl)
+      .map(apiVideoToSample),
+    ...SAMPLE_VIDEOS,
+  ];
 
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -160,6 +182,9 @@ const allVideos: SampleVideo[] = [
           </Pressable>
         </View>
       </View>
+
+      {/* ── First-time-viewer explainer popup ── */}
+      {showIntro && <FirstTimeViewerPopup onDismiss={dismissIntro} />}
 
       {/* ── Comments Sheet ── */}
       <CommentsSheet

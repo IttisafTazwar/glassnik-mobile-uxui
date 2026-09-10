@@ -170,6 +170,16 @@ export function FeedVideoItem({ video, isActive, onCommentPress }: Props) {
     }
   }
 
+  // Category tap → jumps to Explore with that category pre-selected, per
+  // Steve's spec ("Category can connect to the category filtering we're
+  // already implementing"). Place/Destination stay non-interactive —
+  // explicitly called out as a later development stage.
+  function handleCategoryPress() {
+    if (!video.category) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    router.push({ pathname: '/(tabs)/explore', params: { category: video.category } } as any);
+  }
+
   const ITEM_HEIGHT = height;
 
   const placeTourTransport = video.description || null;
@@ -214,13 +224,6 @@ export function FeedVideoItem({ video, isActive, onCommentPress }: Props) {
         <Feather name="heart" size={90} color="#fff" />
       </Animated.View>
 
-      {/* Right-side floating sidebar (avatar, follow badge, music disc)
-          removed entirely — this was the "strange icon" reappearing and
-          the reason icons looked like they were "invading the picture"
-          instead of sitting in the black box below, consistent with the
-          Explore page cards. Everything now lives in the single bottom
-          box only, matching Steve's explicit request. */}
-
       {controlsVisible && (
         <View style={styles.progressTrack}>
           <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
@@ -257,9 +260,9 @@ export function FeedVideoItem({ video, isActive, onCommentPress }: Props) {
                 {metaLine}
               </Text>
               {video.category ? (
-                <View style={styles.categoryPill}>
+                <Pressable style={styles.categoryPill} onPress={handleCategoryPress}>
                   <Text style={styles.categoryText}>{video.category.toUpperCase()}</Text>
-                </View>
+                </Pressable>
               ) : null}
             </View>
           ) : null}
