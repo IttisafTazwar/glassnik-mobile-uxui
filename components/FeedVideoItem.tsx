@@ -208,12 +208,12 @@ function WebFeedVideo({
     src: uri,
     playsInline: true,
 
-    // Active video gets aggressive loading.
-    // Preloaded next video stays lighter so it doesn't
+    // Only the active video should aggressively load.
+    // Adjacent videos use metadata only so they don't
     // compete with the active video's bandwidth.
-    preload: isActive || shouldPreload ? 'auto' : 'metadata',
+    preload: isActive ? 'auto' : 'metadata',
 
-    // Give the active video network priority.
+    // Give only the active video network priority.
     fetchPriority: isActive ? 'high' : 'low',
 
     autoPlay: isActive,
