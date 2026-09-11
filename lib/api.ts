@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL ?? 'https://glassnik-backend-vub3pcnoma-ts.a.run.app';
+  process.env.EXPO_PUBLIC_API_URL ?? 'https://glassnik-backend-798114647130.australia-southeast1.run.app';
 
 async function getToken(): Promise<string | null> {
   return AsyncStorage.getItem('accessToken');

@@ -17,7 +17,7 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { Feather } from '@expo/vector-icons';
 import { mobileApi } from '@/lib/api';
 import { type SampleVideo } from '@/constants/sampleVideos';
@@ -295,11 +295,36 @@ export default function ExploreScreen() {
     scrollActiveCategoryToLeft(activeCategory);
   }, [activeCategory, scrollActiveCategoryToLeft]);
 
-  const { data: apiVideos, isLoading } = useQuery<VideoAsset[]>({
-    queryKey: ['explore'],
-    queryFn: () => mobileApi.getFeed(1, 200),
+  const {
+    data: feedPages,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery<VideoAsset[]>({
+    queryKey: ['explore', isMobile],
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) =>
+      mobileApi.getFeed(
+        pageParam as number,
+        isMobile ? 200 : 20
+      ),
+    getNextPageParam: (lastPage, allPages) => {
+      // Keep mobile behaviour unchanged.
+      if (isMobile) return undefined;
+
+      // A short page means we reached the end.
+      if (lastPage.length < 20) return undefined;
+
+      return allPages.length + 1;
+    },
     retry: false,
   });
+
+  const apiVideos = useMemo(
+    () => feedPages?.pages.flat() ?? [],
+    [feedPages]
+  );
 
   const allVideos = useMemo(() => {
     const api = (apiVideos ?? []).filter((v) => !!v.publicUrl).map(apiVideoToSample);
@@ -709,6 +734,24 @@ export default function ExploreScreen() {
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingBottom: insets.bottom }}
           showsVerticalScrollIndicator={false}
+          onScroll={(event) => {
+            if (isMobile || !hasNextPage || isFetchingNextPage) return;
+
+            const {
+              contentOffset,
+              layoutMeasurement,
+              contentSize,
+            } = event.nativeEvent;
+
+            const distanceFromBottom =
+              contentSize.height -
+              (contentOffset.y + layoutMeasurement.height);
+
+            if (distanceFromBottom < 800) {
+              fetchNextPage();
+            }
+          }}
+          scrollEventThrottle={200}
         >
           {isMobile ? (
             <View style={[styles.bannerMobile, isMobileDiscoveryPage && styles.mobileDiscoveryHidden]}>
@@ -941,6 +984,12 @@ export default function ExploreScreen() {
           </View>
 
           {discoveryContent}
+
+          {!isMobile && isFetchingNextPage && (
+            <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+              <ActivityIndicator size="small" color="#FE2C55" />
+            </View>
+          )}
 
           <View style={[styles.footer, isMobileDiscoveryPage && styles.mobileDiscoveryHidden]}>
             <View style={styles.footerColumnsRow}>
