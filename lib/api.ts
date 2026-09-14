@@ -59,94 +59,28 @@ async function request<T>(
     throw new Error(err.message ?? 'Request failed');
   }
 
-  return res.json() as Promise<T>;
+  if (res.status === 204) return undefined as T;
+  return res.json();
 }
 
-// ─── Auth ─────────────────────────────────────────────────────────────────────
 export const authApi = {
-  register: (email: string, password: string, displayName?: string, username?: string) =>
-    request('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({ email, password, displayName, username }),
-    }),
-
   login: (email: string, password: string) =>
-    request('/auth/login', {
+    request<any>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     }),
 
-  logout: async () => {
-    const refreshToken = await AsyncStorage.getItem('refreshToken');
-    if (!refreshToken) return;
-    return request('/auth/logout', {
+  register: (email: string, password: string, displayName?: string, username?: string) =>
+    request<any>('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ refreshToken }),
-    }).catch(() => {});
-  },
+      body: JSON.stringify({ email, password, displayName, username }),
+    }),
+
+  logout: () =>
+    request<void>('/auth/logout', { method: 'POST' }),
 };
 
-// ─── Mobile feed & upload ──────────────────────────────────────────────────────
-export const mobileApi = {
-  getFeed: (page = 1, limit = 20) =>
-    request<any[]>(`/mobile/feed?page=${page}&limit=${limit}`),
-
-  getExplore: (page = 1, limit = 50, categoryId?: number, city?: string) => {
-    const params = new URLSearchParams({
-      page: String(page),
-      limit: String(limit),
-    });
-
-    if (categoryId) params.set('categoryId', String(categoryId));
-    if (city) params.set('city', city);
-
-    return request<{
-      page: number;
-      limit: number;
-      total: number;
-      items: any[];
-    }>(`/mobile/explore?${params.toString()}`);
-  },
-
- /** Request a Google Cloud Storage signed upload URL from the backend. */
-  requestUpload: (
-    title: string,
-    fileSize: number,
-    description?: string,
-    locationName?: string,
-    categoryId?: number,
-  ) =>
-    request<{ id: number; uploadUrl: string }>(
-      '/videos/request-upload',
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          title,
-          fileSize,
-          description,
-          locationName,
-          categoryId,
-          source: 'MOBILE',
-        }),
-      },
-    ),
-
-  completeUpload: (videoId: number) =>
-  request(`/videos/${videoId}/complete`, {
-    method: 'POST',
-  }),
-
-  /** Poll Cloudflare processing status for a video. */
-  checkStatus: (videoId: number) =>
-    request<{ status: string; publicUrl?: string; thumbnailUrl?: string; errorMessage?: string }>(
-      `/videos/${videoId}/status`,
-    ),
-};
-
-// ─── User / capabilities / profile ────────────────────────────────────────────
 export const userApi = {
-  getMyCapabilities: () => request<any[]>('/me/capabilities'),
-
   getMe: () => request<any>('/users/me'),
 
   updateMe: (data: { displayName?: string; username?: string; avatarUrl?: string }) =>
@@ -155,68 +89,77 @@ export const userApi = {
       body: JSON.stringify(data),
     }),
 
-  getUser: (id: number) =>
-    request<any>(`/users/${id}`),
+  getMyCapabilities: () => request<any[]>('/users/me/capabilities'),
 
   follow: (userId: number) =>
-    request<{ following: boolean; followerCount: number }>(`/users/${userId}/follow`, {
-      method: 'POST',
-    }),
+    request<void>(`/users/${userId}/follow`, { method: 'POST' }),
 
   unfollow: (userId: number) =>
-    request<{ following: boolean; followerCount: number }>(`/users/${userId}/follow`, {
-      method: 'DELETE',
-    }),
+    request<void>(`/users/${userId}/follow`, { method: 'DELETE' }),
 };
 
-// ─── Videos ───────────────────────────────────────────────────────────────────
 export const videoApi = {
-  /** Fetch a single video by ID. */
-  getVideo: (id: number) =>
-    request<any>(`/videos/${id}`),
+  getUserVideos: (userId: number) =>
+    request<any>(`/users/${userId}/videos`),
 
-  /** Returns videos for a user. Owner sees all statuses; others see published only. */
-  getUserVideos: (userId: number, page = 1, limit = 50) =>
-    request<any>(`/users/${userId}/videos?page=${page}&limit=${limit}`),
+  deleteVideo: (videoId: number) =>
+    request<void>(`/videos/${videoId}`, { method: 'DELETE' }),
 
-  deleteVideo: (id: number) =>
-    request<{ success: boolean }>(`/videos/${id}`, { method: 'DELETE' }),
+  likeVideo: (videoId: number) =>
+    request<void>(`/videos/${videoId}/like`, { method: 'POST' }),
 
-  getComments: (videoId: string | number, page = 1, limit = 50) =>
-    request<any>(`/videos/${videoId}/comments?page=${page}&limit=${limit}`),
-
-  postComment: (videoId: string | number, text: string) =>
-    request<any>(`/videos/${videoId}/comments`, {
-      method: 'POST',
-      body: JSON.stringify({ text }),
-    }),
-
-  likeVideo: (videoId: string | number) =>
-    request<{ liked: boolean; likeCount: number }>(`/videos/${videoId}/like`, {
-      method: 'POST',
-    }),
-
-  unlikeVideo: (videoId: string | number) =>
-    request<{ liked: boolean; likeCount: number }>(`/videos/${videoId}/like`, {
-      method: 'DELETE',
-    }),
+  unlikeVideo: (videoId: number) =>
+    request<void>(`/videos/${videoId}/like`, { method: 'DELETE' }),
 };
 
-// ─── Notifications ────────────────────────────────────────────────────────────
-export const notificationsApi = {
-  getNotifications: async (): Promise<import('@/types').Notification[]> => {
-    const raw = await request<unknown>('/notifications');
-    // Normalize: server may return [] or { notifications: [] } or { data: [] }
-    if (Array.isArray(raw)) return raw as import('@/types').Notification[];
-    const obj = raw as Record<string, unknown>;
-    return ((obj?.notifications ?? obj?.data ?? []) as import('@/types').Notification[]);
+export const mobileApi = {
+  getFeed: (page: number, limit: number) =>
+    request<any[]>(`/feed?page=${page}&limit=${limit}`),
+
+  requestUpload: (title: string, fileSize: number, description?: string) =>
+    request<any>('/videos/upload-request', {
+      method: 'POST',
+      body: JSON.stringify({ title, fileSize, description }),
+    }),
+
+  completeUpload: (videoId: number) =>
+    request<void>(`/videos/${videoId}/complete`, { method: 'POST' }),
+
+  checkStatus: (videoId: number) =>
+    request<any>(`/videos/${videoId}/status`),
+};
+
+// ── Moderation ──────────────────────────────────────────────────────────
+// New — supports the moderator/admin page. Follows the same request<T>()
+// pattern as every other API group above. Requires the logged-in user to
+// have MODERATOR or ADMIN role (enforced server-side); the frontend page
+// this powers should also gate access based on the user's role once that
+// field is confirmed on the User type.
+export const moderationApi = {
+  getQueue: (filters?: { status?: string; assignedToId?: number; minPriority?: number }) => {
+    const params = new URLSearchParams();
+    if (filters?.status) params.set('status', filters.status);
+    if (filters?.assignedToId != null) params.set('assignedToId', String(filters.assignedToId));
+    if (filters?.minPriority != null) params.set('minPriority', String(filters.minPriority));
+    const qs = params.toString();
+    return request<any>(`/moderation/queue${qs ? `?${qs}` : ''}`);
   },
 
-  getUnreadCount: () => request<{ count: number }>('/notifications/unread-count'),
+  assignToQueue: (queueItemId: number, assignedToId?: number) =>
+    request<any>(`/moderation/queue/${queueItemId}/assign`, {
+      method: 'PATCH',
+      body: JSON.stringify(assignedToId != null ? { assignedToId } : {}),
+    }),
 
-  markAllRead: () =>
-    request<{ success: boolean }>('/notifications/read-all', { method: 'POST' }),
-
-  markRead: (id: number) =>
-    request<{ success: boolean }>(`/notifications/${id}/read`, { method: 'PATCH' }),
+  submitAction: (opts: {
+    videoId: number;
+    action: 'APPROVE' | 'REJECT' | 'REMOVE' | 'SHADOW_BAN' | 'AGE_RESTRICT';
+    reason?: string;
+    policyVersion?: string;
+    queueItemId?: number;
+  }) =>
+    request<any>('/moderation/actions', {
+      method: 'POST',
+      body: JSON.stringify(opts),
+    }),
 };

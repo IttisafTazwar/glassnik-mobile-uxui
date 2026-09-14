@@ -53,6 +53,7 @@ function AuthGate() {
       <Stack.Screen name="user/[id]" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="settings" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="my-videos" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="moderation" options={{ headerShown: false, presentation: 'card' }} />
     </Stack>
   );
 }
