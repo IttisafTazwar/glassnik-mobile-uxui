@@ -516,54 +516,54 @@ function DiscoveryTabs({
 // on the real DOM node before calling play()/seeking — setting `muted` as
 // a JSX prop on a raw <video> element is unreliable in React and often
 // fails silently, which is why an earlier attempt rendered nothing.
-function WebVideoThumb({ uri, isFirst }: { uri: string; isFirst: boolean }) {
+function WebVideoThumb({
+  uri,
+  isFirst,
+  shouldPlay = false,
+}: {
+  uri: string;
+  isFirst: boolean;
+  shouldPlay?: boolean;
+}) {
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
+  const [isReady, setIsReady] = React.useState(false);
 
   React.useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
 
-    // Must be set imperatively, not via JSX props, or autoplay/frame
-    // rendering gets silently blocked by the browser.
     el.muted = true;
     el.defaultMuted = true;
 
-    if (isFirst) {
+    if (shouldPlay) {
       const playPromise = el.play();
       if (playPromise && typeof playPromise.catch === 'function') {
-        playPromise.catch(() => {
-          // Autoplay blocked for some other reason (e.g. data-saver mode) —
-          // fail silently rather than throwing; card just shows the poster
-          // frame once metadata loads instead.
-        });
+        playPromise.catch(() => {});
       }
     } else {
-      const showFrame = () => {
-        try {
-          el.currentTime = 0.1;
-        } catch {}
-      };
-      if (el.readyState >= 1) {
-        showFrame();
-      } else {
-        el.addEventListener('loadedmetadata', showFrame, { once: true });
-      }
+      el.pause();
+      try {
+        el.currentTime = 0;
+      } catch {}
     }
-  }, [uri, isFirst]);
+  }, [uri, isFirst, shouldPlay]);
 
   return React.createElement('video', {
     ref: videoRef,
     src: uri,
     playsInline: true,
-    preload: 'metadata',
-    loop: isFirst,
+    preload: 'auto',
+    loop: true,
+    onCanPlay: () => setIsReady(true),
     style: {
       position: 'absolute',
       top: 0,
       left: 0,
       width: '100%',
       height: '100%',
-      objectFit: 'contain',
+      objectFit: 'cover',
+      opacity: isReady ? 1 : 0,
+      transition: 'opacity 120ms ease',
     },
   });
 }
@@ -607,10 +607,20 @@ export function VideoGridCell({
     return String(n);
   }
 
-  const canUseWebVideoFallback = Platform.OS === 'web' && !video.thumbnailUrl && !!video.uri;
+  const [isHovered, setIsHovered] = React.useState(false);
+
+  const canUseWebVideo = Platform.OS === 'web' && !!video.uri;
 
   return (
-    <View style={{ width, marginBottom: 14 }}>
+    <View
+      style={{ width, marginBottom: 14 }}
+      {...(Platform.OS === 'web'
+        ? ({
+            onMouseEnter: () => setIsHovered(true),
+            onMouseLeave: () => setIsHovered(false),
+          } as any)
+        : {})}
+    >
       <Pressable
         style={({ pressed }) => [
           styles.cell,
@@ -624,9 +634,15 @@ export function VideoGridCell({
             contentFit="cover"
             transition={200}
           />
-        ) : canUseWebVideoFallback ? (
-          <WebVideoThumb uri={video.uri} isFirst={isFirst} />
-        ) : (
+        ) : null}
+
+        {canUseWebVideo ? (
+          <WebVideoThumb
+            uri={video.uri}
+            isFirst={isFirst}
+            shouldPlay={isHovered}
+          />
+        ) : !video.thumbnailUrl ? (
           <>
             <View style={[StyleSheet.absoluteFill, { backgroundColor: video.creator.color, opacity: 0.25 }]} />
             <View style={styles.cellThumb}>
@@ -635,7 +651,7 @@ export function VideoGridCell({
               </Text>
             </View>
           </>
-        )}
+        ) : null}
 
         <View style={styles.cellScrim} />
 

@@ -37,7 +37,8 @@ export function Sidebar() {
     <View style={styles.wrap}>
       <View style={styles.navGroup}>
         {navItems.map((item) => {
-          const isActive = pathname === item.route || (item.route === '/(tabs)/explore' && pathname === '/explore');
+          const routePath = item.route.replace('/(tabs)', '');
+          const isActive = pathname === routePath || pathname === item.route;
           return (
             <Pressable
               key={item.label}

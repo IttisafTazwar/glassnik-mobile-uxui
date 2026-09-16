@@ -171,7 +171,7 @@ export function FeedVideoItem({
             StyleSheet.absoluteFill,
             !isCompactMobile && styles.desktopVideoStage,
           ]}
-          contentFit={isCompactMobile ? "cover" : "contain"}
+          contentFit="contain"
           nativeControls={false}
         />
       ) : video.thumbnailUrl ? (
@@ -357,7 +357,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#111',
   },
   desktopVideoStage: {
+    top: 0,
     bottom: 58,
+    aspectRatio: 9 / 16,
+    alignSelf: 'center',
   },
   videoTapLayer: {
     zIndex: 1,

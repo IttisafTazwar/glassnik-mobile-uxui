@@ -207,7 +207,8 @@ export function TopNav() {
             {/* App navigation — Glassnik app sections */}
             <View style={styles.menuSection}>
               {navItems.map((item) => {
-                const isActive = pathname === item.route || (item.route === '/(tabs)/explore' && pathname === '/explore');
+                const routePath = item.route.replace('/(tabs)', '');
+                const isActive = pathname === routePath || pathname === item.route;
                 return (
                   <Pressable
                     key={item.label}
