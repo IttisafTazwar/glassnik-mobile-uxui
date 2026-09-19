@@ -212,9 +212,20 @@ export default function ModerationScreen() {
                       )}
                     </Pressable>
                   )}
-                  <Pressable style={styles.reviewBtn} onPress={() => openActionModal(item)}>
-                    <Feather name="flag" size={14} color="#000" />
-                    <Text style={styles.reviewBtnText}>Review</Text>
+                  <Pressable
+                    style={styles.reviewBtn}
+                    onPress={() => {
+                      const videoId = item.videoId ?? item.video?.id ?? item.id;
+                      router.push(`/video/${videoId}` as any);
+                    }}
+                  >
+                    <Feather name="play-circle" size={14} color="#000" />
+                    <Text style={styles.reviewBtnText}>Watch</Text>
+                  </Pressable>
+
+                  <Pressable style={styles.moderateBtn} onPress={() => openActionModal(item)}>
+                    <Feather name="flag" size={14} color="#fff" />
+                    <Text style={styles.moderateBtnText}>Moderate</Text>
                   </Pressable>
                 </View>
               </View>
@@ -317,4 +328,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   reviewBtnText: { color: '#000', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  moderateBtn: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  moderateBtnText: { color: '#fff', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
 });
