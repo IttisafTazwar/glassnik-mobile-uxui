@@ -220,3 +220,55 @@ export const notificationsApi = {
   markRead: (id: number) =>
     request<{ success: boolean }>(`/notifications/${id}/read`, { method: 'PATCH' }),
 };
+
+// ─── Moderation ───────────────────────────────────────────────────────────────
+// Backend authorization remains the security boundary. The frontend also
+// restricts the moderation UI to MODERATOR and ADMIN users.
+export const moderationApi = {
+  getQueue: (filters?: {
+    status?: string;
+    assignedToId?: number;
+    minPriority?: number;
+  }) => {
+    const params = new URLSearchParams();
+
+    if (filters?.status) params.set('status', filters.status);
+    if (filters?.assignedToId != null) {
+      params.set('assignedToId', String(filters.assignedToId));
+    }
+    if (filters?.minPriority != null) {
+      params.set('minPriority', String(filters.minPriority));
+    }
+
+    const qs = params.toString();
+
+    return request<any>(
+      `/moderation/queue${qs ? `?${qs}` : ''}`,
+    );
+  },
+
+  assignToQueue: (queueItemId: number, assignedToId?: number) =>
+    request<any>(`/moderation/queue/${queueItemId}/assign`, {
+      method: 'PATCH',
+      body: JSON.stringify(
+        assignedToId != null ? { assignedToId } : {},
+      ),
+    }),
+
+  submitAction: (opts: {
+    videoId: number;
+    action:
+      | 'APPROVE'
+      | 'REJECT'
+      | 'REMOVE'
+      | 'SHADOW_BAN'
+      | 'AGE_RESTRICT';
+    reason?: string;
+    policyVersion?: string;
+    queueItemId?: number;
+  }) =>
+    request<any>('/moderation/actions', {
+      method: 'POST',
+      body: JSON.stringify(opts),
+    }),
+};

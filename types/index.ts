@@ -5,6 +5,7 @@ export interface User {
   displayName?: string | null;
   avatarUrl?: string | null;
   status?: string | null;
+  role?: 'USER' | 'MODERATOR' | 'ADMIN' | string | null;
 }
 
 export interface AuthTokens {

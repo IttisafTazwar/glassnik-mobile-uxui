@@ -33,8 +33,14 @@ const EXPLORE_CHILDREN: Leaf[] = [
   { label: 'Global', icon: 'globe', route: '/(tabs)/explore', discovery: 'Global' },
 ];
 
-// Profile's sub-items — shown only when the user is logged in AND has the
-// videographer (mobile.creator) capability, per spec.
+// Profile sub-items. Upload requires the mobile.creator capability;
+// moderation is shown only to MODERATOR and ADMIN users.
+const MODERATION_ITEM: Leaf = {
+  label: 'Moderation',
+  icon: 'shield',
+  route: '/moderation',
+};
+
 const UPLOAD_ITEM: Leaf = {
   label: 'Upload',
   icon: 'plus-square',
@@ -79,6 +85,12 @@ export function Sidebar() {
   // consistently across web and native navigation.
   const onProfilePage =
     pathname === '/profile' || pathname === '/(tabs)/profile';
+
+  const onModerationPage =
+    pathname === '/moderation';
+
+  const canModerate =
+    user?.role === 'MODERATOR' || user?.role === 'ADMIN';
 
   const onUploadPage =
     pathname === '/upload' || pathname === '/(tabs)/upload';
@@ -186,6 +198,36 @@ export function Sidebar() {
             Profile
           </Text>
         </Pressable>
+
+        {user && canModerate && (
+          <Pressable
+            style={[
+              styles.navItemChild,
+              onModerationPage && styles.navItemActive,
+            ]}
+            onPress={() =>
+              router.push(MODERATION_ITEM.route as any)
+            }
+          >
+            <Feather
+              name={MODERATION_ITEM.icon}
+              size={14}
+              color={
+                onModerationPage
+                  ? '#000'
+                  : 'rgba(255,255,255,0.75)'
+              }
+            />
+            <Text
+              style={[
+                styles.navItemChildText,
+                onModerationPage && styles.navItemTextActive,
+              ]}
+            >
+              Moderation
+            </Text>
+          </Pressable>
+        )}
 
         {user && hasCreatorCap && (() => {
           const isActive = onUploadPage;
