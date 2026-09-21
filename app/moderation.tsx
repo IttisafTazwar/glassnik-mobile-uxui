@@ -216,7 +216,9 @@ export default function ModerationScreen() {
                     style={styles.reviewBtn}
                     onPress={() => {
                       const videoId = item.videoId ?? item.video?.id ?? item.id;
-                      router.push(`/video/${videoId}` as any);
+                      router.push(
+                        `/moderation/review/${videoId}?queueItemId=${item.id}&status=${encodeURIComponent(item.status ?? '')}` as any
+                      );
                     }}
                   >
                     <Feather name="play-circle" size={14} color="#000" />
