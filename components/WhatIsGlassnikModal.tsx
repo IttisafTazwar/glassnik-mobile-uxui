@@ -12,7 +12,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
 
-const STORAGE_KEY = 'glassnik_what_is_glassnik_seen_v1';
+const STORAGE_KEY = 'glassnik_what_is_glassnik_seen_v2';
 
 export function WhatIsGlassnikModal() {
   const [visible, setVisible] = useState(false);
@@ -111,7 +111,7 @@ export function WhatIsGlassnikModal() {
                 isMobile && styles.mobileBody,
               ]}
             >
-              Glassnik is a new way to explore and share videos.
+              Glassnik is a new way to explore and share videos — focused on places, destinations and activities rather than personalities competing for your attention.
             </Text>
 
             <Text style={[styles.body, isMobile && styles.mobileBody]}>
@@ -132,6 +132,20 @@ export function WhatIsGlassnikModal() {
               destination or category links below each video to explore similar
               experiences.
             </Text>
+
+            <View style={[styles.divider, isMobile && styles.mobileDivider]} />
+
+            <View style={styles.musicSection}>
+              <Feather name="music" size={isMobile ? 18 : 22} color="#FFFFFF" />
+              <View style={styles.musicTextContainer}>
+                <Text style={[styles.musicTitle, isMobile && styles.mobileMusicTitle]}>
+                  Better with your music
+                </Text>
+                <Text style={[styles.musicBody, isMobile && styles.mobileMusicBody]}>
+                  Playing your Spotify in the background makes Experiences even better.
+                </Text>
+              </View>
+            </View>
 
             <Pressable
               onPress={dismiss}
@@ -299,6 +313,43 @@ const styles = StyleSheet.create({
 
   cyanText: {
     color: '#12DCE5',
+  },
+
+  musicSection: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+
+  musicTextContainer: {
+    flexShrink: 1,
+  },
+
+  musicTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Inter_700Bold',
+    textAlign: 'left',
+  },
+
+  mobileMusicTitle: {
+    fontSize: 13,
+  },
+
+  musicBody: {
+    color: 'rgba(255,255,255,0.82)',
+    fontSize: 13,
+    fontFamily: 'Inter_400Regular',
+    lineHeight: 18,
+    marginTop: 2,
+  },
+
+  mobileMusicBody: {
+    fontSize: 11,
+    lineHeight: 14,
   },
 
   gotItButton: {

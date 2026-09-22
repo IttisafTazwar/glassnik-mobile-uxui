@@ -772,7 +772,7 @@ export default function ExploreScreen() {
                   <Text style={styles.heroTitleAccent}>Experience</Text> it.
                 </Text>
                 <Text style={styles.heroSubtitleMobile}>
-                  Glassnik turns real-world smart-glasses Eye-POV videos into immersive experiences.
+                  Explore real places and activities through Eye-POV videos recorded with smart glasses.{'\n'}Unlike social media, which is mostly personality-driven, Glassnik is Experience-driven.
                 </Text>
               </View>
 
@@ -815,7 +815,7 @@ export default function ExploreScreen() {
                     Don't scroll through the world. <Text style={styles.heroTitleAccent}>Experience</Text> it.
                   </Text>
                   <Text style={styles.heroSubtitle}>
-                    Glassnik turns real-world smart-glasses Eye-POV videos into immersive experiences.
+                    Explore real places and activities through Eye-POV videos recorded with smart glasses.{'\n'}Unlike social media, which is mostly personality-driven, Glassnik is Experience-driven.
                   </Text>
                 </View>
 
