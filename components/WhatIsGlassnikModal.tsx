@@ -4,6 +4,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -84,11 +85,14 @@ export function WhatIsGlassnikModal() {
             <Feather name="x" size={isMobile ? 16 : 20} color="#FFFFFF" />
           </Pressable>
 
-          <View
-            style={[
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={[
               styles.contentContainer,
               isMobile && styles.mobileContentContainer,
             ]}
+            showsVerticalScrollIndicator={false}
+            bounces={false}
           >
             <Image
               source={require('../assets/images/logo.png')}
@@ -165,7 +169,7 @@ export function WhatIsGlassnikModal() {
               REAL PLACES. REAL PEOPLE.{' '}
               <Text style={styles.cyanText}>REAL EXPERIENCES.</Text>
             </Text>
-          </View>
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -217,6 +221,10 @@ const styles = StyleSheet.create({
   mobileCard: {
     maxWidth: 520,
     borderRadius: 24,
+  },
+
+  scrollView: {
+    width: '100%',
   },
 
   contentContainer: {
