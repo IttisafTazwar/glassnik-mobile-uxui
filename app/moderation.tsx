@@ -122,7 +122,7 @@ export default function ModerationScreen() {
   return (
     <View style={styles.root}>
       <View style={[styles.header, { paddingTop: topPad }]}>
-        <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
+        <Pressable onPress={() => router.replace('/')} hitSlop={12} style={styles.backBtn}>
           <Feather name="arrow-left" size={22} color="#fff" />
         </Pressable>
         <Text style={styles.headerTitle}>Moderation Queue</Text>
