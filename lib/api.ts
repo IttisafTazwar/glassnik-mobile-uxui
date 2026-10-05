@@ -163,3 +163,13 @@ export const moderationApi = {
       body: JSON.stringify(opts),
     }),
 };
+
+// ── Notifications ───────────────────────────────────────────────────────
+// Was missing entirely before — this is what crashed NotificationTabIcon
+// in app/(tabs)/_layout.tsx ("Cannot read properties of undefined
+// (reading 'getUnreadCount')"). Endpoint path below is my best inference
+// (`/notifications/unread-count`), not confirmed against the real backend
+// route — please verify with Tenzin and adjust if the actual path differs.
+export const notificationsApi = {
+  getUnreadCount: () => request<{ count: number }>('/notifications/unread-count'),
+};

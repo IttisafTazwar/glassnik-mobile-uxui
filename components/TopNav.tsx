@@ -57,12 +57,6 @@ const APP_NAV_ITEMS: {
   { label: 'Activity', icon: 'bell', route: '/(tabs)/notifications', loggedInOnly: true },
 ];
 
-const FOOTER_LINKS = [
-  { label: 'Company', url: 'https://www.glassnik.com/about-us' },
-  { label: 'Terms and Policies', url: 'https://www.glassnik.com/terms-of-service' },
-  { label: 'Support', url: 'https://www.glassnik.com/reviews' },
-];
-
 export function TopNav() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -233,7 +227,12 @@ export function TopNav() {
 
             <View style={styles.menuDivider} />
 
-            {/* App navigation — Glassnik app sections */}
+            {/* App navigation — Glassnik app sections.
+                NOTE: per Steve's Mobile UX/UI Updates doc, Company / Terms
+                and Policies / Support are being removed from the bottom of
+                this menu entirely — those were already dead code (defined
+                but not rendered), now removed for real so nothing
+                resurrects them later. */}
             <View style={styles.menuSection}>
               {navItems.map((item) => {
                 const isActive = pathname === item.route || (item.route === '/(tabs)/explore' && pathname === '/explore');
@@ -260,8 +259,6 @@ export function TopNav() {
                 </Pressable>
               )}
             </View>
-
-
           </ScrollView>
         </View>
       </Modal>
@@ -335,7 +332,6 @@ const styles = StyleSheet.create({
   menuSection: { gap: 2 },
   menuLinkRow: { paddingVertical: 12 },
   menuLinkText: { color: '#fff', fontSize: 15, fontFamily: 'Inter_500Medium' },
-  menuFooterLinkText: { color: 'rgba(255,255,255,0.5)', fontSize: 13, fontFamily: 'Inter_400Regular' },
   menuNavItemRow: {
     flexDirection: 'row',
     alignItems: 'center',

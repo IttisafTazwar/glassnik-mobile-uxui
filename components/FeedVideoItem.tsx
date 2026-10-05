@@ -15,6 +15,7 @@ const useNativeDriver = Platform.OS !== 'web';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useEvent } from 'expo';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -720,9 +721,12 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
           ]}
         >
           {!isDesktopWeb && (
-            <View style={styles.mobileGradient} pointerEvents="none">
-
-            </View>
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.75)']}
+              locations={[0, 1]}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
           )}
 
           <View style={styles.mobileOverlayContent}>
@@ -887,12 +891,15 @@ const styles = StyleSheet.create({
   },
 
   // Heart double-tap
+  // Mute button moved to upper-right of the video per the Mobile UX/UI
+  // Updates doc (item 5) — was previously bottom-right (bottom: 82),
+  // which placed it near the info box rather than the upper-right area.
   mobileMuteButton: {
     position: 'absolute',
-    bottom: 82,
-    right: 14,
-    width: 24,
-    height: 24,
+    top: 18,
+    right: 18,
+    width: 28,
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 50,
@@ -1010,22 +1017,6 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     overflow: 'hidden',
     zIndex: 40,
-  },
-  mobileGradient: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-end',
-  },
-  mobileGradientLight: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-  mobileGradientMedium: {
-    height: 48,
-    backgroundColor: 'transparent',
-  },
-  mobileGradientDark: {
-    height: 72,
-    backgroundColor: 'transparent',
   },
   mobileOverlayContent: {
     gap: 8,

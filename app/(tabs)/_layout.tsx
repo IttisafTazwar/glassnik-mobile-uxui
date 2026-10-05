@@ -63,12 +63,17 @@ function UploadTabButton({ onPress }: { onPress?: () => void }) {
   );
 }
 
+// Guarded against notificationsApi (or its getUnreadCount method) being
+// undefined — was crashing the whole tab layout with "Cannot read
+// properties of undefined (reading 'getUnreadCount')" when notificationsApi
+// wasn't available from lib/api.ts. Query now simply doesn't run if the
+// function isn't there, badge just shows nothing instead of crashing.
 function NotificationTabIcon({ color }: { color: string }) {
   const { user } = useAuth();
   const { data } = useQuery({
     queryKey: ['unread-count'],
-    queryFn: notificationsApi.getUnreadCount,
-    enabled: !!user,
+    queryFn: notificationsApi?.getUnreadCount,
+    enabled: !!user && typeof notificationsApi?.getUnreadCount === 'function',
     refetchInterval: 30_000,
     retry: false,
     staleTime: 10_000,
