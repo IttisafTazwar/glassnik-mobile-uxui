@@ -272,3 +272,7 @@ export const moderationApi = {
       body: JSON.stringify(opts),
     }),
 };
+// ── Notifications ───────────────────────────────────────────────────────
+export const notificationsApi = {
+  getUnreadCount: () => request<{ count: number }>('/notifications/unread-count'),
+};

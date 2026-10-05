@@ -178,7 +178,10 @@ export default function NotificationsScreen() {
         <View style={styles.center}>
           <ActivityIndicator color="rgba(255,255,255,0.5)" />
         </View>
-      ) : isError && !(Platform.OS === 'web' && isMobile) ? (
+      ) : isError && !isMobile ? (
+        // Desktop only keeps the real error state with Retry. On mobile (web
+        // or native) a failed load now falls through to the "All caught up!"
+        // empty state below, with no Retry button, per the Mobile UX/UI doc.
         <View style={styles.center}>
           <Feather name="alert-circle" size={32} color="rgba(255,255,255,0.25)" />
           <Text style={styles.emptyText}>Could not load notifications.</Text>
