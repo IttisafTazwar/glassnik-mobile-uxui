@@ -40,6 +40,45 @@ function formatMemberSince(iso?: string | null): string | null {
   return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 }
 
+// ── Video status helpers ────────────────────────────────────────────────────
+// Shared by the polling logic and the lists below so they always agree.
+// A video still "in flight" (pending / inprogress / pendingupload) for longer
+// than STALE_MS is treated as stalled and shown as failed, instead of showing
+// a spinner forever. NOTE: this is a frontend safety net — if statuses aren't
+// being updated by the backend after processing/approval, that needs fixing
+// at the source.
+const STALE_MS = 24 * 60 * 60 * 1000;
+
+function normaliseStatus(status?: string | null): string {
+  return (status ?? '').toLowerCase().replace(/_/g, '');
+}
+
+function isOlderThanStaleWindow(video: VideoItem): boolean {
+  if (!video.createdAt) return false;
+  const createdTime = new Date(video.createdAt).getTime();
+  if (!Number.isFinite(createdTime)) return false;
+  return Date.now() - createdTime > STALE_MS;
+}
+
+// pendingupload expiry applies at every width (existing behaviour).
+// pending/inprogress expiry is mobile-only, per the Mobile UX/UI doc's
+// "mobile only, don't change desktop" rule.
+function isStalled(video: VideoItem, mobile: boolean): boolean {
+  const status = normaliseStatus(video.status);
+  if (status === 'pendingupload') return isOlderThanStaleWindow(video);
+  if (mobile && (status === 'pending' || status === 'inprogress')) {
+    return isOlderThanStaleWindow(video);
+  }
+  return false;
+}
+
+function isInFlight(video: VideoItem, mobile: boolean): boolean {
+  const status = normaliseStatus(video.status);
+  const inFlightStatus =
+    status === 'pending' || status === 'inprogress' || status === 'pendingupload';
+  return inFlightStatus && !isStalled(video, mobile);
+}
+
 function ProfileVideoPreview({ uri }: { uri: string }) {
   if (Platform.OS !== 'web') return null;
 
@@ -128,13 +167,12 @@ export default function ProfileScreen() {
     queryFn: () => videoApi.getUserVideos(user!.id),
     enabled: !!user,
     retry: 1,
+    // Only poll while something is genuinely still processing. Stalled videos
+    // no longer keep the 5-second polling loop running forever.
     refetchInterval: (query) => {
       const data = (query.state as any).data;
       const all: VideoItem[] = Array.isArray(data) ? data : (data?.data ?? data?.videos ?? []);
-      const hasProcessing = all.some(
-        (v) => v.status === 'pending' || v.status === 'inprogress' || v.status === 'pendingupload',
-      );
-      return hasProcessing ? 5000 : false;
+      return all.some((v) => isInFlight(v, isMobile)) ? 5000 : false;
     },
   });
 
@@ -161,47 +199,22 @@ export default function ProfileScreen() {
     ? rawVideos
     : (rawVideos?.data ?? rawVideos?.videos ?? []);
 
-  // Split into processing, failed/abandoned, and ready-to-view.
-  const normaliseStatus = (status?: string | null) =>
-    (status ?? '').toLowerCase().replace(/_/g, '');
-
-  const isStalePendingUpload = (video: VideoItem) => {
-    if (normaliseStatus(video.status) !== 'pendingupload') return false;
-
-    const createdAt = (video as any).createdAt;
-    if (!createdAt) return false;
-
-    const createdTime = new Date(createdAt).getTime();
-    if (!Number.isFinite(createdTime)) return false;
-
-    const STALE_UPLOAD_MS = 24 * 60 * 60 * 1000;
-    return Date.now() - createdTime > STALE_UPLOAD_MS;
-  };
-
-  const processingVideos = allVideos.filter((v) => {
-    const status = normaliseStatus(v.status);
-
-    return (
-      status === 'pending' ||
-      status === 'inprogress' ||
-      (status === 'pendingupload' && !isStalePendingUpload(v))
-    );
-  });
+  // Split into processing, failed/stalled, and ready-to-view.
+  const processingVideos = allVideos.filter((v) => isInFlight(v, isMobile));
 
   const errorVideos = allVideos.filter((v) => {
     const status = normaliseStatus(v.status);
-
-    return (
-      status === 'error' ||
-      status === 'failed' ||
-      isStalePendingUpload(v)
-    );
+    return status === 'error' || status === 'failed' || isStalled(v, isMobile);
   });
 
-const videos = allVideos.filter((v) => {
-  const status = normaliseStatus(v.status);
-  return status === 'published' || status === 'ready';
-});
+  const videos = allVideos.filter((v) => {
+    const status = normaliseStatus(v.status);
+    return status === 'published' || status === 'ready';
+  });
+
+  // The heart/favourites tab is removed on mobile, so mobile is always on the
+  // Videos tab (even if the window was resized while 'liked' was selected).
+  const activeGridTab: GridTab = isMobile ? 'videos' : gridTab;
 
   const topPad = Platform.OS === 'web' ? 8 : insets.top + 12;
 
@@ -383,9 +396,10 @@ const videos = allVideos.filter((v) => {
                 {/* Bio — only shown when the backend provides it */}
                 {bio ? <Text style={styles.bioText}>{bio}</Text> : null}
 
-                {/* Stats */}
+                {/* Stats — Following/Followers are removed on mobile (all
+                    mobile widths, web and native). Total Views stays. */}
                 <View style={styles.statsRow}>
-                  {!(Platform.OS === 'web' && isMobile) && (
+                  {!isMobile && (
                     <>
                       <View style={styles.statItem}>
                         <Text style={styles.statNum}>{stats.following}</Text>
@@ -466,10 +480,11 @@ const videos = allVideos.filter((v) => {
               </Text>
             </View>
             {processingVideos.map((video) => {
+              const status = normaliseStatus(video.status);
               const statusLabel =
-                video.status === 'pendingupload'
+                status === 'pendingupload'
                   ? 'Uploading'
-                  : video.status === 'pending'
+                  : status === 'pending'
                   ? 'Queued'
                   : 'Encoding';
               return (
@@ -532,26 +547,26 @@ const videos = allVideos.filter((v) => {
           </View>
         )}
 
-        {/* ── Sticky grid tabs ── */}
+        {/* ── Sticky grid tabs — heart/favourites tab removed on mobile ── */}
         <View style={styles.gridTabs}>
           <Pressable
-            style={[styles.gridTab, gridTab === 'videos' && styles.gridTabActive]}
+            style={[styles.gridTab, activeGridTab === 'videos' && styles.gridTabActive]}
             onPress={() => setGridTab('videos')}
           >
-            <Feather name="grid" size={20} color={gridTab === 'videos' ? '#fff' : 'rgba(255,255,255,0.4)'} />
+            <Feather name="grid" size={20} color={activeGridTab === 'videos' ? '#fff' : 'rgba(255,255,255,0.4)'} />
           </Pressable>
-          {!(Platform.OS === 'web' && isMobile) && (
+          {!isMobile && (
             <Pressable
-              style={[styles.gridTab, gridTab === 'liked' && styles.gridTabActive]}
+              style={[styles.gridTab, activeGridTab === 'liked' && styles.gridTabActive]}
               onPress={() => setGridTab('liked')}
             >
-              <Feather name="heart" size={20} color={gridTab === 'liked' ? '#fff' : 'rgba(255,255,255,0.4)'} />
+              <Feather name="heart" size={20} color={activeGridTab === 'liked' ? '#fff' : 'rgba(255,255,255,0.4)'} />
             </Pressable>
           )}
         </View>
 
         {/* ── Video grid ── */}
-        {gridTab === 'videos' && (
+        {activeGridTab === 'videos' && (
           <>
             {videosLoading ? (
               <View style={styles.gridLoader}>
@@ -627,7 +642,7 @@ const videos = allVideos.filter((v) => {
           </>
         )}
 
-        {gridTab === 'liked' && !(Platform.OS === 'web' && isMobile) && (
+        {activeGridTab === 'liked' && (
           <View style={styles.gridEmpty}>
             <Feather name="heart" size={36} color="rgba(255,255,255,0.15)" />
             <Text style={styles.gridEmptyText}>Liked Experiences</Text>

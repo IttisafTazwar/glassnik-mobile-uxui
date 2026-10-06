@@ -17,7 +17,7 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Feather } from '@expo/vector-icons';
 import { mobileApi } from '@/lib/api';
 import { type SampleVideo } from '@/constants/sampleVideos';
@@ -61,6 +61,33 @@ const CATEGORIES = [
 
 const DISCOVERY_TABS = ['Explore', 'Categories', 'Trending', 'Nearby', 'Global'] as const;
 type DiscoveryTab = typeof DISCOVERY_TABS[number];
+
+// ── Destination / Place grouping helpers ─────────────────────────────────────
+// Locations and Places are free text on upload, so the same destination can be
+// typed several ways ("Kuala Lumpur", "Kuala Lumpur, Malaysia"). These helpers
+// build a cleaned-up key so those variants group together.
+function normaliseKey(value?: string | null): string {
+  return (value ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+// Known misspellings of a city, corrected when videos are loaded so the pills,
+// the cards and the filters all agree. This is a stopgap: the lasting fix is a
+// standard location list on the upload form (or correcting the saved data).
+const CITY_CORRECTIONS: Record<string, string> = {
+  'kuala lumper': 'Kuala Lumpur',
+};
+
+function correctCity(city?: string | null): string | undefined {
+  if (!city) return undefined;
+  return CITY_CORRECTIONS[normaliseKey(city)] ?? city;
+}
+
+function destinationKey(city?: string | null): string {
+  return normaliseKey(city);
+}
+
+type ChipItem = { key: string; label: string; count: number };
+type DestinationItem = ChipItem & { variants: Set<string> };
 
 function apiVideoToSample(v: VideoAsset): SampleVideo {
   const colors = ['#FF6B9D', '#FF4500', '#7C3AED', '#0EA5E9', '#F59E0B', '#10B981', '#EF4444', '#6366F1'];
@@ -112,11 +139,23 @@ function apiVideoToSample(v: VideoAsset): SampleVideo {
     comments: 0,
     shares: v.shares ?? 0,
     place: v.place ?? v.title ?? undefined,
-    city: mappedCity,
+    city: correctCity(mappedCity),
     country: mappedCountry,
     category: mappedCategory,
     createdAt: v.createdAt,
   };
+}
+
+// Videos with a playable URL, converted and sorted newest first.
+function toSamples(list: VideoAsset[]): SampleVideo[] {
+  return list
+    .filter((v) => !!v.publicUrl)
+    .map(apiVideoToSample)
+    .sort((a, b) => {
+      const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return tb - ta;
+    });
 }
 
 export default function ExploreScreen() {
@@ -125,8 +164,6 @@ export default function ExploreScreen() {
   const categoryPillOffsets = React.useRef<Record<string, number>>({});
   const categoryFeedPillScrollRef = React.useRef<ScrollView>(null);
   const categoryFeedScrollRef = React.useRef<ScrollView>(null);
-  const destinationScrollRef = React.useRef<ScrollView>(null);
-  const destinationScrollX = React.useRef(0);
 
   const scrollCategoriesLeft = React.useCallback(() => {
     const currentX = categoryScrollX.current;
@@ -162,24 +199,6 @@ export default function ExploreScreen() {
     }
   }, []);
 
-  const scrollDestinationsLeft = React.useCallback(() => {
-    destinationScrollX.current = Math.max(0, destinationScrollX.current - 420);
-
-    destinationScrollRef.current?.scrollTo({
-      x: destinationScrollX.current,
-      animated: true,
-    });
-  }, []);
-
-  const scrollDestinationsRight = React.useCallback(() => {
-    destinationScrollX.current += 420;
-
-    destinationScrollRef.current?.scrollTo({
-      x: destinationScrollX.current,
-      animated: true,
-    });
-  }, []);
-
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const isMobile = width < MOBILE_BREAKPOINT;
@@ -192,6 +211,10 @@ export default function ExploreScreen() {
     discovery?: string;
     category?: string;
   }>();
+
+  // Real width of the area beside the sidebar. The grid is sized from this
+  // instead of relying on the SIDEBAR_WIDTH constant matching the real sidebar.
+  const [scrollAreaWidth, setScrollAreaWidth] = useState<number | null>(null);
 
   // Mobile Home is the full-screen Experience feed.
   // Plain /explore is desktop-only; mobile discovery routes with
@@ -209,6 +232,8 @@ export default function ExploreScreen() {
 
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
+  const [activeDestination, setActiveDestination] = useState<{ key: string; label: string } | null>(null);
+  const [activePlace, setActivePlace] = useState<{ key: string; label: string } | null>(null);
   const [categoryFeedIndex, setCategoryFeedIndex] = useState(0);
   const [categoryControlsVisible, setCategoryControlsVisible] = useState(true);
   const [commentsVideoId, setCommentsVideoId] = useState<string | null>(null);
@@ -295,6 +320,7 @@ export default function ExploreScreen() {
     scrollActiveCategoryToLeft(activeCategory);
   }, [activeCategory, scrollActiveCategoryToLeft]);
 
+  // Paginated feed used for unfiltered browsing (20 at a time on desktop).
   const {
     data: feedPages,
     isLoading,
@@ -321,42 +347,125 @@ export default function ExploreScreen() {
     retry: false,
   });
 
+  // One larger request (up to 200 videos, the same amount the mobile feed
+  // already requests) used to build the Destination / Place pills with correct
+  // counts and to give filtered views their complete results. The paginated
+  // feed above is untouched, so normal browsing still loads 20 at a time.
+  const { data: indexData, isError: indexFailed } = useQuery<VideoAsset[]>({
+    queryKey: ['explore-index'],
+    queryFn: () => mobileApi.getFeed(1, 200),
+    enabled: !isMobile,
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const apiVideos = useMemo(
     () => feedPages?.pages.flat() ?? [],
     [feedPages]
   );
 
-  const allVideos = useMemo(() => {
-    const api = (apiVideos ?? []).filter((v) => !!v.publicUrl).map(apiVideoToSample);
-    const sortedApi = [...api].sort((a, b) => {
-      const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return tb - ta;
-    });
-    return sortedApi;
-  }, [apiVideos]);
+  const allVideos = useMemo(() => toSamples(apiVideos), [apiVideos]);
 
-  const trendingDestinations = useMemo(() => {
-    const counts = new Map<string, { label: string; count: number }>();
-    for (const v of allVideos) {
+  // Mobile already loads everything in one request, so it uses allVideos.
+  const indexVideos = useMemo(
+    () => (isMobile || !indexData ? allVideos : toSamples(indexData)),
+    [isMobile, indexData, allVideos]
+  );
+  const indexReady = isMobile || !!indexData;
+
+  // Destinations are grouped by a cleaned-up city key, so "Kuala Lumpur" and
+  // "Kuala Lumpur, Malaysia" become one pill.
+  const trendingDestinations = useMemo<DestinationItem[]>(() => {
+    const groups = new Map<
+      string,
+      { count: number; labels: Map<string, number>; variants: Set<string> }
+    >();
+
+    for (const v of indexVideos) {
       if (!v.city && !v.country) continue;
+
+      const key = destinationKey(v.city || v.country);
+      if (!key) continue;
+
       const label = [v.city, v.country].filter(Boolean).join(', ');
-      const key = label;
-      const existing = counts.get(key);
+      const group = groups.get(key) ?? {
+        count: 0,
+        labels: new Map<string, number>(),
+        variants: new Set<string>(),
+      };
+
+      group.count += 1;
+      group.labels.set(label, (group.labels.get(label) ?? 0) + 1);
+      group.variants.add(key);
+      group.variants.add(normaliseKey(label));
+      groups.set(key, group);
+    }
+
+    return Array.from(groups.entries())
+      .map(([key, group]) => {
+        // Show the most common label that includes a country when there is
+        // one ("Kuala Lumpur, Malaysia"), otherwise the most common label.
+        const entries = Array.from(group.labels.entries());
+        const withCountry = entries.filter(([label]) => label.includes(','));
+        const pool = withCountry.length > 0 ? withCountry : entries;
+        pool.sort((a, b) => b[1] - a[1]);
+
+        return {
+          key,
+          label: pool[0][0],
+          count: group.count,
+          variants: group.variants,
+        };
+      })
+      .sort((a, b) => b.count - a.count);
+  }, [indexVideos]);
+
+  // Places are grouped by the video's place text (the "Place / Tour /
+  // Transport / Walk" field), matched ignoring case and extra spaces.
+  const trendingPlaces = useMemo<ChipItem[]>(() => {
+    const groups = new Map<string, ChipItem>();
+
+    for (const v of indexVideos) {
+      const label = v.place?.trim();
+      const key = normaliseKey(label);
+      if (!label || !key) continue;
+
+      const existing = groups.get(key);
       if (existing) {
         existing.count += 1;
       } else {
-        counts.set(key, { label, count: 1 });
+        groups.set(key, { key, label, count: 1 });
       }
     }
-    return Array.from(counts.values()).sort((a, b) => b.count - a.count);
-  }, [allVideos]);
+
+    return Array.from(groups.values()).sort((a, b) => b.count - a.count);
+  }, [indexVideos]);
+
+  const isFiltering =
+    activeCategory !== 'All' ||
+    !!activeDestination ||
+    !!activePlace ||
+    query.trim().length > 0;
+
+  // Filtered views read from the complete list; unfiltered browsing keeps the
+  // paginated one.
+  const filterSource = isFiltering ? indexVideos : allVideos;
 
   const filtered = useMemo(() => {
-    let result = allVideos;
+    let result = filterSource;
 
     if (activeCategory !== 'All') {
       result = result.filter((v) => v.category === activeCategory);
+    }
+
+    if (activeDestination) {
+      result = result.filter(
+        (v) => destinationKey(v.city || v.country) === activeDestination.key
+      );
+    }
+
+    if (activePlace) {
+      result = result.filter((v) => normaliseKey(v.place) === activePlace.key);
     }
 
     if (!query.trim()) return result;
@@ -369,9 +478,27 @@ export default function ExploreScreen() {
         v.city?.toLowerCase().includes(q) ||
         v.country?.toLowerCase().includes(q)
     );
-  }, [allVideos, query, activeCategory]);
+  }, [filterSource, query, activeCategory, activeDestination, activePlace]);
 
-  const contentWidth = isMobile ? width : width - SIDEBAR_WIDTH;
+  // Fallback only: if the larger request failed, keep loading pages while a
+  // filter is on so the filtered view still ends up complete.
+  useEffect(() => {
+    if (isMobile || !isFiltering || !indexFailed || !hasNextPage || isFetchingNextPage) return;
+    fetchNextPage();
+  }, [isMobile, isFiltering, indexFailed, hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  // Show a spinner (not "No results") while the complete list is still loading.
+  const waitingForResults =
+    isLoading ||
+    (isFiltering &&
+      !isMobile &&
+      (indexFailed ? !!hasNextPage || isFetchingNextPage : !indexReady));
+
+  // Width of the content area. On desktop this is measured from the real
+  // layout; the constant is only used for the first render.
+  const contentWidth = isMobile
+    ? width
+    : scrollAreaWidth ?? width - SIDEBAR_WIDTH;
 
   // Instagram/TikTok-style portrait cards on both mobile and desktop —
   // reverted from an earlier landscape attempt. Desktop columns bumped
@@ -381,19 +508,89 @@ export default function ExploreScreen() {
   const COLS = isMobile ? 2 : 4;
   const CELL_GAP = 6;
   const GRID_PADDING = isMobile ? 14 : 20;
-  const cellWidth = (contentWidth - GRID_PADDING * 2 - CELL_GAP * (COLS - 1)) / COLS;
+  // Rounded down so fractional widths can never push the last card onto a
+  // new row.
+  const cellWidth = Math.floor(
+    (contentWidth - GRID_PADDING * 2 - CELL_GAP * (COLS - 1)) / COLS
+  );
   const cellHeight = cellWidth * (16 / 9);
 
   const topPad = Platform.OS === 'web' ? 0 : insets.top;
 
+  // Destination / Place pills always show the grid view, because the
+  // Trending / Nearby / Global / Categories views don't use this filter.
+  function showGridView() {
+    if (activeDiscoveryTab !== 'Explore') {
+      setActiveDiscoveryTab('Explore');
+    }
+  }
+
+  function selectDestination(item: { key: string; label: string }) {
+    setQuery('');
+    setActivePlace(null);
+    setActiveDestination({ key: item.key, label: item.label });
+    showGridView();
+  }
+
+  function selectPlace(item: { key: string; label: string }) {
+    setQuery('');
+    setActiveDestination(null);
+    setActivePlace({ key: item.key, label: item.label });
+    showGridView();
+  }
+
+  function clearLocationFilter() {
+    setActiveDestination(null);
+    setActivePlace(null);
+  }
+
+  // Used by the Trending / Nearby / Global sections, which pass a text label.
   function handleDestinationPress(label: string) {
-    setActiveDiscoveryTab('Explore');
-    setQuery(label);
+    const target = normaliseKey(label);
+    const match = trendingDestinations.find((d) => d.variants.has(target));
+
+    if (match) {
+      selectDestination(match);
+    } else {
+      // No matching group (shouldn't normally happen): fall back to a text search.
+      setActiveDestination(null);
+      setActivePlace(null);
+      setQuery(label);
+      showGridView();
+    }
   }
 
   function handleViewAllDestinations() {
     setActiveDiscoveryTab('Trending');
   }
+
+  const activeFilter = activeDestination
+    ? { kind: 'Destination', label: activeDestination.label }
+    : activePlace
+    ? { kind: 'Place', label: activePlace.label }
+    : null;
+
+  const emptyForLabel = activeFilter?.label ?? query;
+
+  // Title shown above the grid when a Destination or Place is selected.
+  const filterHeader = activeFilter ? (
+    <View style={[styles.filterTitleRow, { paddingHorizontal: GRID_PADDING }]}>
+      <View style={styles.filterTitleBlock}>
+        <Text style={styles.filterTitleKind}>{activeFilter.kind}</Text>
+        <Text style={styles.filterTitle} numberOfLines={1}>
+          {activeFilter.label}
+        </Text>
+        <Text style={styles.filterTitleCount}>
+          {filtered.length} {filtered.length === 1 ? 'Experience' : 'Experiences'}
+        </Text>
+      </View>
+
+      <Pressable onPress={clearLocationFilter} hitSlop={8} style={styles.filterClearBtn}>
+        <Feather name="x" size={14} color="#fff" />
+        <Text style={styles.filterClearText}>Clear</Text>
+      </Pressable>
+    </View>
+  ) : null;
 
   const categoryParam = Array.isArray(params.category)
     ? params.category[0]
@@ -465,7 +662,7 @@ export default function ExploreScreen() {
 
     discoveryContent = (
       <TrendingSection
-        videos={allVideos}
+        videos={indexVideos}
         isMobile={isMobile}
         contentWidth={contentWidth}
         cellWidth={cellWidth}
@@ -477,7 +674,7 @@ export default function ExploreScreen() {
   } else if (activeDiscoveryTab === 'Nearby') {
     discoveryContent = (
       <NearbySection
-        videos={allVideos}
+        videos={indexVideos}
         isMobile={isMobile}
         contentWidth={contentWidth}
         onDestinationPress={handleDestinationPress}
@@ -486,7 +683,7 @@ export default function ExploreScreen() {
   } else if (activeDiscoveryTab === 'Global') {
     discoveryContent = (
       <GlobalSection
-        videos={allVideos}
+        videos={indexVideos}
         isMobile={isMobile}
         contentWidth={contentWidth}
         onDestinationPress={handleDestinationPress}
@@ -502,7 +699,7 @@ export default function ExploreScreen() {
           contentContainerStyle={styles.tagsRow}
         >
           {trendingDestinations.map((d) => (
-            <Pressable key={d.label} style={styles.trendChip} onPress={() => setQuery(d.label)}>
+            <Pressable key={d.key} style={styles.trendChip} onPress={() => selectDestination(d)}>
               <Feather name="map-pin" size={12} color="#FE2C55" />
               <Text style={styles.trendChipTag}>{d.label}</Text>
               <Text style={styles.trendChipCount}>
@@ -623,6 +820,7 @@ export default function ExploreScreen() {
       discoveryContent = (
         <View>
           {exploreHeader}
+          {filterHeader}
 
           <View
             style={{
@@ -645,14 +843,14 @@ export default function ExploreScreen() {
           </View>
 
           {filtered.length === 0 && (
-            isLoading ? (
+            waitingForResults ? (
               <View style={styles.centered}>
                 <ActivityIndicator size="large" color="#FE2C55" />
               </View>
             ) : (
               <View style={styles.centered}>
                 <Feather name="search" size={40} color="rgba(255,255,255,0.2)" />
-                <Text style={styles.emptyText}>No results{query ? ` for "${query}"` : ''}</Text>
+                <Text style={styles.emptyText}>No results{emptyForLabel ? ` for "${emptyForLabel}"` : ''}</Text>
               </View>
             )
           )}
@@ -662,6 +860,7 @@ export default function ExploreScreen() {
       discoveryContent = (
         <View>
           {exploreHeader}
+          {filterHeader}
 
           <View
             style={{
@@ -684,14 +883,14 @@ export default function ExploreScreen() {
           </View>
 
           {filtered.length === 0 && (
-            isLoading ? (
+            waitingForResults ? (
               <View style={styles.centered}>
                 <ActivityIndicator size="large" color="#FE2C55" />
               </View>
             ) : (
               <View style={styles.centered}>
                 <Feather name="search" size={40} color="rgba(255,255,255,0.2)" />
-                <Text style={styles.emptyText}>No results{query ? ` for "${query}"` : ''}</Text>
+                <Text style={styles.emptyText}>No results{emptyForLabel ? ` for "${emptyForLabel}"` : ''}</Text>
               </View>
             )
           )}
@@ -734,6 +933,14 @@ export default function ExploreScreen() {
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingBottom: insets.bottom }}
           showsVerticalScrollIndicator={false}
+          onLayout={(event) => {
+            const measured = event.nativeEvent.layout.width;
+            setScrollAreaWidth((previous) =>
+              previous !== null && Math.abs(previous - measured) < 0.5
+                ? previous
+                : measured
+            );
+          }}
           onScroll={(event) => {
             if (isMobile || !hasNextPage || isFetchingNextPage) return;
 
@@ -814,8 +1021,13 @@ export default function ExploreScreen() {
                   <Text style={styles.heroTitle}>
                     Don't scroll through the world. <Text style={styles.heroTitleAccent}>Experience</Text> it.
                   </Text>
+                  {/* Desktop subheading: the two sentences from Steve's
+                      text-change request, one sentence per line. */}
                   <Text style={styles.heroSubtitle}>
-                    Glassnik turns real-world smart-glasses Eye-POV videos into immersive experiences.
+                    Explore real places and activities through Eye-POV videos recorded with smart glasses.
+                  </Text>
+                  <Text style={styles.heroSubtitle}>
+                    Unlike social media, which is mostly personality-driven, Glassnik is Experience-driven.
                   </Text>
                 </View>
 
@@ -880,7 +1092,7 @@ export default function ExploreScreen() {
             ) : (
               <>
                 <View style={styles.labeledRow}>
-                  <Text style={styles.rowLabel}>Categories:</Text>
+                  <Text style={styles.rowLabel} numberOfLines={1}>Categories:</Text>
 
                   <Pressable
                     onPress={scrollCategoriesLeft}
@@ -932,52 +1144,31 @@ export default function ExploreScreen() {
                   >
                     <Feather name="chevron-right" size={20} color="#111" />
                   </Pressable>
+
+                  {/* Empty slot so this row ends at the same place as the
+                      rows that have a "View all" link. */}
+                  <View style={styles.viewAllSlot} />
                 </View>
 
                 {trendingDestinations.length > 0 && (
-                  <View style={styles.labeledRow}>
-                    <Text style={styles.rowLabel}>Trending Destinations:</Text>
+                  <ChipRow
+                    label="Trending Destinations:"
+                    icon="map-pin"
+                    items={trendingDestinations}
+                    activeKey={activeDestination?.key}
+                    onSelect={selectDestination}
+                    onViewAll={handleViewAllDestinations}
+                  />
+                )}
 
-                    <Pressable
-                      onPress={scrollDestinationsLeft}
-                      hitSlop={8}
-                      style={styles.horizontalNavButton}
-                    >
-                      <Feather name="chevron-left" size={20} color="#111" />
-                    </Pressable>
-
-                    <ScrollView
-                      ref={destinationScrollRef}
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.categoryRow}
-                      style={{ flex: 1 }}
-                      onScroll={(event) => {
-                        destinationScrollX.current = event.nativeEvent.contentOffset.x;
-                      }}
-                      scrollEventThrottle={16}
-                    >
-                      {trendingDestinations.map((d) => (
-                        <Pressable key={d.label} style={styles.trendChipCompact} onPress={() => setQuery(d.label)}>
-                          <Feather name="map-pin" size={11} color="#FE2C55" />
-                          <Text style={styles.trendChipCompactTag}>{d.label}</Text>
-                          <Text style={styles.trendChipCompactCount}>{d.count}</Text>
-                        </Pressable>
-                      ))}
-                    </ScrollView>
-
-                    <Pressable
-                      onPress={scrollDestinationsRight}
-                      hitSlop={8}
-                      style={styles.horizontalNavButton}
-                    >
-                      <Feather name="chevron-right" size={20} color="#111" />
-                    </Pressable>
-
-                    <Pressable onPress={handleViewAllDestinations} hitSlop={8}>
-                      <Text style={styles.viewAllText}>View all</Text>
-                    </Pressable>
-                  </View>
+                {trendingPlaces.length > 0 && (
+                  <ChipRow
+                    label="Trending Places:"
+                    icon="map"
+                    items={trendingPlaces}
+                    activeKey={activePlace?.key}
+                    onSelect={selectPlace}
+                  />
                 )}
               </>
             )}
@@ -1080,6 +1271,7 @@ function DiscoveryTabs({
 }) {
   const icons: Record<DiscoveryTab, React.ComponentProps<typeof Feather>['name']> = {
     Explore: 'compass',
+    Categories: 'grid',
     Trending: 'trending-up',
     Nearby: 'map-pin',
     Global: 'globe',
@@ -1098,6 +1290,92 @@ function DiscoveryTabs({
           </Pressable>
         );
       })}
+    </View>
+  );
+}
+
+// Labelled row of pills with left/right scroll arrows. Used for both
+// Trending Destinations and Trending Places so they look and behave the same,
+// and line up with the Categories row (same label width, same right-hand slot).
+function ChipRow({
+  label,
+  icon,
+  items,
+  activeKey,
+  onSelect,
+  onViewAll,
+}: {
+  label: string;
+  icon: React.ComponentProps<typeof Feather>['name'];
+  items: ChipItem[];
+  activeKey?: string | null;
+  onSelect: (item: ChipItem) => void;
+  onViewAll?: () => void;
+}) {
+  const scrollRef = React.useRef<ScrollView>(null);
+  const scrollX = React.useRef(0);
+
+  const scrollBy = (delta: number) => {
+    scrollX.current = Math.max(0, scrollX.current + delta);
+    scrollRef.current?.scrollTo({ x: scrollX.current, animated: true });
+  };
+
+  return (
+    <View style={styles.labeledRow}>
+      <Text style={styles.rowLabel} numberOfLines={1}>{label}</Text>
+
+      <Pressable
+        onPress={() => scrollBy(-420)}
+        hitSlop={8}
+        style={styles.horizontalNavButton}
+      >
+        <Feather name="chevron-left" size={20} color="#111" />
+      </Pressable>
+
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.categoryRow}
+        style={{ flex: 1 }}
+        onScroll={(event) => {
+          scrollX.current = event.nativeEvent.contentOffset.x;
+        }}
+        scrollEventThrottle={16}
+      >
+        {items.map((item) => {
+          const isActive = activeKey === item.key;
+          return (
+            <Pressable
+              key={item.key}
+              style={[styles.trendChipCompact, isActive && styles.trendChipCompactActive]}
+              onPress={() => onSelect(item)}
+            >
+              <Feather name={icon} size={11} color="#FE2C55" />
+              <Text style={[styles.trendChipCompactTag, isActive && styles.trendChipCompactTagActive]}>
+                {item.label}
+              </Text>
+              <Text style={styles.trendChipCompactCount}>{item.count}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      <Pressable
+        onPress={() => scrollBy(420)}
+        hitSlop={8}
+        style={styles.horizontalNavButton}
+      >
+        <Feather name="chevron-right" size={20} color="#111" />
+      </Pressable>
+
+      <View style={styles.viewAllSlot}>
+        {onViewAll ? (
+          <Pressable onPress={onViewAll} hitSlop={8}>
+            <Text style={styles.viewAllText}>View all</Text>
+          </Pressable>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -1242,6 +1520,9 @@ export function VideoGridCell({
   isMobile?: boolean;
   isFirst?: boolean;
 }) {
+  // The desktop category tag below calls router.push, but this component
+  // never defined `router`, so clicking the tag threw an error.
+  const router = useRouter();
   const [isHovered, setIsHovered] = React.useState(false);
   const [isMobilePlaying, setIsMobilePlaying] = React.useState(false);
 
@@ -1453,13 +1734,17 @@ const styles = StyleSheet.create({
   screenRoot: { flex: 1, backgroundColor: '#000' },
   root: { flex: 1, backgroundColor: '#000' },
 
+  // minHeight (was a fixed height of 104) so the banner grows when the
+  // heading wraps to a second line, instead of clipping the hero text.
+  // It stays 104px whenever the text fits.
   banner: {
-    height: 104,
-    paddingHorizontal: 20,
-    backgroundColor: '#0a0f14',
-    overflow: 'hidden',
-    justifyContent: 'center',
-  },
+  minHeight: 104,      // was: height: 104
+  paddingVertical: 8,  // new
+  paddingHorizontal: 20,
+  backgroundColor: '#0a0f14',
+  overflow: 'hidden',
+  justifyContent: 'center',
+},
   bannerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1597,8 +1882,19 @@ const styles = StyleSheet.create({
   },
 
   labeledRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  rowLabel: { color: 'rgba(255,255,255,0.75)', fontSize: 15, fontFamily: 'Inter_600SemiBold', flexShrink: 0 },
-  viewAllText: { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontFamily: 'Inter_600SemiBold', flexShrink: 0, marginLeft: 8 },
+  // Fixed width so the three desktop rows (Categories / Trending Destinations /
+  // Trending Places) start their arrows and pills at the same position.
+  rowLabel: {
+    width: 190,
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 15,
+    fontFamily: 'Inter_600SemiBold',
+    flexShrink: 0,
+  },
+  // Fixed-width space at the end of every desktop row, so rows with a
+  // "View all" link and rows without one finish at the same place.
+  viewAllSlot: { width: 64, alignItems: 'flex-end', flexShrink: 0 },
+  viewAllText: { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontFamily: 'Inter_600SemiBold' },
 
   categoryRow: { gap: 8, paddingRight: 14 },
   categoryPill: {
@@ -1666,8 +1962,41 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: 16, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
   },
+  trendChipCompactActive: { backgroundColor: '#fff', borderColor: '#fff' },
   trendChipCompactTag: { color: '#fff', fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  trendChipCompactTagActive: { color: '#000' },
   trendChipCompactCount: { color: '#FE2C55', fontSize: 11, fontFamily: 'Inter_700Bold' },
+
+  // Title block shown above the grid when a Destination or Place is selected.
+  filterTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 16,
+    paddingBottom: 12,
+    gap: 12,
+  },
+  filterTitleBlock: { flex: 1, gap: 2 },
+  filterTitleKind: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 11,
+    fontFamily: 'Inter_600SemiBold',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  filterTitle: { color: '#fff', fontSize: 22, fontFamily: 'Inter_700Bold' },
+  filterTitleCount: { color: 'rgba(255,255,255,0.5)', fontSize: 13, fontFamily: 'Inter_400Regular' },
+  filterClearBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+  },
+  filterClearText: { color: '#fff', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
 
   columnWrapper: { gap: 6 },
 
