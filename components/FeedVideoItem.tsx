@@ -22,8 +22,12 @@ import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import type { SampleVideo } from '@/constants/sampleVideos';
 import { userApi, videoApi } from '@/lib/api';
+import { destinationKeyFor } from '@/lib/location';
 import { useAuth } from '@/context/AuthContext';
 import { useMute } from '@/context/MuteContext';
+
+// Web only: show a pointer cursor over tappable text.
+const linkCursor = Platform.OS === 'web' ? ({ cursor: 'pointer' } as any) : null;
 
 interface Props {
   video: SampleVideo;
@@ -510,6 +514,30 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
   const locationText = [video.city, video.country].filter(Boolean).join(', ') || null;
   const metaLine = [placeTourTransport, locationText].filter(Boolean).join(' • ');
 
+  // Place and Destination links. They use the same values the Explore pills
+  // use (place text; a cleaned-up destination key), so a tap lands on the
+  // matching view. Category already linked below.
+  const placeLinkText = (video.place || video.description || '').trim() || null;
+  const destinationLinkKey = destinationKeyFor(video.city, video.country) || null;
+
+  function openPlace() {
+    if (!placeLinkText) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    router.push({
+      pathname: '/(tabs)/explore',
+      params: { place: placeLinkText },
+    } as any);
+  }
+
+  function openDestination() {
+    if (!destinationLinkKey) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    router.push({
+      pathname: '/(tabs)/explore',
+      params: { destination: destinationLinkKey },
+    } as any);
+  }
+
   return (
     <View style={[
       styles.container,
@@ -734,7 +762,11 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
             <View style={styles.desktopMetaBlock}>
               {placeTourTransport ? (
                 <View style={styles.desktopMetaTopRow}>
-                  <Text style={styles.desktopPlaceText} numberOfLines={1}>
+                  <Text
+                    style={[styles.desktopPlaceText, placeLinkText ? linkCursor : null]}
+                    numberOfLines={1}
+                    onPress={placeLinkText ? openPlace : undefined}
+                  >
                     {placeTourTransport}
                   </Text>
 
@@ -754,7 +786,11 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
 
               <View style={styles.desktopMetaBottomRow}>
                 {locationText ? (
-                  <Text style={styles.desktopLocationText} numberOfLines={1}>
+                  <Text
+                    style={[styles.desktopLocationText, destinationLinkKey ? linkCursor : null]}
+                    numberOfLines={1}
+                    onPress={destinationLinkKey ? openDestination : undefined}
+                  >
                     {locationText}
                   </Text>
                 ) : null}
@@ -782,14 +818,22 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
           ) : (
             <View style={styles.mobileDiscoveryBlock}>
               {placeTourTransport ? (
-                <Text style={styles.mobilePlaceText} numberOfLines={1}>
+                <Text
+                  style={[styles.mobilePlaceText, placeLinkText ? linkCursor : null]}
+                  numberOfLines={1}
+                  onPress={placeLinkText ? openPlace : undefined}
+                >
                   {placeTourTransport}
                 </Text>
               ) : null}
 
               <View style={styles.mobileDestinationRow}>
                 {locationText ? (
-                  <Text style={styles.mobileDestinationText} numberOfLines={1}>
+                  <Text
+                    style={[styles.mobileDestinationText, destinationLinkKey ? linkCursor : null]}
+                    numberOfLines={1}
+                    onPress={destinationLinkKey ? openDestination : undefined}
+                  >
                     {locationText}
                   </Text>
                 ) : null}
@@ -890,10 +934,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // Heart double-tap
-  // Mute button moved to upper-right of the video per the Mobile UX/UI
-  // Updates doc (item 5) — was previously bottom-right (bottom: 82),
-  // which placed it near the info box rather than the upper-right area.
+  // Mute button in the upper-right of the video (Mobile UX/UI doc, item 5).
   mobileMuteButton: {
     position: 'absolute',
     top: 18,
