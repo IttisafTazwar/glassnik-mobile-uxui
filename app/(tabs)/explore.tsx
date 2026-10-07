@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   Linking,
   Platform,
   Pressable,
@@ -20,6 +19,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Feather } from '@expo/vector-icons';
 import { mobileApi } from '@/lib/api';
+import { destinationKeyFor, titleCase } from '@/lib/location';
 import { type SampleVideo } from '@/constants/sampleVideos';
 import type { VideoAsset } from '@/types';
 import { TopNav } from '@/components/TopNav';
@@ -210,6 +210,8 @@ export default function ExploreScreen() {
   const params = useLocalSearchParams<{
     discovery?: string;
     category?: string;
+    destination?: string;
+    place?: string;
   }>();
 
   // Real width of the area beside the sidebar. The grid is sized from this
@@ -218,17 +220,19 @@ export default function ExploreScreen() {
 
   // Mobile Home is the full-screen Experience feed.
   // Plain /explore is desktop-only; mobile discovery routes with
-  // discovery/category params remain available.
+  // discovery/category/destination/place params remain available.
   useEffect(() => {
     if (
       Platform.OS === 'web' &&
       isMobile &&
       !params.discovery &&
-      !params.category
+      !params.category &&
+      !params.destination &&
+      !params.place
     ) {
       router.replace('/');
     }
-  }, [isMobile, params.discovery, params.category, router]);
+  }, [isMobile, params.discovery, params.category, params.destination, params.place, router]);
 
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
@@ -279,6 +283,34 @@ export default function ExploreScreen() {
       setActiveCategory(matchingCategory);
     }
   }, [params.category]);
+
+  // Links from video cards (and the feed) arrive here with ?destination= or
+  // ?place=. Show that view, and clear any category picked earlier. Going
+  // Back to an address without them clears the view again.
+  useEffect(() => {
+    const rawDestination = Array.isArray(params.destination) ? params.destination[0] : params.destination;
+    const rawPlace = Array.isArray(params.place) ? params.place[0] : params.place;
+    const destinationParam = rawDestination?.trim();
+    const placeParam = rawPlace?.trim();
+
+    if (destinationParam) {
+      setActiveCategory('All');
+      setQuery('');
+      setActivePlace(null);
+      setActiveDestination({
+        key: normaliseKey(destinationParam),
+        label: titleCase(destinationParam),
+      });
+    } else if (placeParam) {
+      setActiveCategory('All');
+      setQuery('');
+      setActiveDestination(null);
+      setActivePlace({ key: normaliseKey(placeParam), label: placeParam });
+    } else {
+      setActiveDestination(null);
+      setActivePlace(null);
+    }
+  }, [params.destination, params.place]);
 
   useEffect(() => {
     setCategoryFeedIndex(0);
@@ -500,11 +532,7 @@ export default function ExploreScreen() {
     ? width
     : scrollAreaWidth ?? width - SIDEBAR_WIDTH;
 
-  // Instagram/TikTok-style portrait cards on both mobile and desktop —
-  // reverted from an earlier landscape attempt. Desktop columns bumped
-  // from 3 to 4 to compensate: portrait cards are much taller per row,
-  // so narrower/more columns is what keeps the "first row visible without
-  // scrolling at 1366×768" requirement intact alongside this shape.
+  // Instagram/TikTok-style portrait cards on both mobile and desktop.
   const COLS = isMobile ? 2 : 4;
   const CELL_GAP = 6;
   const GRID_PADDING = isMobile ? 14 : 20;
@@ -539,9 +567,11 @@ export default function ExploreScreen() {
     showGridView();
   }
 
+  // Clears the view and the address (?destination= / ?place=) together.
   function clearLocationFilter() {
     setActiveDestination(null);
     setActivePlace(null);
+    router.replace('/(tabs)/explore' as any);
   }
 
   // Used by the Trending / Nearby / Global sections, which pass a text label.
@@ -816,47 +846,8 @@ export default function ExploreScreen() {
           )}
         </View>
       );
-    } else if (Platform.OS === 'web' && isMobile) {
-      discoveryContent = (
-        <View>
-          {exploreHeader}
-          {filterHeader}
-
-          <View
-            style={{
-              flexDirection: 'row',
-              flexWrap: 'wrap',
-              gap: 6,
-              paddingHorizontal: GRID_PADDING,
-            }}
-          >
-            {filtered.map((item, index) => (
-              <VideoGridCell
-                key={item.id}
-                video={item}
-                width={cellWidth}
-                height={cellHeight}
-                isMobile={isMobile}
-                isFirst={index === 0}
-              />
-            ))}
-          </View>
-
-          {filtered.length === 0 && (
-            waitingForResults ? (
-              <View style={styles.centered}>
-                <ActivityIndicator size="large" color="#FE2C55" />
-              </View>
-            ) : (
-              <View style={styles.centered}>
-                <Feather name="search" size={40} color="rgba(255,255,255,0.2)" />
-                <Text style={styles.emptyText}>No results{emptyForLabel ? ` for "${emptyForLabel}"` : ''}</Text>
-              </View>
-            )
-          )}
-        </View>
-      );
     } else {
+      // Grid view used on desktop and on mobile widths.
       discoveryContent = (
         <View>
           {exploreHeader}
@@ -1071,14 +1062,10 @@ export default function ExploreScreen() {
                     <Pressable
                       key={cat}
                       onPress={() => {
-                        if (isMobile) {
-                          router.replace({
-                            pathname: '/(tabs)/explore',
-                            params: { category: cat },
-                          } as any);
-                        } else {
-                          setActiveCategory(cat);
-                        }
+                        router.replace({
+                          pathname: '/(tabs)/explore',
+                          params: { category: cat },
+                        } as any);
                       }}
                       style={[styles.categoryPill, isActive && styles.categoryPillActive]}
                     >
@@ -1526,6 +1513,24 @@ export function VideoGridCell({
   const [isHovered, setIsHovered] = React.useState(false);
   const [isMobilePlaying, setIsMobilePlaying] = React.useState(false);
 
+  // Place and Destination links on each card. They use the same values the
+  // Explore pills use, so a click lands on the matching view.
+  const linkCursor = Platform.OS === 'web' ? ({ cursor: 'pointer' } as any) : null;
+  const placeLink = video.place?.trim() || null;
+  const destinationLink = destinationKeyFor(video.city, video.country) || null;
+
+  function openPlace(event?: any) {
+    event?.stopPropagation?.();
+    if (!placeLink) return;
+    router.push({ pathname: '/(tabs)/explore', params: { place: placeLink } } as any);
+  }
+
+  function openDestination(event?: any) {
+    event?.stopPropagation?.();
+    if (!destinationLink) return;
+    router.push({ pathname: '/(tabs)/explore', params: { destination: destinationLink } } as any);
+  }
+
   // Explore overlay:
   // First line = place/title.
   // Second line = city + country only.
@@ -1539,10 +1544,6 @@ export function VideoGridCell({
   const locationText = [cleanCity, video.country]
     .filter(Boolean)
     .join(', ');
-
-  const metaLine = [placeTourTransport, locationText]
-    .filter(Boolean)
-    .join(' • ');
 
   function formatCount(n: number): string {
     if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -1654,7 +1655,8 @@ export function VideoGridCell({
             <View style={styles.cellBottomBox}>
               {placeTourTransport ? (
                 <Text
-                  style={[styles.mobilePlaceText, styles.desktopPlaceText, { color: '#fff' }]}
+                  style={[styles.mobilePlaceText, styles.desktopPlaceText, { color: '#fff' }, placeLink ? linkCursor : null]}
+                  onPress={placeLink ? openPlace : undefined}
                   numberOfLines={1}
                 >
                   {placeTourTransport}
@@ -1664,7 +1666,8 @@ export function VideoGridCell({
               <View style={styles.mobileDestinationRow}>
                 {locationText ? (
                   <Text
-                    style={[styles.mobileDestinationText, styles.desktopLocationText, { color: '#fff' }]}
+                    style={[styles.mobileDestinationText, styles.desktopLocationText, { color: '#fff' }, destinationLink ? linkCursor : null]}
+                    onPress={destinationLink ? openDestination : undefined}
                     numberOfLines={1}
                   >
                     {locationText}
@@ -1732,19 +1735,17 @@ const styles = StyleSheet.create({
   },
 
   screenRoot: { flex: 1, backgroundColor: '#000' },
-  root: { flex: 1, backgroundColor: '#000' },
 
-  // minHeight (was a fixed height of 104) so the banner grows when the
-  // heading wraps to a second line, instead of clipping the hero text.
-  // It stays 104px whenever the text fits.
+  // minHeight (not a fixed height) so the banner grows when the heading wraps
+  // to a second line, instead of clipping the hero text.
   banner: {
-  minHeight: 104,      // was: height: 104
-  paddingVertical: 8,  // new
-  paddingHorizontal: 20,
-  backgroundColor: '#0a0f14',
-  overflow: 'hidden',
-  justifyContent: 'center',
-},
+    minHeight: 104,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    backgroundColor: '#0a0f14',
+    overflow: 'hidden',
+    justifyContent: 'center',
+  },
   bannerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1820,67 +1821,6 @@ const styles = StyleSheet.create({
     position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, backgroundColor: '#fff', borderRadius: 1,
   },
 
-  featureBoxesRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 6,
-  },
-  featureBox: {
-    flex: 1,
-    minHeight: 76,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: 'rgba(255,255,255,0.055)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  featureBoxIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  featureBoxContent: {
-    flex: 1,
-    gap: 4,
-  },
-  featureBoxTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  featureBoxTitle: {
-    color: '#fff',
-    fontSize: 16,
-    fontFamily: 'Inter_700Bold',
-    letterSpacing: 0.4,
-  },
-  featureBoxSubtitle: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 13,
-    fontFamily: 'Inter_400Regular',
-  },
-  liveBadge: {
-    backgroundColor: 'rgba(254,44,85,0.16)',
-    borderWidth: 1,
-    borderColor: 'rgba(254,44,85,0.4)',
-    borderRadius: 5,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  liveBadgeText: {
-    color: '#FE2C55',
-    fontSize: 9,
-    fontFamily: 'Inter_700Bold',
-    letterSpacing: 0.5,
-  },
-
   labeledRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   // Fixed width so the three desktop rows (Categories / Trending Destinations /
   // Trending Places) start their arrows and pills at the same position.
@@ -1940,21 +1880,11 @@ const styles = StyleSheet.create({
 
   section: { paddingTop: 18, paddingBottom: 10 },
   sectionTitle: { color: 'rgba(255,255,255,0.75)', fontSize: 15, fontFamily: 'Inter_600SemiBold' },
-  sectionHeaderRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline',
-    marginBottom: 12, marginTop: 36, paddingHorizontal: 14,
-  },
-  sectionHeaderRowDesktop: {
-    marginTop: 14,
-    paddingHorizontal: 0,
-  },
-  sectionCount: { color: 'rgba(255,255,255,0.4)', fontSize: 12, fontFamily: 'Inter_400Regular' },
   tagsRow: { paddingHorizontal: 14, gap: 8 },
   trendChip: {
     flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
   },
-  trendChipHash: { color: '#FE2C55', fontSize: 13, fontFamily: 'Inter_700Bold' },
   trendChipTag: { color: '#fff', fontSize: 14, fontFamily: 'Inter_700Bold' },
   trendChipCount: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontFamily: 'Inter_400Regular', marginLeft: 4 },
 
@@ -1998,8 +1928,6 @@ const styles = StyleSheet.create({
   },
   filterClearText: { color: '#fff', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
 
-  columnWrapper: { gap: 6 },
-
   cell: { overflow: 'hidden', borderRadius: 8, backgroundColor: '#111', alignItems: 'center', justifyContent: 'center' },
   cellThumb: {
     width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.08)',
@@ -2025,8 +1953,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 7,
   },
-  cellMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  cellMetaText: { flex: 1, color: 'rgba(255,255,255,0.9)', fontSize: 7, fontFamily: 'Inter_500Medium' },
   cellCategoryPill: {
     backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 3, paddingHorizontal: 4, paddingVertical: 1,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)', flexShrink: 0, maxWidth: '45%',
@@ -2055,19 +1981,6 @@ const styles = StyleSheet.create({
     position: 'absolute', top: 6, left: 6, right: 6,
     flexDirection: 'row', alignItems: 'center', gap: 8,
   },
-  cellMiniTabs: { flexDirection: 'row', gap: 6, marginLeft: 'auto' },
-  cellMiniTabActive: { color: '#fff', fontSize: 9, fontFamily: 'Inter_700Bold', textDecorationLine: 'underline' },
-  cellMiniTab: { color: 'rgba(255,255,255,0.55)', fontSize: 9, fontFamily: 'Inter_500Medium' },
-  cellTagDesktop: { position: 'absolute', bottom: 20, left: 6 },
-  cellTagTextDesktop: {
-    backgroundColor: 'rgba(0,0,0,0.5)', color: '#fff', fontSize: 7, fontFamily: 'Inter_600SemiBold',
-    paddingHorizontal: 4, paddingVertical: 2, borderRadius: 3, overflow: 'hidden',
-  },
-  cellLocationDesktop: {
-    position: 'absolute', bottom: 5, left: 6, right: 6,
-    flexDirection: 'row', alignItems: 'center', gap: 2,
-  },
-  cellLocationTextDesktop: { color: 'rgba(255,255,255,0.85)', fontSize: 7, fontFamily: 'Inter_500Medium', flexShrink: 1 },
 
   cellActions: { flexDirection: 'row', justifyContent: 'space-around', paddingTop: 6 },
   cellActionItem: { flexDirection: 'row', alignItems: 'center', gap: 3 },
