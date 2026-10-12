@@ -28,6 +28,7 @@ import { TrendingSection } from '@/components/TrendingSection';
 import { NearbySection } from '@/components/NearbySection';
 import { GlobalSection } from '@/components/GlobalSection';
 import { FeedVideoItem } from '@/components/FeedVideoItem';
+import { LocationRow } from '@/components/LocationRow';
 import { CommentsSheet } from '@/components/CommentsSheet';
 
 const MOBILE_BREAKPOINT = 768;
@@ -59,8 +60,11 @@ const CATEGORIES = [
   'After Dark',
 ];
 
-const DISCOVERY_TABS = ['Explore', 'Categories', 'Trending', 'Nearby', 'Global'] as const;
+const DISCOVERY_TABS = ['Explore', 'Categories', 'Places', 'Destinations', 'Trending', 'Nearby', 'Global'] as const;
 type DiscoveryTab = typeof DISCOVERY_TABS[number];
+
+// The small mobile tab row keeps its original five tabs.
+const MOBILE_DISCOVERY_TABS: readonly DiscoveryTab[] = ['Explore', 'Categories', 'Trending', 'Nearby', 'Global'];
 
 // ── Destination / Place grouping helpers ─────────────────────────────────────
 // Locations and Places are free text on upload, so the same destination can be
@@ -248,7 +252,7 @@ export default function ExploreScreen() {
 
   const activeDiscoveryTab: DiscoveryTab =
     discoveryParam &&
-    (DISCOVERY_TABS as readonly string[]).includes(discoveryParam)
+      (DISCOVERY_TABS as readonly string[]).includes(discoveryParam)
       ? discoveryParam as DiscoveryTab
       : 'Explore';
 
@@ -591,14 +595,14 @@ export default function ExploreScreen() {
   }
 
   function handleViewAllDestinations() {
-    setActiveDiscoveryTab('Trending');
+    setActiveDiscoveryTab('Destinations');
   }
 
   const activeFilter = activeDestination
     ? { kind: 'Destination', label: activeDestination.label }
     : activePlace
-    ? { kind: 'Place', label: activePlace.label }
-    : null;
+      ? { kind: 'Place', label: activePlace.label }
+      : null;
 
   const emptyForLabel = activeFilter?.label ?? query;
 
@@ -688,8 +692,64 @@ export default function ExploreScreen() {
         )}
       </View>
     );
-  } else if (activeDiscoveryTab === 'Trending') {
+  } else if (activeDiscoveryTab === 'Places' || activeDiscoveryTab === 'Destinations') {
+    // Browse-all views opened from the sidebar and the "View all" link.
+    const isPlaces = activeDiscoveryTab === 'Places';
+    const browseItems: ChipItem[] = isPlaces ? trendingPlaces : trendingDestinations;
+    const noun = isPlaces ? 'Place' : 'Destination';
 
+    discoveryContent = (
+      <View style={styles.section}>
+        <View style={[styles.filterTitleRow, { paddingHorizontal: GRID_PADDING }]}>
+          <View style={styles.filterTitleBlock}>
+            <Text style={styles.filterTitleKind}>Browse</Text>
+            <Text style={styles.filterTitle}>
+              {isPlaces ? 'All Places' : 'All Destinations'}
+            </Text>
+            <Text style={styles.filterTitleCount}>
+              {browseItems.length} {browseItems.length === 1 ? noun : `${noun}s`}
+            </Text>
+          </View>
+        </View>
+
+        {browseItems.length > 0 ? (
+          <View
+            style={{
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              gap: CELL_GAP,
+              paddingHorizontal: GRID_PADDING,
+            }}
+          >
+            {browseItems.map((item) => (
+              <BrowseCard
+                key={item.key}
+                icon={isPlaces ? 'map' : 'map-pin'}
+                title={item.label}
+                count={item.count}
+                width={cellWidth}
+                onPress={() =>
+                  router.push({
+                    pathname: '/(tabs)/explore',
+                    params: isPlaces ? { place: item.label } : { destination: item.key },
+                  } as any)
+                }
+              />
+            ))}
+          </View>
+        ) : indexReady ? (
+          <View style={styles.centered}>
+            <Feather name="search" size={40} color="rgba(255,255,255,0.2)" />
+            <Text style={styles.emptyText}>No {noun.toLowerCase()}s available yet.</Text>
+          </View>
+        ) : (
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" color="#FE2C55" />
+          </View>
+        )}
+      </View>
+    );
+  } else if (activeDiscoveryTab === 'Trending') {
     discoveryContent = (
       <TrendingSection
         videos={indexVideos}
@@ -851,7 +911,7 @@ export default function ExploreScreen() {
       discoveryContent = (
         <View>
           {exploreHeader}
-          {filterHeader}
+          {isMobile ? filterHeader : null}
 
           <View
             style={{
@@ -1134,24 +1194,16 @@ export default function ExploreScreen() {
                   <View style={styles.viewAllSlot} />
                 </View>
 
-                {trendingDestinations.length > 0 && (
-                  <ChipRow
-                    label="Trending Destinations:"
-                    icon="map-pin"
-                    items={trendingDestinations}
-                    activeKey={activeDestination?.key}
-                    onSelect={selectDestination}
-                    onViewAll={handleViewAllDestinations}
-                  />
-                )}
-
-                {trendingPlaces.length > 0 && (
-                  <ChipRow
-                    label="Trending Places:"
-                    icon="map"
-                    items={trendingPlaces}
-                    activeKey={activePlace?.key}
-                    onSelect={selectPlace}
+                {(trendingDestinations.length > 0 || trendingPlaces.length > 0) && (
+                  <LocationRow
+                    destinations={trendingDestinations}
+                    places={trendingPlaces}
+                    activeDestinationKey={activeDestination?.key}
+                    activePlaceKey={activePlace?.key}
+                    onSelectDestination={selectDestination}
+                    onSelectPlace={selectPlace}
+                    onViewAllDestinations={handleViewAllDestinations}
+                    onViewAllPlaces={() => setActiveDiscoveryTab('Places')}
                   />
                 )}
               </>
@@ -1256,13 +1308,15 @@ function DiscoveryTabs({
   const icons: Record<DiscoveryTab, React.ComponentProps<typeof Feather>['name']> = {
     Explore: 'compass',
     Categories: 'grid',
+    Places: 'map',
+    Destinations: 'map-pin',
     Trending: 'trending-up',
     Nearby: 'map-pin',
     Global: 'globe',
   };
   return (
     <View style={styles.discoveryRow}>
-      {DISCOVERY_TABS.map((tab) => {
+      {MOBILE_DISCOVERY_TABS.map((tab) => {
         const isActive = active === tab;
         return (
           <Pressable key={tab} style={styles.discoveryTab} onPress={() => onChange(tab)}>
@@ -1364,6 +1418,36 @@ function ChipRow({
   );
 }
 
+// Card used by the "All Places" / "All Destinations" browse views.
+function BrowseCard({
+  icon,
+  title,
+  count,
+  width,
+  onPress,
+}: {
+  icon: React.ComponentProps<typeof Feather>['name'];
+  title: string;
+  count: number;
+  width: number;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.browseCard, { width, opacity: pressed ? 0.85 : 1 }]}
+    >
+      <Feather name={icon} size={16} color="#FE2C55" />
+      <Text style={styles.browseCardTitle} numberOfLines={2}>
+        {title}
+      </Text>
+      <Text style={styles.browseCardCount}>
+        {count} {count === 1 ? 'Experience' : 'Experiences'}
+      </Text>
+    </Pressable>
+  );
+}
+
 function WebVideoThumb({
   uri,
   isFirst,
@@ -1392,7 +1476,7 @@ function WebVideoThumb({
 
         const playPromise = el.play();
         if (playPromise && typeof playPromise.catch === 'function') {
-          playPromise.catch(() => {});
+          playPromise.catch(() => { });
         }
       };
 
@@ -1411,7 +1495,7 @@ function WebVideoThumb({
 
     try {
       el.currentTime = 0.1;
-    } catch {}
+    } catch { }
   }, [uri, isFirst, hovered, clickedPlaying]);
 
   const handleClick = (event: React.MouseEvent<HTMLVideoElement>) => {
@@ -1429,7 +1513,7 @@ function WebVideoThumb({
 
       const playPromise = el.play();
       if (playPromise && typeof playPromise.catch === 'function') {
-        playPromise.catch(() => {});
+        playPromise.catch(() => { });
       }
     }
   };
@@ -1478,7 +1562,7 @@ function MobileVideoThumb({
       } else {
         player.pause();
       }
-    } catch {}
+    } catch { }
   }, [playing, player]);
 
   return (
@@ -1913,6 +1997,21 @@ const styles = StyleSheet.create({
   },
   filterTitle: { color: '#fff', fontSize: 22, fontFamily: 'Inter_700Bold' },
   filterTitleCount: { color: 'rgba(255,255,255,0.5)', fontSize: 13, fontFamily: 'Inter_400Regular' },
+
+  // Cards on the "All Places" / "All Destinations" browse views.
+  browseCard: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    padding: 14,
+    gap: 6,
+    minHeight: 96,
+    marginBottom: 8,
+  },
+  browseCardTitle: { color: '#fff', fontSize: 15, fontFamily: 'Inter_700Bold' },
+  browseCardCount: { color: '#5eead4', fontSize: 12, fontFamily: 'Inter_500Medium' },
+
   filterClearBtn: {
     flexDirection: 'row',
     alignItems: 'center',
