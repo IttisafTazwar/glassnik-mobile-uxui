@@ -558,17 +558,27 @@ export default function ExploreScreen() {
   }
 
   function selectDestination(item: { key: string; label: string }) {
-    setQuery('');
-    setActivePlace(null);
-    setActiveDestination({ key: item.key, label: item.label });
-    showGridView();
+    // Clicking the highlighted pill again clears the view.
+    if (activeDestination?.key === item.key) {
+      clearLocationFilter();
+      return;
+    }
+    router.push({
+      pathname: '/(tabs)/explore',
+      params: { destination: item.key },
+    } as any);
   }
 
   function selectPlace(item: { key: string; label: string }) {
-    setQuery('');
-    setActiveDestination(null);
-    setActivePlace({ key: item.key, label: item.label });
-    showGridView();
+    // Clicking the highlighted pill again clears the view.
+    if (activePlace?.key === item.key) {
+      clearLocationFilter();
+      return;
+    }
+    router.push({
+      pathname: '/(tabs)/explore',
+      params: { place: item.label },
+    } as any);
   }
 
   // Clears the view and the address (?destination= / ?place=) together.
@@ -983,6 +993,7 @@ export default function ExploreScreen() {
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingBottom: insets.bottom }}
+          stickyHeaderIndices={isMobile ? undefined : [1]}
           showsVerticalScrollIndicator={false}
           onLayout={(event) => {
             const measured = event.nativeEvent.layout.width;
@@ -1331,92 +1342,6 @@ function DiscoveryTabs({
           </Pressable>
         );
       })}
-    </View>
-  );
-}
-
-// Labelled row of pills with left/right scroll arrows. Used for both
-// Trending Destinations and Trending Places so they look and behave the same,
-// and line up with the Categories row (same label width, same right-hand slot).
-function ChipRow({
-  label,
-  icon,
-  items,
-  activeKey,
-  onSelect,
-  onViewAll,
-}: {
-  label: string;
-  icon: React.ComponentProps<typeof Feather>['name'];
-  items: ChipItem[];
-  activeKey?: string | null;
-  onSelect: (item: ChipItem) => void;
-  onViewAll?: () => void;
-}) {
-  const scrollRef = React.useRef<ScrollView>(null);
-  const scrollX = React.useRef(0);
-
-  const scrollBy = (delta: number) => {
-    scrollX.current = Math.max(0, scrollX.current + delta);
-    scrollRef.current?.scrollTo({ x: scrollX.current, animated: true });
-  };
-
-  return (
-    <View style={styles.labeledRow}>
-      <Text style={styles.rowLabel} numberOfLines={1}>{label}</Text>
-
-      <Pressable
-        onPress={() => scrollBy(-420)}
-        hitSlop={8}
-        style={styles.horizontalNavButton}
-      >
-        <Feather name="chevron-left" size={20} color="#111" />
-      </Pressable>
-
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoryRow}
-        style={{ flex: 1 }}
-        onScroll={(event) => {
-          scrollX.current = event.nativeEvent.contentOffset.x;
-        }}
-        scrollEventThrottle={16}
-      >
-        {items.map((item) => {
-          const isActive = activeKey === item.key;
-          return (
-            <Pressable
-              key={item.key}
-              style={[styles.trendChipCompact, isActive && styles.trendChipCompactActive]}
-              onPress={() => onSelect(item)}
-            >
-              <Feather name={icon} size={11} color="#FE2C55" />
-              <Text style={[styles.trendChipCompactTag, isActive && styles.trendChipCompactTagActive]}>
-                {item.label}
-              </Text>
-              <Text style={styles.trendChipCompactCount}>{item.count}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-
-      <Pressable
-        onPress={() => scrollBy(420)}
-        hitSlop={8}
-        style={styles.horizontalNavButton}
-      >
-        <Feather name="chevron-right" size={20} color="#111" />
-      </Pressable>
-
-      <View style={styles.viewAllSlot}>
-        {onViewAll ? (
-          <Pressable onPress={onViewAll} hitSlop={8}>
-            <Text style={styles.viewAllText}>View all</Text>
-          </Pressable>
-        ) : null}
-      </View>
     </View>
   );
 }
@@ -1836,8 +1761,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 24,
   },
-  hero: { gap: 5, flexShrink: 1, maxWidth: '64%' },
-  heroTitle: { color: '#fff', fontSize: 30, fontFamily: 'Inter_700Bold', lineHeight: 35 },
+  hero: { gap: 5, flexShrink: 1, maxWidth: '72%' },
+  heroTitle: { color: '#fff', fontSize: 26, fontFamily: 'Inter_700Bold', lineHeight: 31 },
   heroTitleAccent: { color: '#5eead4' },
   heroSubtitle: { color: 'rgba(255,255,255,0.78)', fontSize: 15, fontFamily: 'Inter_400Regular', lineHeight: 20 },
 
@@ -1906,8 +1831,8 @@ const styles = StyleSheet.create({
   },
 
   labeledRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  // Fixed width so the three desktop rows (Categories / Trending Destinations /
-  // Trending Places) start their arrows and pills at the same position.
+  // Fixed width so the desktop rows (Categories / Destinations-Places toggle)
+  // start their arrows and pills at the same position.
   rowLabel: {
     width: 190,
     color: 'rgba(255,255,255,0.75)',
@@ -1972,16 +1897,8 @@ const styles = StyleSheet.create({
   trendChipTag: { color: '#fff', fontSize: 14, fontFamily: 'Inter_700Bold' },
   trendChipCount: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontFamily: 'Inter_400Regular', marginLeft: 4 },
 
-  trendChipCompact: {
-    flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 16, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
-  },
-  trendChipCompactActive: { backgroundColor: '#fff', borderColor: '#fff' },
-  trendChipCompactTag: { color: '#fff', fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-  trendChipCompactTagActive: { color: '#000' },
-  trendChipCompactCount: { color: '#FE2C55', fontSize: 11, fontFamily: 'Inter_700Bold' },
-
-  // Title block shown above the grid when a Destination or Place is selected.
+  // Title block shown above the grid when a Destination or Place is selected
+  // (mobile), and above the "All Places" / "All Destinations" browse views.
   filterTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2057,6 +1974,25 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)', flexShrink: 0, maxWidth: '45%',
   },
   cellCategoryText: { color: 'rgba(255,255,255,0.9)', fontSize: 6, fontFamily: 'Inter_700Bold', letterSpacing: 0.3 },
+
+  // Text rows inside the card's bottom box. The location sits on the left and
+  // the category tag is pushed to the bottom-right corner.
+  mobilePlaceText: {
+    fontSize: 12,
+    fontFamily: 'Inter_600SemiBold',
+  },
+  mobileDestinationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+    marginTop: 2,
+  },
+  mobileDestinationText: {
+    fontSize: 10,
+    fontFamily: 'Inter_400Regular',
+    flexShrink: 1,
+  },
   desktopPlaceText: {
     fontSize: 11,
     fontFamily: 'Inter_600SemiBold',
