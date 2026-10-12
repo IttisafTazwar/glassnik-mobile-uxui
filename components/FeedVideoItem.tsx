@@ -1113,9 +1113,10 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
-  mobileDestinationRow: {
+    mobileDestinationRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 12,
   },
   mobileDestinationText: {
@@ -1140,6 +1141,7 @@ const styles = StyleSheet.create({
   desktopMetaBottomRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 8,
   },
   desktopPlaceText: {
