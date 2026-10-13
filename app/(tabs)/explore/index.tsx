@@ -20,6 +20,7 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Feather } from '@expo/vector-icons';
 import { mobileApi } from '@/lib/api';
 import { destinationKeyFor, titleCase } from '@/lib/location';
+import { setPlaylist } from '@/lib/playlist';
 import { type SampleVideo } from '@/constants/sampleVideos';
 import type { VideoAsset } from '@/types';
 import { TopNav } from '@/components/TopNav';
@@ -515,6 +516,13 @@ export default function ExploreScreen() {
         v.country?.toLowerCase().includes(q)
     );
   }, [filterSource, query, activeCategory, activeDestination, activePlace]);
+
+  // Remember the videos on this page (the selected Category, Place,
+  // Destination or search results). The large viewer plays this list,
+  // starting from the video that was clicked.
+  useEffect(() => {
+    setPlaylist(filtered.map((v) => v.id));
+  }, [filtered]);
 
   // Fallback only: if the larger request failed, keep loading pages while a
   // filter is on so the filtered view still ends up complete.
@@ -1377,10 +1385,12 @@ function WebVideoThumb({
   uri,
   isFirst,
   hovered,
+  onOpen,
 }: {
   uri: string;
   isFirst: boolean;
   hovered: boolean;
+  onOpen?: () => void;
 }) {
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
   const [clickedPlaying, setClickedPlaying] = React.useState(false);
@@ -1426,6 +1436,13 @@ function WebVideoThumb({
   const handleClick = (event: React.MouseEvent<HTMLVideoElement>) => {
     event.preventDefault();
     event.stopPropagation();
+
+    // When the card gives us an action, a click opens the large viewer
+    // instead of pausing the little preview.
+    if (onOpen) {
+      onOpen();
+      return;
+    }
 
     const el = videoRef.current;
     if (!el) return;
@@ -1537,6 +1554,12 @@ export function VideoGridCell({
     router.push({ pathname: '/(tabs)/explore', params: { destination: destinationLink } } as any);
   }
 
+  // Opens this video in the large viewer (the home feed screen). The list
+  // saved in lib/playlist.ts tells the viewer which videos to play next.
+  function openViewer() {
+    router.push({ pathname: '/', params: { video: video.id } } as any);
+  }
+
   // Explore overlay:
   // First line = place/title.
   // Second line = city + country only.
@@ -1567,6 +1590,7 @@ export function VideoGridCell({
       uri={video.uri}
       isFirst={isFirst}
       hovered={isHovered}
+      onOpen={openViewer}
     />
   ) : isMobile && Platform.OS !== 'web' && !!video.uri && isMobilePlaying ? (
     <MobileVideoThumb
@@ -1596,6 +1620,10 @@ export function VideoGridCell({
     <View style={{ width, marginBottom: 14 }}>
       <Pressable
         onPress={() => {
+          if (Platform.OS === 'web' && !isMobile) {
+            openViewer();
+            return;
+          }
           if (isMobile && Platform.OS !== 'web' && video.uri) {
             setIsMobilePlaying((current) => !current);
           }

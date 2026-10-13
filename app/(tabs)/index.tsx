@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   ScrollView,
@@ -12,6 +12,7 @@ import {
   ViewToken,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Feather } from '@expo/vector-icons';
 import { FeedVideoItem } from '@/components/FeedVideoItem';
@@ -20,6 +21,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { CommentsSheet } from '@/components/CommentsSheet';
 import { type SampleVideo } from '@/constants/sampleVideos';
 import { mobileApi } from '@/lib/api';
+import { getPlaylist } from '@/lib/playlist';
 import { useMute } from '@/context/MuteContext';
 import { useAuth } from '@/context/AuthContext';
 import type { VideoAsset } from '@/types';
@@ -78,6 +80,12 @@ export default function FeedScreen() {
   const [commentsVideoId, setCommentsVideoId] = useState<string | null>(null);
   const { isMuted, toggleMute } = useMute();
 
+  // ?video=<id> means the visitor clicked a thumbnail on a Category, Place,
+  // Destination or search page. The viewer then starts at that video and
+  // plays the list saved from that page.
+  const params = useLocalSearchParams<{ video?: string }>();
+  const videoParam = Array.isArray(params.video) ? params.video[0] : params.video;
+
   const { data: apiVideos } = useQuery<VideoAsset[]>({
     queryKey: ['feed'],
     queryFn: () => mobileApi.getFeed(1, 200),
@@ -85,7 +93,7 @@ export default function FeedScreen() {
   });
 
   // Production feed: real API videos only
-  const allVideos: SampleVideo[] = [...(apiVideos ?? [])]
+  const feedVideos: SampleVideo[] = [...(apiVideos ?? [])]
     .filter((v) => !!v.publicUrl)
     .sort((a, b) => {
       const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -93,6 +101,32 @@ export default function FeedScreen() {
       return tb - ta;
     })
     .map(apiVideoToSample);
+
+  // The list the viewer plays. Normally every video, newest first. When a
+  // thumbnail was clicked, it is that page's list, rotated so it starts at
+  // the clicked video (video 5 of 12 plays 5 to 12, then 1 to 4).
+  const allVideos: SampleVideo[] = (() => {
+    if (!videoParam) return feedVideos;
+
+    const byId = new Map(feedVideos.map((v) => [v.id, v]));
+    let list = getPlaylist()
+      .map((id) => byId.get(id))
+      .filter((v): v is SampleVideo => !!v);
+
+    // No saved list (for example after a reload), or the clicked video is
+    // not in it: fall back to every video.
+    if (!list.some((v) => v.id === videoParam)) {
+      list = feedVideos;
+    }
+
+    const start = list.findIndex((v) => v.id === videoParam);
+    return start > 0 ? [...list.slice(start), ...list.slice(0, start)] : list;
+  })();
+
+  // A different clicked video starts again from the top of the list.
+  useEffect(() => {
+    setCurrentIndex(0);
+  }, [videoParam]);
 
   const renderItem = useCallback(
     ({ item, index }: { item: SampleVideo; index: number }) => (
@@ -139,6 +173,7 @@ export default function FeedScreen() {
       {/* ── Video feed ── */}
       {Platform.OS === 'web' && !isMobile ? (
         <ScrollView
+          key={videoParam ?? 'feed'}
           showsVerticalScrollIndicator={false}
           style={{
             height: feedHeight,
@@ -192,6 +227,7 @@ export default function FeedScreen() {
         </ScrollView>
       ) : Platform.OS === 'web' ? (
         <ScrollView
+          key={videoParam ?? 'feed'}
           showsVerticalScrollIndicator={false}
           style={{
             height: feedHeight,
@@ -243,6 +279,7 @@ export default function FeedScreen() {
         </ScrollView>
       ) : (
         <ScrollView
+          key={videoParam ?? 'feed'}
           showsVerticalScrollIndicator={false}
           style={{
             height: feedHeight,
