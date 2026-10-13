@@ -85,7 +85,7 @@ export default function FeedScreen() {
   // plays the list saved from that page.
   const params = useLocalSearchParams<{ video?: string }>();
   const videoParam = Array.isArray(params.video) ? params.video[0] : params.video;
-  
+
   const router = useRouter();
 
   // Closing the viewer returns to the page the visitor came from, at the
@@ -97,6 +97,11 @@ export default function FeedScreen() {
       router.replace('/(tabs)/explore' as any);
     }
   };
+
+  // The viewer (opened from a thumbnail) plays each video once and moves on
+  // to the next one by itself. The normal home feed keeps looping.
+  const viewerMode = !!videoParam;
+  const feedScrollRef = useRef<ScrollView>(null);
 
   const { data: apiVideos } = useQuery<VideoAsset[]>({
     queryKey: ['feed'],
@@ -139,6 +144,19 @@ export default function FeedScreen() {
   useEffect(() => {
     setCurrentIndex(0);
   }, [videoParam]);
+
+  // When the playing video ends, scroll to the next one. The last video in
+  // the list simply stops.
+  const handleVideoEnded = (index: number) => {
+    if (index !== currentIndex) return;
+    if (index >= allVideos.length - 1) return;
+
+    feedScrollRef.current?.scrollTo({
+      y: (index + 1) * feedHeight,
+      animated: true,
+    });
+    setCurrentIndex(index + 1);
+  };
 
   const renderItem = useCallback(
     ({ item, index }: { item: SampleVideo; index: number }) => (
@@ -185,6 +203,7 @@ export default function FeedScreen() {
       {/* ── Video feed ── */}
       {Platform.OS === 'web' && !isMobile ? (
         <ScrollView
+          ref={feedScrollRef}
           key={videoParam ?? 'feed'}
           showsVerticalScrollIndicator={false}
           style={{
@@ -230,6 +249,8 @@ export default function FeedScreen() {
                 shouldPreload={Math.abs(index - currentIndex) <= 1}
                 itemWidth={desktopFeedWidth}
                 itemHeight={feedHeight}
+                playOnce={viewerMode}
+                onEnded={viewerMode ? () => handleVideoEnded(index) : undefined}
                 onCommentPress={(videoId) =>
                   setCommentsVideoId(videoId)
                 }
@@ -239,6 +260,7 @@ export default function FeedScreen() {
         </ScrollView>
       ) : Platform.OS === 'web' ? (
         <ScrollView
+          ref={feedScrollRef}
           key={videoParam ?? 'feed'}
           showsVerticalScrollIndicator={false}
           style={{
@@ -284,6 +306,8 @@ export default function FeedScreen() {
                 isFirstVideo={index === 0}
                 shouldPreload={Math.abs(index - currentIndex) <= 1}
                 itemHeight={feedHeight}
+                playOnce={viewerMode}
+                onEnded={viewerMode ? () => handleVideoEnded(index) : undefined}
                 onCommentPress={(videoId) => setCommentsVideoId(videoId)}
               />
             </View>
@@ -291,6 +315,7 @@ export default function FeedScreen() {
         </ScrollView>
       ) : (
         <ScrollView
+          ref={feedScrollRef}
           key={videoParam ?? 'feed'}
           showsVerticalScrollIndicator={false}
           style={{
@@ -355,11 +380,12 @@ export default function FeedScreen() {
         </View>
       )}
 
-            {videoParam ? (
+      {videoParam ? (
         <Pressable onPress={closeViewer} hitSlop={10} style={styles.closeButton}>
           <Feather name="x" size={22} color="#fff" />
         </Pressable>
       ) : null}
+
       {/* ── Comments Sheet ── */}
       <CommentsSheet
         videoId={commentsVideoId}
@@ -446,7 +472,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: '80%',
   },
-    closeButton: {
+  closeButton: {
     position: 'absolute',
     top: 12,
     right: 58,

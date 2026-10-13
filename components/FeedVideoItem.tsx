@@ -42,6 +42,10 @@ interface Props {
   onControlsVisibilityChange?: (visible: boolean) => void;
   /** Category-feed presentation without creator attribution and with compact mute placement. */
   categoryMode?: boolean;
+  /** Play once and stop instead of looping (used by the large viewer). */
+  playOnce?: boolean;
+  /** Called when a play-once video finishes. */
+  onEnded?: () => void;
 }
 
 function formatCount(n: number): string {
@@ -58,6 +62,8 @@ function WebFeedVideo({
   isFirstVideo = false,
   shouldPreload = false,
   objectFit = 'cover',
+  playOnce = false,
+  onEnded,
   onPlaying,
 }: {
   uri: string;
@@ -66,6 +72,8 @@ function WebFeedVideo({
   isFirstVideo?: boolean;
   shouldPreload?: boolean;
   objectFit?: 'cover' | 'contain';
+  playOnce?: boolean;
+  onEnded?: () => void;
   onPlaying?: () => void;
 }) {
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
@@ -78,7 +86,7 @@ function WebFeedVideo({
     let cancelled = false;
 
     el.playsInline = true;
-    el.loop = true;
+    el.loop = !playOnce;
 
     const getBufferedAhead = () => {
       if (!Number.isFinite(el.currentTime) || !el.buffered.length) {
@@ -136,13 +144,13 @@ function WebFeedVideo({
     };
 
     const handleCanPlay = () => {
-      if (isActive && el.paused) {
+      if (isActive && el.paused && !el.ended) {
         void playActiveVideo();
       }
     };
 
     const handleProgress = () => {
-      if (isActive && el.paused) {
+      if (isActive && el.paused && !el.ended) {
         void playActiveVideo();
       }
     };
@@ -186,7 +194,7 @@ function WebFeedVideo({
       el.removeEventListener('loadeddata', handleCanPlay);
       el.removeEventListener('progress', handleProgress);
     };
-  }, [isActive, uri, isFirstVideo]);
+  }, [isActive, uri, isFirstVideo, playOnce]);
 
   // Keep the user's mute preference without
   // restarting or seeking the video.
@@ -196,7 +204,7 @@ function WebFeedVideo({
 
     el.muted = isMuted;
 
-    if (isActive && el.paused) {
+    if (isActive && el.paused && !el.ended) {
       const result = el.play();
 
       if (result && typeof result.catch === 'function') {
@@ -223,7 +231,8 @@ function WebFeedVideo({
 
     autoPlay: isActive,
     muted: isMuted,
-    loop: true,
+    loop: !playOnce,
+    onEnded,
 
     onPlaying,
     style: {
@@ -330,7 +339,7 @@ function NativeFeedVideo({
   );
 }
 
-export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPreload = true, itemWidth, itemHeight, onCommentPress, onControlsVisibilityChange, categoryMode = false }: Props) {
+export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPreload = true, itemWidth, itemHeight, onCommentPress, onControlsVisibilityChange, categoryMode = false, playOnce = false, onEnded }: Props) {
   const { isMuted, toggleMute } = useMute();
   const onMuteToggle = toggleMute;
   const { width, height } = useWindowDimensions();
@@ -561,7 +570,7 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
       {isDesktopWeb ? (
         <>
           {shouldPreload ? (
-            <WebFeedVideo
+            <WebFeedVideo playOnce={playOnce} onEnded={onEnded}
               uri={video.uri}
               isActive={isActive}
               isMuted={isMuted}
@@ -587,7 +596,7 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
         <>
           {Platform.OS === 'web' ? (
             shouldPreload ? (
-              <WebFeedVideo
+              <WebFeedVideo playOnce={playOnce} onEnded={onEnded}
                 uri={video.uri}
                 isActive={isActive}
                 isMuted={isMuted}
@@ -1113,7 +1122,7 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
-    mobileDestinationRow: {
+  mobileDestinationRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
