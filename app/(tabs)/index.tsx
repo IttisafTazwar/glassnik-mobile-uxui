@@ -12,7 +12,7 @@ import {
   ViewToken,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Feather } from '@expo/vector-icons';
 import { FeedVideoItem } from '@/components/FeedVideoItem';
@@ -85,6 +85,18 @@ export default function FeedScreen() {
   // plays the list saved from that page.
   const params = useLocalSearchParams<{ video?: string }>();
   const videoParam = Array.isArray(params.video) ? params.video[0] : params.video;
+  
+  const router = useRouter();
+
+  // Closing the viewer returns to the page the visitor came from, at the
+  // same scroll position. With no history (a direct link), go to Explore.
+  const closeViewer = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(tabs)/explore' as any);
+    }
+  };
 
   const { data: apiVideos } = useQuery<VideoAsset[]>({
     queryKey: ['feed'],
@@ -343,6 +355,11 @@ export default function FeedScreen() {
         </View>
       )}
 
+            {videoParam ? (
+        <Pressable onPress={closeViewer} hitSlop={10} style={styles.closeButton}>
+          <Feather name="x" size={22} color="#fff" />
+        </Pressable>
+      ) : null}
       {/* ── Comments Sheet ── */}
       <CommentsSheet
         videoId={commentsVideoId}
@@ -428,6 +445,18 @@ const styles = StyleSheet.create({
     marginTop: 3,
     alignSelf: 'center',
     width: '80%',
+  },
+    closeButton: {
+    position: 'absolute',
+    top: 12,
+    right: 58,
+    zIndex: 30,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   topRight: {
     flex: 1,
