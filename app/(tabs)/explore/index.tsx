@@ -1222,6 +1222,13 @@ export default function ExploreScreen() {
                     places={trendingPlaces}
                     activeDestinationKey={activeDestination?.key}
                     activePlaceKey={activePlace?.key}
+                    preferredTab={
+                      activeDiscoveryTab === 'Places'
+                        ? 'Places'
+                        : activeDiscoveryTab === 'Destinations'
+                          ? 'Destinations'
+                          : undefined
+                    }
                     onSelectDestination={selectDestination}
                     onSelectPlace={selectPlace}
                     onViewAllDestinations={handleViewAllDestinations}
