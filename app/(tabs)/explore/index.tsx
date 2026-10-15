@@ -80,6 +80,8 @@ function normaliseKey(value?: string | null): string {
 // standard location list on the upload form (or correcting the saved data).
 const CITY_CORRECTIONS: Record<string, string> = {
   'kuala lumper': 'Kuala Lumpur',
+  'kualu lumpur': 'Kuala Lumpur',
+  'georgetown, penang': 'George Town, Penang',
 };
 
 function correctCity(city?: string | null): string | undefined {
@@ -102,7 +104,12 @@ function apiVideoToSample(v: VideoAsset): SampleVideo {
   // (for example "Bangkok, Thailand") rather than separate city/country
   // fields, so normalise it here for Explore.
   const locationName = (v as any).locationName?.trim() ?? '';
-  const locationParts = locationName
+
+  // Fix a typo seen in the data before the location is split into parts:
+  // "Punnawithi, Bangkokm Thailand" should read "Punnawithi, Bangkok, Thailand".
+  const cleanedLocationName = locationName.replace(/bangkokm thailand/i, 'Bangkok, Thailand');
+
+  const locationParts = cleanedLocationName
     .split(',')
     .map((part: string) => part.trim())
     .filter(Boolean);
@@ -217,6 +224,7 @@ export default function ExploreScreen() {
     category?: string;
     destination?: string;
     place?: string;
+    show?: string;
   }>();
 
   // Real width of the area beside the sidebar. The grid is sized from this
@@ -247,6 +255,9 @@ export default function ExploreScreen() {
   const [categoryControlsVisible, setCategoryControlsVisible] = useState(true);
   const [commentsVideoId, setCommentsVideoId] = useState<string | null>(null);
 
+  // ?show=places / ?show=destinations comes from the sidebar and opens the
+  // normal page on that toggle, with all videos showing and nothing selected.
+  const showParam = Array.isArray(params.show) ? params.show[0] : params.show;
   const discoveryParam = Array.isArray(params.discovery)
     ? params.discovery[0]
     : params.discovery;
@@ -1223,9 +1234,9 @@ export default function ExploreScreen() {
                     activeDestinationKey={activeDestination?.key}
                     activePlaceKey={activePlace?.key}
                     preferredTab={
-                      activeDiscoveryTab === 'Places'
+                      activeDiscoveryTab === 'Places' || showParam === 'places'
                         ? 'Places'
-                        : activeDiscoveryTab === 'Destinations'
+                        : activeDiscoveryTab === 'Destinations' || showParam === 'destinations'
                           ? 'Destinations'
                           : undefined
                     }
