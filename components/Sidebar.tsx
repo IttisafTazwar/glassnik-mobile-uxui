@@ -57,7 +57,12 @@ const ACTIVITY_ITEM: Leaf = {
 export function Sidebar() {
   const router = useRouter();
   const pathname = usePathname();
-  const params = useLocalSearchParams<{ discovery?: string; show?: string }>();
+  const params = useLocalSearchParams<{
+    discovery?: string;
+    show?: string;
+    place?: string;
+    destination?: string;
+  }>();
   const { user, logout } = useAuth();
 
   const { data: capabilities } = useQuery({
@@ -76,13 +81,17 @@ export function Sidebar() {
     pathname === '/'
       ? 'Featured'
       : onExplorePage
-        ? ((Array.isArray(params.show) ? params.show[0] : params.show) === 'places'
+        ? (params.place
             ? 'Places'
-            : (Array.isArray(params.show) ? params.show[0] : params.show) === 'destinations'
+            : params.destination
               ? 'Destinations'
-              : (Array.isArray(params.discovery)
-                  ? params.discovery[0]
-                  : params.discovery) ?? null)
+              : (Array.isArray(params.show) ? params.show[0] : params.show) === 'places'
+                ? 'Places'
+                : (Array.isArray(params.show) ? params.show[0] : params.show) === 'destinations'
+                  ? 'Destinations'
+                  : (Array.isArray(params.discovery)
+                      ? params.discovery[0]
+                      : params.discovery) ?? null)
         : null;
 
   // expo-router returns public URL paths on web, e.g. /profile rather
@@ -125,7 +134,15 @@ export function Sidebar() {
     }
 
     if (child.show) {
-      router.push(`/explore?show=${child.show}` as any);
+      if (Platform.OS === 'web') {
+        window.history.pushState({}, '', `/explore?show=${child.show}`);
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      } else {
+        router.push({
+          pathname: '/(tabs)/explore',
+          params: { show: child.show },
+        } as any);
+      }
       return;
     }
 

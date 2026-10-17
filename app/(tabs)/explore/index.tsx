@@ -241,11 +241,12 @@ export default function ExploreScreen() {
       !params.discovery &&
       !params.category &&
       !params.destination &&
-      !params.place
+      !params.place &&
+      !params.show
     ) {
       router.replace('/');
     }
-  }, [isMobile, params.discovery, params.category, params.destination, params.place, router]);
+  }, [isMobile, params.discovery, params.category, params.destination, params.place, params.show, router]);
 
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
@@ -266,7 +267,11 @@ export default function ExploreScreen() {
     discoveryParam &&
       (DISCOVERY_TABS as readonly string[]).includes(discoveryParam)
       ? discoveryParam as DiscoveryTab
-      : 'Explore';
+      : showParam === 'places'
+        ? 'Places'
+        : showParam === 'destinations'
+          ? 'Destinations'
+          : 'Explore';
 
   const setActiveDiscoveryTab = React.useCallback(
     (tab: DiscoveryTab) => {

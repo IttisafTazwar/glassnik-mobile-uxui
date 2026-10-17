@@ -569,9 +569,30 @@ async function main() {
     updateBundleUrls(timestamp, baseUrl);
   }
 
-  console.log('Updating manifests and creating landing page...');
+  console.log('Updating manifests...');
   updateManifests(manifests, timestamp, baseUrl, assetsByHash);
 
+  console.log('Building web export...');
+  const webBuild = spawn(
+    'pnpm',
+    ['exec', 'expo', 'export', '--platform', 'web'],
+    {
+      stdio: 'inherit',
+      cwd: projectRoot,
+      env: process.env,
+    },
+  );
+
+  const webExitCode = await new Promise((resolve, reject) => {
+    webBuild.on('error', reject);
+    webBuild.on('close', resolve);
+  });
+
+  if (webExitCode !== 0) {
+    exitWithError(`Web export failed with exit code ${webExitCode}`);
+  }
+
+  console.log('Web export complete');
   console.log('Build complete! Deploy to:', baseUrl);
 
   if (metroProcess) {
