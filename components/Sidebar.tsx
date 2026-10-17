@@ -11,6 +11,7 @@ type Leaf = {
   icon: React.ComponentProps<typeof Feather>['name'];
   route: string;
   discovery?: string; // query param value for Explore sub-items
+  show?: 'places' | 'destinations';
   deadLink?: boolean;
 };
 
@@ -25,8 +26,8 @@ const FOOTER_LINKS = [
 // `discovery` query param; explore.tsx reads this to set its active tab.
 const EXPLORE_CHILDREN: Leaf[] = [
   { label: 'Featured', icon: 'home', route: '/' },
-  { label: 'Places', icon: 'map', route: '', deadLink: true },
-  { label: 'Destinations', icon: 'map-pin', route: '', deadLink: true },
+  { label: 'Places', icon: 'map', route: '/(tabs)/explore', show: 'places' },
+  { label: 'Destinations', icon: 'map-pin', route: '/(tabs)/explore', show: 'destinations' },
   { label: 'Categories', icon: 'grid', route: '/(tabs)/explore', discovery: 'Categories' },
   { label: 'Trending', icon: 'trending-up', route: '/(tabs)/explore', discovery: 'Trending' },
   { label: 'Nearby', icon: 'map-pin', route: '/(tabs)/explore', discovery: 'Nearby' },
@@ -116,6 +117,14 @@ export function Sidebar() {
 
     if (child.discovery) {
       goExplore(child.discovery);
+      return;
+    }
+
+    if (child.show) {
+      router.push({
+        pathname: '/(tabs)/explore',
+        params: { show: child.show },
+      } as any);
       return;
     }
 
