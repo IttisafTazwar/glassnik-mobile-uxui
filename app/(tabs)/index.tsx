@@ -59,6 +59,7 @@ function apiVideoToSample(v: VideoAsset): SampleVideo {
 }
 
 import { WhatIsGlassnikModal } from '@/components/WhatIsGlassnikModal';
+import { ClosingLoopHint } from '@/components/ClosingLoopHint';
 
 export default function FeedScreen() {
   const { width, height } = useWindowDimensions();
@@ -183,6 +184,7 @@ export default function FeedScreen() {
   return (
     <View style={styles.root}>
       <WhatIsGlassnikModal />
+      <ClosingLoopHint />
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
       {(!isMobile || showWebTopNav) && <TopNav />}
@@ -200,197 +202,197 @@ export default function FeedScreen() {
               },
             ]}
           >
-      {/* ── Video feed ── */}
-      {Platform.OS === 'web' && !isMobile ? (
-        <ScrollView
-          ref={feedScrollRef}
-          key={videoParam ?? 'feed'}
-          showsVerticalScrollIndicator={false}
-          style={{
-            height: feedHeight,
-            width: desktopFeedWidth,
-          }}
-          contentContainerStyle={{
-            width: desktopFeedWidth,
-          }}
-          snapToInterval={feedHeight}
-          snapToAlignment="start"
-          decelerationRate="fast"
-          onScroll={(event) => {
-            const y = event.nativeEvent.contentOffset?.y ?? 0;
+            {/* ── Video feed ── */}
+            {Platform.OS === 'web' && !isMobile ? (
+              <ScrollView
+                ref={feedScrollRef}
+                key={videoParam ?? 'feed'}
+                showsVerticalScrollIndicator={false}
+                style={{
+                  height: feedHeight,
+                  width: desktopFeedWidth,
+                }}
+                contentContainerStyle={{
+                  width: desktopFeedWidth,
+                }}
+                snapToInterval={feedHeight}
+                snapToAlignment="start"
+                decelerationRate="fast"
+                onScroll={(event) => {
+                  const y = event.nativeEvent.contentOffset?.y ?? 0;
 
-            const nextIndex = Math.max(
-              0,
-              Math.min(
-                allVideos.length - 1,
-                Math.round(y / feedHeight)
-              )
-            );
+                  const nextIndex = Math.max(
+                    0,
+                    Math.min(
+                      allVideos.length - 1,
+                      Math.round(y / feedHeight)
+                    )
+                  );
 
-            if (nextIndex !== currentIndex) {
-              setCurrentIndex(nextIndex);
-            }
-          }}
-          scrollEventThrottle={16}
-        >
-          {allVideos.map((item, index) => (
-            <View
-              key={item.id}
-              style={{
-                width: desktopFeedWidth,
-                height: feedHeight,
-                scrollSnapAlign: 'start',
-              } as any}
-            >
-              <FeedVideoItem
-                video={item}
-                isActive={index === currentIndex}
-                isFirstVideo={index === 0}
-                shouldPreload={Math.abs(index - currentIndex) <= 1}
-                itemWidth={desktopFeedWidth}
-                itemHeight={feedHeight}
-                playOnce={viewerMode}
-                onEnded={viewerMode ? () => handleVideoEnded(index) : undefined}
-                onCommentPress={(videoId) =>
-                  setCommentsVideoId(videoId)
-                }
-              />
-            </View>
-          ))}
-        </ScrollView>
-      ) : Platform.OS === 'web' ? (
-        <ScrollView
-          ref={feedScrollRef}
-          key={videoParam ?? 'feed'}
-          showsVerticalScrollIndicator={false}
-          style={{
-            height: feedHeight,
-            width: '100%',
-          }}
-          contentContainerStyle={{
-            width: '100%',
-          }}
-          snapToInterval={feedHeight}
-          snapToAlignment="start"
-          decelerationRate="fast"
-          pagingEnabled
-          scrollEventThrottle={16}
-          onScroll={(event) => {
-            const y = event.nativeEvent.contentOffset?.y ?? 0;
+                  if (nextIndex !== currentIndex) {
+                    setCurrentIndex(nextIndex);
+                  }
+                }}
+                scrollEventThrottle={16}
+              >
+                {allVideos.map((item, index) => (
+                  <View
+                    key={item.id}
+                    style={{
+                      width: desktopFeedWidth,
+                      height: feedHeight,
+                      scrollSnapAlign: 'start',
+                    } as any}
+                  >
+                    <FeedVideoItem
+                      video={item}
+                      isActive={index === currentIndex}
+                      isFirstVideo={index === 0}
+                      shouldPreload={Math.abs(index - currentIndex) <= 1}
+                      itemWidth={desktopFeedWidth}
+                      itemHeight={feedHeight}
+                      playOnce={viewerMode}
+                      onEnded={viewerMode ? () => handleVideoEnded(index) : undefined}
+                      onCommentPress={(videoId) =>
+                        setCommentsVideoId(videoId)
+                      }
+                    />
+                  </View>
+                ))}
+              </ScrollView>
+            ) : Platform.OS === 'web' ? (
+              <ScrollView
+                ref={feedScrollRef}
+                key={videoParam ?? 'feed'}
+                showsVerticalScrollIndicator={false}
+                style={{
+                  height: feedHeight,
+                  width: '100%',
+                }}
+                contentContainerStyle={{
+                  width: '100%',
+                }}
+                snapToInterval={feedHeight}
+                snapToAlignment="start"
+                decelerationRate="fast"
+                pagingEnabled
+                scrollEventThrottle={16}
+                onScroll={(event) => {
+                  const y = event.nativeEvent.contentOffset?.y ?? 0;
 
-            const nextIndex = Math.max(
-              0,
-              Math.min(
-                allVideos.length - 1,
-                Math.round(y / feedHeight)
-              )
-            );
+                  const nextIndex = Math.max(
+                    0,
+                    Math.min(
+                      allVideos.length - 1,
+                      Math.round(y / feedHeight)
+                    )
+                  );
 
-            setCurrentIndex((previousIndex) =>
-              previousIndex === nextIndex ? previousIndex : nextIndex
-            );
-          }}
-        >
-          {allVideos.map((item, index) => (
-            <View
-              key={item.id}
-              style={{
-                width: '100%',
-                height: feedHeight,
-                scrollSnapAlign: 'start',
-              } as any}
-            >
-              <FeedVideoItem
-                video={item}
-                isActive={index === currentIndex}
-                isFirstVideo={index === 0}
-                shouldPreload={Math.abs(index - currentIndex) <= 1}
-                itemHeight={feedHeight}
-                playOnce={viewerMode}
-                onEnded={viewerMode ? () => handleVideoEnded(index) : undefined}
-                onCommentPress={(videoId) => setCommentsVideoId(videoId)}
-              />
-            </View>
-          ))}
-        </ScrollView>
-      ) : (
-        <ScrollView
-          ref={feedScrollRef}
-          key={videoParam ?? 'feed'}
-          showsVerticalScrollIndicator={false}
-          style={{
-            height: feedHeight,
-            width: '100%',
-          }}
-          contentContainerStyle={{
-            width: '100%',
-          }}
-          snapToInterval={feedHeight}
-          snapToAlignment="start"
-          decelerationRate="fast"
-          pagingEnabled
-          scrollEventThrottle={16}
-          onScroll={(event) => {
-            const y = event.nativeEvent.contentOffset?.y ?? 0;
+                  setCurrentIndex((previousIndex) =>
+                    previousIndex === nextIndex ? previousIndex : nextIndex
+                  );
+                }}
+              >
+                {allVideos.map((item, index) => (
+                  <View
+                    key={item.id}
+                    style={{
+                      width: '100%',
+                      height: feedHeight,
+                      scrollSnapAlign: 'start',
+                    } as any}
+                  >
+                    <FeedVideoItem
+                      video={item}
+                      isActive={index === currentIndex}
+                      isFirstVideo={index === 0}
+                      shouldPreload={Math.abs(index - currentIndex) <= 1}
+                      itemHeight={feedHeight}
+                      playOnce={viewerMode}
+                      onEnded={viewerMode ? () => handleVideoEnded(index) : undefined}
+                      onCommentPress={(videoId) => setCommentsVideoId(videoId)}
+                    />
+                  </View>
+                ))}
+              </ScrollView>
+            ) : (
+              <ScrollView
+                ref={feedScrollRef}
+                key={videoParam ?? 'feed'}
+                showsVerticalScrollIndicator={false}
+                style={{
+                  height: feedHeight,
+                  width: '100%',
+                }}
+                contentContainerStyle={{
+                  width: '100%',
+                }}
+                snapToInterval={feedHeight}
+                snapToAlignment="start"
+                decelerationRate="fast"
+                pagingEnabled
+                scrollEventThrottle={16}
+                onScroll={(event) => {
+                  const y = event.nativeEvent.contentOffset?.y ?? 0;
 
-            const nextIndex = Math.max(
-              0,
-              Math.min(
-                allVideos.length - 1,
-                Math.round(y / feedHeight)
-              )
-            );
+                  const nextIndex = Math.max(
+                    0,
+                    Math.min(
+                      allVideos.length - 1,
+                      Math.round(y / feedHeight)
+                    )
+                  );
 
-            setCurrentIndex((previousIndex) =>
-              previousIndex === nextIndex ? previousIndex : nextIndex
-            );
-          }}
-        >
-          {allVideos.map((item, index) => (
-            <View
-              key={item.id}
-              style={{
-                width: '100%',
-                height: feedHeight,
-              }}
-            >
-              <FeedVideoItem
-                video={item}
-                isActive={index === currentIndex}
-                isFirstVideo={index === 0}
-                shouldPreload={Math.abs(index - currentIndex) <= 1}
-                itemHeight={feedHeight}
-                onCommentPress={(videoId) =>
-                  setCommentsVideoId(videoId)
-                }
-              />
-            </View>
-          ))}
-        </ScrollView>
-      )}
+                  setCurrentIndex((previousIndex) =>
+                    previousIndex === nextIndex ? previousIndex : nextIndex
+                  );
+                }}
+              >
+                {allVideos.map((item, index) => (
+                  <View
+                    key={item.id}
+                    style={{
+                      width: '100%',
+                      height: feedHeight,
+                    }}
+                  >
+                    <FeedVideoItem
+                      video={item}
+                      isActive={index === currentIndex}
+                      isFirstVideo={index === 0}
+                      shouldPreload={Math.abs(index - currentIndex) <= 1}
+                      itemHeight={feedHeight}
+                      onCommentPress={(videoId) =>
+                        setCommentsVideoId(videoId)
+                      }
+                    />
+                  </View>
+                ))}
+              </ScrollView>
+            )}
 
 
-      {!isMobile && (
-        <View style={[styles.topBar, { paddingTop: topInset + (Platform.OS === 'web' ? 8 : 12), pointerEvents: 'box-none' }]}>
-          <View style={styles.topRight}>
-            <Pressable onPress={toggleMute} hitSlop={8}>
-              <Feather name={isMuted ? 'volume-x' : 'volume-2'} size={22} color="#fff" />
-            </Pressable>
-          </View>
-        </View>
-      )}
+            {!isMobile && (
+              <View style={[styles.topBar, { paddingTop: topInset + (Platform.OS === 'web' ? 8 : 12), pointerEvents: 'box-none' }]}>
+                <View style={styles.topRight}>
+                  <Pressable onPress={toggleMute} hitSlop={8}>
+                    <Feather name={isMuted ? 'volume-x' : 'volume-2'} size={22} color="#fff" />
+                  </Pressable>
+                </View>
+              </View>
+            )}
 
-      {videoParam ? (
-        <Pressable onPress={closeViewer} hitSlop={10} style={styles.closeButton}>
-          <Feather name="x" size={22} color="#fff" />
-        </Pressable>
-      ) : null}
+            {videoParam ? (
+              <Pressable onPress={closeViewer} hitSlop={10} style={styles.closeButton}>
+                <Feather name="x" size={22} color="#fff" />
+              </Pressable>
+            ) : null}
 
-      {/* ── Comments Sheet ── */}
-      <CommentsSheet
-        videoId={commentsVideoId}
-        onClose={() => setCommentsVideoId(null)}
-      />
+            {/* ── Comments Sheet ── */}
+            <CommentsSheet
+              videoId={commentsVideoId}
+              onClose={() => setCommentsVideoId(null)}
+            />
           </View>
         </View>
       </View>

@@ -1641,13 +1641,9 @@ export function VideoGridCell({
     <View style={{ width, marginBottom: 14 }}>
       <Pressable
         onPress={() => {
-          if (Platform.OS === 'web' && !isMobile) {
-            openViewer();
-            return;
-          }
-          if (isMobile && Platform.OS !== 'web' && video.uri) {
-            setIsMobilePlaying((current) => !current);
-          }
+          // Desktop and mobile both open the large viewer. The playlist saved
+          // in lib/playlist.ts tells the viewer which videos to play next.
+          openViewer();
         }}
         onHoverIn={() => {
           if (Platform.OS === 'web' && !isMobile) {
