@@ -1042,7 +1042,7 @@ export default function ExploreScreen() {
           scrollEventThrottle={200}
         >
           {isMobile ? (
-            <View style={[styles.bannerMobile, isMobileDiscoveryPage && styles.mobileDiscoveryHidden]}>
+            <View style={[styles.bannerMobile, styles.mobileDiscoveryHidden]}>
               <Image
                 source={require('@/assets/images/home-banner.png')}
                 style={StyleSheet.absoluteFill}

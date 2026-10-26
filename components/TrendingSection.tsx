@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { SampleVideo } from '@/constants/sampleVideos';
+import { normaliseKey } from '@/lib/location';
 import { DestinationCard } from './DestinationCard';
-
 interface Props {
   videos: SampleVideo[];
   isMobile: boolean;
@@ -40,21 +40,29 @@ export function TrendingSection({
   // Trending Destinations — top 10 by number of videos at that destination.
   // Real ranking should be by view count per the spec; this uses video
   // count as the available proxy until that data exists.
-  const destinations = useMemo(() => {
-    const counts = new Map<string, { city: string; country: string; count: number }>();
+    const destinations = useMemo(() => {
+    // Grouped by the cleaned-up city name only, the same way as the Explore
+    // pills and the Global page, so one city never shows up twice.
+    const groups = new Map<
+      string,
+      { city: string; countries: Map<string, number>; count: number }
+    >();
     for (const v of videos) {
       if (!v.city && !v.country) continue;
-      const city = v.city ?? '';
-      const country = v.country ?? '';
-      const key = `${city}|${country}`;
-      const existing = counts.get(key);
-      if (existing) {
-        existing.count += 1;
-      } else {
-        counts.set(key, { city, country, count: 1 });
-      }
+      const key = normaliseKey(v.city || v.country);
+      if (!key) continue;
+      const group = groups.get(key) ?? { city: v.city ?? '', countries: new Map<string, number>(), count: 0 };
+      group.count += 1;
+      const country = (v.country ?? '').trim();
+      if (country) group.countries.set(country, (group.countries.get(country) ?? 0) + 1);
+      groups.set(key, group);
     }
-    return Array.from(counts.values())
+    return Array.from(groups.values())
+      .map((g) => ({
+        city: g.city,
+        country: Array.from(g.countries.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '',
+        count: g.count,
+      }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
   }, [videos]);

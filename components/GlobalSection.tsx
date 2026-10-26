@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import type { SampleVideo } from '@/constants/sampleVideos';
+import { normaliseKey } from '@/lib/location';
 import { DestinationCard } from './DestinationCard';
 
 interface Props {
@@ -13,20 +14,43 @@ interface Props {
 
 export function GlobalSection({ videos, isMobile, contentWidth, onDestinationPress }: Props) {
   const destinations = useMemo(() => {
-    const counts = new Map<string, { city: string; country: string; count: number }>();
+    // Grouped by the cleaned-up city name only (the same way the Explore
+    // pills are grouped), so "Kuala Lumpur" with a differently spelled or
+    // missing country still counts as one destination.
+    const groups = new Map<
+      string,
+      { key: string; city: string; countries: Map<string, number>; count: number }
+    >();
+
     for (const v of videos) {
       if (!v.city && !v.country) continue;
-      const city = v.city ?? '';
-      const country = v.country ?? '';
-      const key = `${city}|${country}`;
-      const existing = counts.get(key);
-      if (existing) {
-        existing.count += 1;
-      } else {
-        counts.set(key, { city, country, count: 1 });
+
+      const key = normaliseKey(v.city || v.country);
+      if (!key) continue;
+
+      const group = groups.get(key) ?? {
+        key,
+        city: v.city ?? '',
+        countries: new Map<string, number>(),
+        count: 0,
+      };
+
+      group.count += 1;
+      const country = (v.country ?? '').trim();
+      if (country) {
+        group.countries.set(country, (group.countries.get(country) ?? 0) + 1);
       }
+      groups.set(key, group);
     }
-    return Array.from(counts.values()).sort((a, b) => b.count - a.count);
+
+    return Array.from(groups.values())
+      .map((group) => {
+        // Show the most common spelling of the country for this city.
+        const country =
+          Array.from(group.countries.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '';
+        return { key: group.key, city: group.city, country, count: group.count };
+      })
+      .sort((a, b) => b.count - a.count);
   }, [videos]);
 
   const COLS = isMobile ? 1 : 5;
@@ -48,7 +72,7 @@ export function GlobalSection({ videos, isMobile, contentWidth, onDestinationPre
         <View style={[styles.grid, { paddingHorizontal: PADDING, gap: GAP }]}>
           {destinations.map((d) => (
             <DestinationCard
-              key={`${d.city}|${d.country}`}
+              key={d.key}
               city={d.city || d.country || 'Unknown'}
               country={d.city ? d.country : ''}
               count={d.count}
