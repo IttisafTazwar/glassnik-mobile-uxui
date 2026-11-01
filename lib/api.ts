@@ -149,6 +149,11 @@ export const userApi = {
 
   getMe: () => request<any>('/users/me'),
 
+  deleteAccount: () =>
+    request<any>('/users/me', {
+      method: 'DELETE',
+    }),
+
   updateMe: (data: { displayName?: string; username?: string; avatarUrl?: string }) =>
     request<any>('/users/me', {
       method: 'PATCH',
@@ -167,6 +172,16 @@ export const userApi = {
     request<{ following: boolean; followerCount: number }>(`/users/${userId}/follow`, {
       method: 'DELETE',
     }),
+  blockUser: (userId: number) =>
+    request<{ message: string }>(`/users/${userId}/block`, {
+      method: 'POST',
+    }),
+
+  unblockUser: (userId: number) =>
+    request<{ message: string }>(`/users/${userId}/block`, {
+      method: 'DELETE',
+    }),
+
 };
 
 // ─── Videos ───────────────────────────────────────────────────────────────────
@@ -219,6 +234,20 @@ export const notificationsApi = {
 
   markRead: (id: number) =>
     request<{ success: boolean }>(`/notifications/${id}/read`, { method: 'PATCH' }),
+};
+
+// Report an Experience (available to authenticated users)
+export const reportApi = {
+  reportExperience: (
+    videoId: number,
+    reason: 'SPAM' | 'NUDITY' | 'VIOLENCE' | 'HATE' |
+      'HARASSMENT' | 'COPYRIGHT' | 'SELF_HARM' | 'OTHER',
+    details?: string,
+  ) =>
+    request<any>('/moderation/reports', {
+      method: 'POST',
+      body: JSON.stringify({ videoId, reason, details }),
+    }),
 };
 
 // ─── Moderation ───────────────────────────────────────────────────────────────

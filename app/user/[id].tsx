@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   Platform,
   Pressable,
@@ -94,10 +95,49 @@ export default function UserProfileScreen() {
     },
   });
 
+  // Block user mutation
+  const blockMutation = useMutation({
+    mutationFn: () => userApi.blockUser(userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      Alert.alert('Success', 'User blocked successfully.');
+      router.back();
+    },
+    onError: () => {
+      Alert.alert('Error', 'Unable to block this user.');
+    },
+  });
+
   function handleFollowPress() {
     if (!me) { router.push('/auth/login' as any); return; }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     followMutation.mutate(!(isFollowing ?? false));
+  }
+
+  function handleBlockPress() {
+    if (!me) {
+      router.push('/auth/login' as any);
+      return;
+    }
+
+    const message =
+      `Are you sure you want to block ${profile?.displayName ?? 'this user'}?`;
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(message)) {
+        blockMutation.mutate();
+      }
+      return;
+    }
+
+    Alert.alert('Block user?', message, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Block',
+        style: 'destructive',
+        onPress: () => blockMutation.mutate(),
+      },
+    ]);
   }
 
   function navigateToVideo(video: VideoItem) {
@@ -244,6 +284,23 @@ export default function UserProfileScreen() {
                       {displayIsFollowing ? 'Following' : 'Follow'}
                     </Text>
                   )}
+                </Pressable>
+
+                <Pressable
+                  onPress={handleBlockPress}
+                  disabled={blockMutation.isPending}
+                  style={{
+                    backgroundColor: '#DC2626',
+                    paddingHorizontal: 20,
+                    paddingVertical: 12,
+                    borderRadius: 8,
+                    marginLeft: 10,
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>
+                    {blockMutation.isPending ? 'Blocking...' : 'Block'}
+                  </Text>
                 </Pressable>
               </View>
             )}

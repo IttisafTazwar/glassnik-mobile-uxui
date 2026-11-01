@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
+import { userApi } from '@/lib/api';
 import { useMute } from '@/context/MuteContext';
 
 // Local preference keys. Autoplay and push-notification toggles persist here
@@ -36,6 +37,7 @@ export default function SettingsScreen() {
   const { isMuted, toggleMute } = useMute();
 
   const [loggingOut, setLoggingOut] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [autoplay, setAutoplay] = useState(true);
   const [pushNotifs, setPushNotifs] = useState(true);
 
@@ -65,21 +67,39 @@ export default function SettingsScreen() {
     );
   }
 
+  async function performDeleteAccount() {
+    if (deletingAccount) return;
+    setDeletingAccount(true);
+    try {
+      await userApi.deleteAccount();
+      await logout();
+      router.replace('/auth/login');
+    } catch {
+      Alert.alert('Error', 'Account deletion could not be completed. Please try again.');
+    } finally {
+      setDeletingAccount(false);
+    }
+  }
+
   function handleDeleteAccount() {
-    Alert.alert(
-      'Delete account',
-      'This will permanently delete your account, including your Experiences, likes, comments, and followers. This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            Alert.alert('Not yet available', 'Account deletion isn\'t supported yet. Contact the team if you need your account removed.');
-          },
-        },
-      ],
-    );
+    if (deletingAccount) return;
+
+    const message =
+      'This will permanently delete your account, including your Experiences, likes, comments, and followers. This cannot be undone.';
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(message)) void performDeleteAccount();
+      return;
+    }
+
+    Alert.alert('Delete account', message, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => void performDeleteAccount(),
+      },
+    ]);
   }
 
   async function performLogout() {
@@ -191,10 +211,13 @@ export default function SettingsScreen() {
 
           <Pressable
             onPress={handleDeleteAccount}
-            style={({ pressed }) => [styles.rowBtn, { opacity: pressed ? 0.7 : 1 }]}
+            disabled={deletingAccount}
+            style={({ pressed }) => [styles.rowBtn, { opacity: pressed || deletingAccount ? 0.7 : 1 }]}
           >
             <Feather name="trash-2" size={16} color="#ef4444" />
-            <Text style={[styles.rowBtnText, { color: '#ef4444' }]}>Delete Account</Text>
+            <Text style={[styles.rowBtnText, { color: '#ef4444' }]}>
+              {deletingAccount ? 'Deleting account...' : 'Delete Account'}
+            </Text>
           </Pressable>
         </View>
 

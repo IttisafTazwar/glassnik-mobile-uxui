@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Linking,
   Platform,
   Pressable,
@@ -21,7 +22,7 @@ import { useVideoPlayer, VideoView, type VideoPlayer } from 'expo-video';
 import { useEvent } from 'expo';
 import { useQuery } from '@tanstack/react-query';
 import { useColors } from '@/hooks/useColors';
-import { videoApi } from '@/lib/api';
+import { videoApi, reportApi } from '@/lib/api';
 import type { VideoAsset } from '@/types';
 
 export default function VideoScreen() {
@@ -33,6 +34,9 @@ export default function VideoScreen() {
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [reportMessage, setReportMessage] = useState('');
 
   // Prefer the pre-serialised video passed as a param (instant); fall back to
   // fetching by ID so links that only carry the numeric ID work too.
@@ -95,6 +99,24 @@ export default function VideoScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
 
+  function handleReport() {
+    setReportMessage('');
+    setReportOpen(true);
+  }
+
+  async function submitReport(reason: 'SPAM' | 'NUDITY' | 'VIOLENCE' | 'HATE' | 'HARASSMENT' | 'COPYRIGHT' | 'SELF_HARM' | 'OTHER') {
+    if (reportSubmitting) return;
+    setReportSubmitting(true);
+    try {
+      await reportApi.reportExperience(Number(video.id), reason);
+      setReportMessage('Thank you. Your report has been submitted.');
+    } catch {
+      setReportMessage('Unable to submit your report. Please try again.');
+    } finally {
+      setReportSubmitting(false);
+    }
+  }
+
   function handleSave() {
     setSaved((v) => !v);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -123,6 +145,73 @@ export default function VideoScreen() {
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <Modal
+        visible={reportOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setReportOpen(false)}
+      >
+        <View style={{
+          flex: 1, backgroundColor: 'rgba(0,0,0,0.75)',
+          justifyContent: 'center', padding: 24,
+        }}>
+          <View style={{
+            backgroundColor: colors.background,
+            borderRadius: 16, padding: 20,
+            maxWidth: 420, width: '100%', alignSelf: 'center',
+          }}>
+            <Text style={{
+              color: colors.foreground, fontSize: 20,
+              fontWeight: '700', marginBottom: 12,
+            }}>Report Experience</Text>
+            {reportMessage ? (
+              <Text style={{ color: colors.foreground, marginBottom: 16 }}>
+                {reportMessage}
+              </Text>
+            ) : (
+              <>
+                <Text style={{ color: colors.foreground, marginBottom: 12 }}>
+                  Why are you reporting this Experience?
+                </Text>
+                <ScrollView style={{ maxHeight: 380 }}>
+                  {([
+                    ['Spam', 'SPAM'],
+                    ['Nudity', 'NUDITY'],
+                    ['Violence', 'VIOLENCE'],
+                    ['Hate', 'HATE'],
+                    ['Harassment', 'HARASSMENT'],
+                    ['Copyright', 'COPYRIGHT'],
+                    ['Self-harm', 'SELF_HARM'],
+                    ['Other', 'OTHER'],
+                  ] as const).map(([label, reason]) => (
+                    <Pressable
+                      key={reason}
+                      disabled={reportSubmitting}
+                      onPress={() => void submitReport(reason)}
+                      style={{ paddingVertical: 12 }}
+                    >
+                      <Text style={{
+                        color: colors.foreground, fontSize: 16,
+                      }}>{label}</Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </>
+            )}
+            {reportSubmitting && <ActivityIndicator />}
+            <Pressable
+              disabled={reportSubmitting}
+              onPress={() => setReportOpen(false)}
+              style={{ paddingTop: 16, alignItems: 'center' }}
+            >
+              <Text style={{ color: colors.primary, fontWeight: '600' }}>
+                {reportMessage ? 'Close' : 'Cancel'}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
       {/* Header */}
       <View style={[styles.header, { paddingTop: topPad, borderBottomColor: colors.border }]}>
         <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={8}>
@@ -182,6 +271,13 @@ export default function VideoScreen() {
             label="Share"
             active={false}
             onPress={handleShare}
+            colors={colors}
+          />
+          <ActionBtn
+            icon="flag"
+            label="Report"
+            active={false}
+            onPress={handleReport}
             colors={colors}
           />
         </View>
