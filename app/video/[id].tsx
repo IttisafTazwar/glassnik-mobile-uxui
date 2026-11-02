@@ -23,6 +23,7 @@ import { useEvent } from 'expo';
 import { useQuery } from '@tanstack/react-query';
 import { useColors } from '@/hooks/useColors';
 import { videoApi, reportApi } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
 import type { VideoAsset } from '@/types';
 
 export default function VideoScreen() {
@@ -30,6 +31,7 @@ export default function VideoScreen() {
   const insets = useSafeAreaInsets();
   const { id, data } = useLocalSearchParams<{ id?: string; data?: string }>();
 
+  const { user } = useAuth();
   const { isMuted } = useMute();
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -100,6 +102,10 @@ export default function VideoScreen() {
   }
 
   function handleReport() {
+    if (!user) {
+      router.push('/auth/login');
+      return;
+    }
     setReportMessage('');
     setReportOpen(true);
   }
