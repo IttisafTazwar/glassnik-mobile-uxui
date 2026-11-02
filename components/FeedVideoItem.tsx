@@ -452,23 +452,10 @@ export function FeedVideoItem({ video, isActive, isFirstVideo = false, shouldPre
   }
 
   function handleReport() {
-    Alert.alert(
-      'Report video',
-      'Why are you reporting this video?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Submit report',
-          style: 'destructive',
-          onPress: () => {
-            // NOTE: no report endpoint confirmed in lib/api.ts — this is a
-            // local acknowledgement only, not a real backend submission.
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-            Alert.alert('Thanks', 'Your report has been noted.');
-          },
-        },
-      ],
-    );
+    router.push({
+      pathname: '/video/[id]',
+      params: { id: String(video.id), data: JSON.stringify(video) },
+    });
   }
 
   async function handleFollow() {
